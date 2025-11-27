@@ -37,6 +37,7 @@ Create the same variables in your Vercel project settings. Mark public keys with
 - `supabase/schema.sql` provisions portfolio tables (`users`, `brokers`, `accounts`, `holdings`, `transactions`, `prices_cache`), row-level security policies, and derived views:
   - `holding_costs` calculates share count, net cost, and average cost per holding in the account currency.
   - `base_currency_positions` rolls those costs into each user's base currency (default `SGD`) using the latest FX rate from `prices_cache`.
+- The `brokers` seed includes SG-first platforms (MooMoo, Tiger Brokers, CMC Invest, IBKR, FSMOne, LongBridge, POEMS); extend this list by editing the insert block in `supabase/schema.sql`.
 - Apply the schema with the Supabase SQL editor or `psql` after creating your project.
 
 ## Quote Fetchers

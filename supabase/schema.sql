@@ -41,9 +41,12 @@ create policy "Service role can manage brokers" on public.brokers
 insert into public.brokers (slug, name)
 values
   ('moomoo', 'MooMoo'),
+  ('tiger-brokers', 'Tiger Brokers'),
   ('cmc-invest', 'CMC Invest'),
   ('poems', 'POEMS'),
-  ('ibkr', 'IBKR')
+  ('ibkr', 'IBKR'),
+  ('fsmone', 'FSMOne'),
+  ('longbridge', 'LongBridge')
 on conflict (slug) do nothing;
 
 create table if not exists public.accounts (

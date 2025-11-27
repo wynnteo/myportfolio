@@ -111,9 +111,9 @@ const brokerTemplates: BrokerTemplate[] = [
   },
   {
     id: "poems",
-    name: "POEMS / FSMOne / CMC / LongBridge",
+    name: "POEMS",
     defaultCurrency: "SGD",
-    description: "Generic SG broker export with mappable columns for POEMS, FSMOne, CMC Invest, or LongBridge.",
+    description: "Phillip POEMS export with trade type, units, and fee columns.",
     mapping: {
       ticker: "Security",
       type: "Type",
@@ -126,6 +126,60 @@ const brokerTemplates: BrokerTemplate[] = [
     },
     sample:
       "Security,Type,Units,Price,Fee,Date,CCY,FX\nD05,BUY,100,32.10,8.00,2024-06-12,SGD,1\n0700.DIF,BUY,50,390.00,15.00,2024-06-20,HKD,0.17",
+  },
+  {
+    id: "fsmone",
+    name: "FSMOne",
+    defaultCurrency: "SGD",
+    description: "FSMOne stock/ETF export with clear units and currency columns.",
+    mapping: {
+      ticker: "Security",
+      type: "Transaction Type",
+      quantity: "Units",
+      price: "Price",
+      fees: "Fee",
+      date: "Date",
+      currency: "CCY",
+      fxRate: "FX",
+    },
+    sample:
+      "Security,Transaction Type,Units,Price,Fee,Date,CCY,FX\nTSM,BUY,80,195.00,9.00,2024-08-02,USD,1.34\nSPY,SELL,10,500.00,5.00,2024-10-12,USD,1.32",
+  },
+  {
+    id: "cmc-invest",
+    name: "CMC Invest",
+    defaultCurrency: "SGD",
+    description: "CMC Invest trades with explicit CCY and FX multiplier fields.",
+    mapping: {
+      ticker: "Instrument",
+      type: "Side",
+      quantity: "Quantity",
+      price: "Price",
+      fees: "Commission",
+      date: "Trade Date",
+      currency: "CCY",
+      fxRate: "FX",
+    },
+    sample:
+      "Instrument,Side,Quantity,Price,Commission,Trade Date,CCY,FX\nAAPL,BUY,5,230.00,4.50,2024-09-14,USD,1.34\nHSBC,BUY,200,6.10,10.00,2024-11-03,HKD,0.17",
+  },
+  {
+    id: "longbridge",
+    name: "LongBridge",
+    defaultCurrency: "SGD",
+    description: "LongBridge contract note style export with per-trade FX markers.",
+    mapping: {
+      ticker: "Symbol",
+      type: "Side",
+      quantity: "Quantity",
+      price: "Price",
+      fees: "Fee",
+      date: "Trade Date",
+      currency: "CCY",
+      fxRate: "FX",
+    },
+    sample:
+      "Symbol,Side,Quantity,Price,Fee,Trade Date,CCY,FX\nBABA,BUY,30,89.10,3.50,2024-05-22,USD,1.35\n9988.HK,SELL,50,72.20,5.20,2024-07-11,HKD,0.17",
   },
 ];
 
@@ -784,7 +838,7 @@ export function TradingWorkspace() {
             <li>Auto-refresh FX for USD, SGD, and MYR via Yahoo Finance (RapidAPI) with manual override.</li>
             <li>Base totals shown in {BASE_CURRENCY} include commissions for apples-to-apples cost and P/L.</li>
             <li>Derived metrics roll up realized and unrealized P/L, average cost, and dividends YTD/by ticker.</li>
-            <li>CSV templates for SG-first brokers (MooMoo, Tiger, IBKR, POEMS/FSMOne/CMC/LongBridge) include mapping UI.</li>
+            <li>CSV templates for SG-first brokers (MooMoo, Tiger, IBKR, POEMS, FSMOne, CMC Invest, LongBridge) include mapping UI.</li>
           </ul>
         </div>
       </div>
