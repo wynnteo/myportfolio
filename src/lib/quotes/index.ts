@@ -2,7 +2,7 @@ import { fetchFinnhubQuoteBundle } from './finnhub';
 import { fetchYahooFinanceQuote } from './yahoo';
 import { DividendEntry, QuotePayload, QuoteResponse, QuoteFetcherOptions, QuoteSource } from './types';
 
-interface FetchQuoteOptions extends QuoteFetcherOptions {
+export interface FetchQuoteOptions extends QuoteFetcherOptions {
   manualDividends?: DividendEntry[];
   preferSource?: QuoteSource;
 }
@@ -54,8 +54,11 @@ async function tryFinnhub(symbol: string, options?: QuoteFetcherOptions): Promis
 
 export async function fetchQuote(symbol: string, options?: FetchQuoteOptions): Promise<QuoteResponse> {
   const errors: string[] = [];
+
   const orderedSources: QuoteSource[] = options?.preferSource
-    ? [options.preferSource, ...(options.preferSource === 'yahoo-finance' ? ['finnhub'] : ['yahoo-finance'])]
+    ? options.preferSource === 'yahoo-finance'
+      ? ['yahoo-finance', 'finnhub']
+      : [options.preferSource, 'yahoo-finance']
     : ['yahoo-finance', 'finnhub'];
 
   let payload: QuotePayload | null = null;
@@ -90,7 +93,6 @@ export async function fetchQuote(symbol: string, options?: FetchQuoteOptions): P
 
 export type {
   DividendEntry,
-  FetchQuoteOptions,
   QuotePayload,
   QuoteResponse,
   QuoteFetcherOptions,

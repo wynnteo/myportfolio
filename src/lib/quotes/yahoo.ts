@@ -125,17 +125,17 @@ async function fetchYahooDividendEvents(
     );
 
     const events = data.eventsData?.dividends ?? {};
-    return Object.values(events)
-      .map((entry) =>
-        entry.date && entry.amount
-          ? {
-              exDate: new Date(entry.date * 1000).toISOString().split('T')[0],
-              amount: entry.amount,
-              source: 'yahoo-finance',
-            }
-          : undefined,
-      )
-      .filter((value): value is DividendEntry => Boolean(value));
+    return Object.values(events).reduce<DividendEntry[]>((acc, entry) => {
+      if (entry.date && entry.amount) {
+        acc.push({
+          exDate: new Date(entry.date * 1000).toISOString().split('T')[0],
+          amount: entry.amount,
+          source: 'yahoo-finance',
+        });
+      }
+
+      return acc;
+    }, []);
   } catch {
     return [];
   }
