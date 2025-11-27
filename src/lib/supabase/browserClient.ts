@@ -8,6 +8,10 @@ import { Database } from './types';
 let client: ReturnType<typeof createClient<Database>> | null = null;
 
 export const getSupabaseBrowserClient = () => {
+  if (!env.NEXT_PUBLIC_SUPABASE_URL || !env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    throw new Error('Supabase public credentials are not configured.');
+  }
+
   if (!client) {
     client = createClient<Database>(
       env.NEXT_PUBLIC_SUPABASE_URL,
