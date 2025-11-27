@@ -1,11 +1,6 @@
 import { fetchFinnhubQuoteBundle } from './finnhub';
 import { fetchYahooFinanceQuote } from './yahoo';
-import { DividendEntry, QuotePayload, QuoteResponse, QuoteFetcherOptions, QuoteSource } from './types';
-
-interface FetchQuoteOptions extends QuoteFetcherOptions {
-  manualDividends?: DividendEntry[];
-  preferSource?: QuoteSource;
-}
+import { DividendEntry, QuotePayload, QuoteResponse, QuoteFetcherOptions, QuoteSource, FetchQuoteOptions } from './types';
 
 function mergeDividends(remote: DividendEntry[], manual?: DividendEntry[], fallbackCurrency?: string): DividendEntry[] {
   const normalizedManual = (manual ?? []).map((entry) => ({

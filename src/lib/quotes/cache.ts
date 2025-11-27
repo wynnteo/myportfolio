@@ -3,6 +3,8 @@ import { QuoteFetcherOptions } from './types';
 
 export const DEFAULT_REVALIDATE_SECONDS = quoteEnv.QUOTE_REVALIDATE_SECONDS ?? 900;
 
+type RequestInit = globalThis.RequestInit;
+
 interface CachedFetchOptions extends QuoteFetcherOptions {
   init?: RequestInit;
 }
