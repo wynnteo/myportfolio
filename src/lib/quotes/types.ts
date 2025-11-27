@@ -39,6 +39,11 @@ export interface QuoteFetcherOptions {
   revalidateSeconds?: number;
 }
 
+export interface FetchQuoteOptions extends QuoteFetcherOptions {
+  manualDividends?: DividendEntry[];
+  preferSource?: QuoteSource;
+}
+
 export interface QuoteResponse {
   payload?: QuotePayload;
   errors: string[];

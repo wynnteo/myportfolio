@@ -5,6 +5,8 @@ import { QuoteFetcherOptions } from './types';
 
 export const DEFAULT_REVALIDATE_SECONDS = quoteEnv.QUOTE_REVALIDATE_SECONDS ?? 900;
 
+type FetchRequestInit = Parameters<typeof fetch>[1];
+
 interface CachedFetchOptions extends QuoteFetcherOptions {
   init?: NextRequestInit;
 }
