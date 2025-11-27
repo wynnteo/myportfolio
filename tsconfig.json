@@ -17,7 +17,6 @@
     "baseUrl": "./",
     "paths": {
       "@/*": ["./src/*"],
-      "@supabase/supabase-js": ["./src/lib/supabase/supabase-js.ts"]
     },
     "plugins": [
       {
