@@ -721,7 +721,7 @@ export function TradingWorkspace() {
       const response = await fetch(`/api/fx?base=${BASE_CURRENCY}&quote=${currency}`);
       if (!response.ok) return;
       const payload = (await response.json()) as { rate?: number };
-      if (payload.rate) {
+      if (typeof payload.rate === "number") {
         setFxRates((prev) => ({ ...prev, [currency]: payload.rate }));
       }
     } finally {
