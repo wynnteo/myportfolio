@@ -722,7 +722,11 @@ export function TradingWorkspace() {
       if (!response.ok) return;
       const payload = (await response.json()) as { rate?: number };
       if (typeof payload.rate === "number") {
-        setFxRates((prev): Record<string, number> => ({ ...prev, [currency]: payload.rate }));
+        const rate = payload.rate;
+        setFxRates((prev) => {
+          const next: Record<string, number> = { ...prev, [currency]: rate };
+          return next;
+        });
       }
     } finally {
       setIsFetchingFx(false);
