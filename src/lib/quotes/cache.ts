@@ -1,3 +1,5 @@
+import type { RequestInit } from 'next/server';
+
 import { quoteEnv } from './env';
 import { QuoteFetcherOptions } from './types';
 
