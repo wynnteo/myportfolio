@@ -55,7 +55,7 @@ async function tryFinnhub(symbol: string, options?: QuoteFetcherOptions): Promis
 export async function fetchQuote(symbol: string, options?: FetchQuoteOptions): Promise<QuoteResponse> {
   const errors: string[] = [];
   const orderedSources: QuoteSource[] = options?.preferSource
-    ? [options.preferSource, ...(options.preferSource === 'yahoo-finance' ? ['finnhub'] : ['yahoo-finance'])]
+    ? [options.preferSource, options.preferSource === 'yahoo-finance' ? 'finnhub' : 'yahoo-finance']
     : ['yahoo-finance', 'finnhub'];
 
   let payload: QuotePayload | null = null;
