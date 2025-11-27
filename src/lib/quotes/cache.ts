@@ -1,4 +1,4 @@
-import type { RequestInit as NextRequestInit } from 'next/server';
+import type { RequestInit as NextRequestInit } from 'next/dist/server/web/spec-extension/request';
 
 import { quoteEnv } from './env';
 import { QuoteFetcherOptions } from './types';
