@@ -1,11 +1,6 @@
 import { fetchFinnhubQuoteBundle } from './finnhub';
 import { fetchYahooFinanceQuote } from './yahoo';
-import { DividendEntry, QuotePayload, QuoteResponse, QuoteFetcherOptions, QuoteSource } from './types';
-
-interface FetchQuoteOptions extends QuoteFetcherOptions {
-  manualDividends?: DividendEntry[];
-  preferSource?: QuoteSource;
-}
+import { DividendEntry, QuotePayload, QuoteResponse, QuoteFetcherOptions, QuoteSource, FetchQuoteOptions } from './types';
 
 function mergeDividends(remote: DividendEntry[], manual?: DividendEntry[], fallbackCurrency?: string): DividendEntry[] {
   const normalizedManual = (manual ?? []).map((entry) => ({
@@ -55,7 +50,7 @@ async function tryFinnhub(symbol: string, options?: QuoteFetcherOptions): Promis
 export async function fetchQuote(symbol: string, options?: FetchQuoteOptions): Promise<QuoteResponse> {
   const errors: string[] = [];
   const orderedSources: QuoteSource[] = options?.preferSource
-    ? [options.preferSource, ...(options.preferSource === 'yahoo-finance' ? ['finnhub'] : ['yahoo-finance'])]
+    ? [options.preferSource, options.preferSource === 'yahoo-finance' ? 'finnhub' : 'yahoo-finance']
     : ['yahoo-finance', 'finnhub'];
 
   let payload: QuotePayload | null = null;

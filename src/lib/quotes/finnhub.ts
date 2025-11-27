@@ -104,18 +104,17 @@ async function fetchFinnhubDividends(symbol: string, options?: QuoteFetcherOptio
     );
 
     return data
-      .map((entry) =>
-        entry.date && entry.amount
-          ? {
-              exDate: entry.date,
-              payDate: entry.paymentDate,
-              amount: entry.amount,
-              currency: entry.currency,
-              source: 'finnhub',
-            }
-          : undefined,
+      .filter(
+        (entry): entry is FinnhubDividendResponse & { date: string; amount: number } =>
+          typeof entry.date === 'string' && typeof entry.amount === 'number',
       )
-      .filter((value): value is DividendEntry => Boolean(value));
+      .map((entry) => ({
+        exDate: entry.date,
+        payDate: entry.paymentDate,
+        amount: entry.amount,
+        currency: entry.currency,
+        source: 'finnhub',
+      }));
   } catch {
     return [];
   }
