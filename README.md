@@ -5,10 +5,12 @@ A Next.js + TypeScript starter configured with Tailwind CSS, ESLint, absolute im
 ## Getting Started
 
 1. Copy `.env.local.example` to `.env.local` and fill in your keys.
-   - `NEXT_PUBLIC_YAHOO_FINANCE_RAPIDAPI_KEY`
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY`
+ - `NEXT_PUBLIC_YAHOO_FINANCE_RAPIDAPI_KEY`
+  - `FINNHUB_API_KEY` (optional fallback for quote/dividend lookups)
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+  - `QUOTE_REVALIDATE_SECONDS` (optional cache duration for quote fetches)
 2. Install dependencies and start the dev server:
 
 ```bash
@@ -28,6 +30,13 @@ Create the same variables in your Vercel project settings. Mark public keys with
 - `npm run lint` - Run ESLint
 - `npm run type-check` - Run TypeScript without emitting output
 - `npm run test` - Run Vitest (add tests under `__tests__` or alongside source files)
+
+## Quote Fetchers
+
+- `src/lib/quotes` provides normalized quote metadata, price snapshots, and dividend data.
+- Yahoo Finance via RapidAPI is used when `NEXT_PUBLIC_YAHOO_FINANCE_RAPIDAPI_KEY` is available; Finnhub (`FINNHUB_API_KEY`) acts as a fallback.
+- Dividends are merged from remote sources with any manual entries you provide to `fetchQuote`.
+- Caching uses Next.js incremental revalidation; override the default with `QUOTE_REVALIDATE_SECONDS` or per-call options.
 
 ## Absolute Imports
 
