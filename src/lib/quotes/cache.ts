@@ -3,10 +3,10 @@ import { QuoteFetcherOptions } from './types';
 
 export const DEFAULT_REVALIDATE_SECONDS = quoteEnv.QUOTE_REVALIDATE_SECONDS ?? 900;
 
-type RequestInit = globalThis.RequestInit;
+type FetchRequestInit = Parameters<typeof fetch>[1];
 
 interface CachedFetchOptions extends QuoteFetcherOptions {
-  init?: RequestInit;
+  init?: FetchRequestInit;
 }
 
 export async function cachedJsonFetch<T>(url: string, options: CachedFetchOptions = {}): Promise<T> {
