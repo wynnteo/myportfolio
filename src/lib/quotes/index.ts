@@ -1,6 +1,11 @@
 import { fetchFinnhubQuoteBundle } from './finnhub';
 import { fetchYahooFinanceQuote } from './yahoo';
-import { DividendEntry, QuotePayload, QuoteResponse, QuoteFetcherOptions, QuoteSource, FetchQuoteOptions } from './types';
+import { DividendEntry, QuotePayload, QuoteResponse, QuoteFetcherOptions, QuoteSource } from './types';
+
+export interface FetchQuoteOptions extends QuoteFetcherOptions {
+  manualDividends?: DividendEntry[];
+  preferSource?: QuoteSource;
+}
 
 function mergeDividends(remote: DividendEntry[], manual?: DividendEntry[], fallbackCurrency?: string): DividendEntry[] {
   const normalizedManual = (manual ?? []).map((entry) => ({
@@ -49,8 +54,11 @@ async function tryFinnhub(symbol: string, options?: QuoteFetcherOptions): Promis
 
 export async function fetchQuote(symbol: string, options?: FetchQuoteOptions): Promise<QuoteResponse> {
   const errors: string[] = [];
+
   const orderedSources: QuoteSource[] = options?.preferSource
-    ? [options.preferSource, options.preferSource === 'yahoo-finance' ? 'finnhub' : 'yahoo-finance']
+    ? options.preferSource === 'yahoo-finance'
+      ? ['yahoo-finance', 'finnhub']
+      : [options.preferSource, 'yahoo-finance']
     : ['yahoo-finance', 'finnhub'];
 
   let payload: QuotePayload | null = null;
@@ -85,7 +93,6 @@ export async function fetchQuote(symbol: string, options?: FetchQuoteOptions): P
 
 export type {
   DividendEntry,
-  FetchQuoteOptions,
   QuotePayload,
   QuoteResponse,
   QuoteFetcherOptions,
