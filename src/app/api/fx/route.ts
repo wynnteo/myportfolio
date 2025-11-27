@@ -17,6 +17,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ rate: 1 });
   }
 
+  if (!env.NEXT_PUBLIC_YAHOO_FINANCE_RAPIDAPI_KEY) {
+    console.warn("FX lookup requested but RapidAPI key is missing.");
+    return NextResponse.json({ error: "FX provider not configured" }, { status: 500 });
+  }
+
   try {
     const response = await fetch(
       `https://apidojo-yahoo-finance-v1.p.rapidapi.com/market/v3/get-quotes?region=US&symbols=${base}${quote}=X`,
