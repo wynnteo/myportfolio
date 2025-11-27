@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { z } from "zod";
 
 export type TradeType = "buy" | "sell" | "dividend";
@@ -51,71 +51,81 @@ interface MetricsSummary {
   }[];
 }
 
-const BASE_CURRENCY = "USD";
-
-const fxRateLookup: Record<string, number> = {
-  USD: 1,
-  CAD: 0.74,
-  EUR: 1.08,
-  GBP: 1.22,
-  JPY: 0.0067,
-};
-
-const brokers = ["Evergreen", "Summit Markets", "Northline", "Riverstone", "Atlas"];
+const BASE_CURRENCY = "SGD";
+const SUPPORTED_CURRENCIES = ["SGD", "USD", "MYR"];
 
 const brokerTemplates: BrokerTemplate[] = [
   {
-    id: "evergreen",
-    name: "Evergreen Standard Export",
-    defaultCurrency: "USD",
-    description: "Standard CSV from Evergreen with explicit FX and commission columns.",
+    id: "moomoo",
+    name: "MooMoo SG",
+    defaultCurrency: "SGD",
+    description: "CSV export from MooMoo with contract FX hints and commission columns.",
     mapping: {
       ticker: "Symbol",
-      type: "Action",
-      quantity: "Quantity",
+      type: "Side",
+      quantity: "Qty",
       price: "Price",
       fees: "Commission",
       date: "Trade Date",
       currency: "Currency",
-      fxRate: "FX Applied",
+      fxRate: "FX Rate",
     },
-    sample: "Symbol,Action,Quantity,Price,Commission,Trade Date,Currency,FX Applied\nAAPL,BUY,12,189.40,4.95,2024-03-12,USD,1\nSHOP.TO,BUY,30,95.10,7.00,2024-05-01,CAD,0.74",
+    sample:
+      "Symbol,Side,Qty,Price,Commission,Trade Date,Currency,FX Rate\nAAPL,BUY,12,189.40,4.95,2024-03-12,USD,1.35\nTSLA,SELL,5,249.10,4.95,2024-05-01,USD,1.34",
   },
   {
-    id: "northline",
-    name: "Northline Flexible",
-    defaultCurrency: "CAD",
-    description: "Flexible CSV that mixes buys, sells, and dividends in a single export.",
+    id: "tiger",
+    name: "Tiger Brokers",
+    defaultCurrency: "USD",
+    description: "Tiger Brokers trade export with base currency and FX multiplier.",
     mapping: {
       ticker: "Ticker",
-      type: "Side",
-      quantity: "Qty",
+      type: "Action",
+      quantity: "Quantity",
       price: "Fill Price",
       fees: "Fees",
-      date: "Timestamp",
-      currency: "CCY",
-      fxRate: "FX Hint",
+      date: "Trade Time",
+      currency: "Currency",
+      fxRate: "FX",
     },
     sample:
-      "Ticker,Side,Qty,Fill Price,Fees,Timestamp,CCY,FX Hint\nTD,SELL,20,83.50,9.99,2024-07-20,CAD,0.74\nBCE,DIVIDEND,40,0.92,0,2024-09-15,CAD,0.74",
+      "Ticker,Action,Quantity,Fill Price,Fees,Trade Time,Currency,FX\nNVDA,BUY,4,950.00,3.00,2024-07-20,USD,1.34\nBABA,DIVIDEND,10,0.21,0,2024-09-15,HKD,0.17",
   },
   {
-    id: "atlas",
-    name: "Atlas Global",
-    defaultCurrency: "EUR",
-    description: "Atlas export with explicit gross amount and costs separated for international accounts.",
+    id: "ibkr",
+    name: "IBKR",
+    defaultCurrency: "USD",
+    description: "Interactive Brokers flex query with CCY and FX rate columns.",
     mapping: {
-      ticker: "ISIN/Symbol",
+      ticker: "Symbol",
       type: "Transaction Type",
-      quantity: "Units",
-      price: "Gross Amount",
-      fees: "Charges",
-      date: "Value Date",
-      currency: "Local CCY",
-      fxRate: "FX Used",
+      quantity: "Quantity",
+      price: "Trade Price",
+      fees: "Commissions",
+      date: "Trade Date",
+      currency: "Currency",
+      fxRate: "FX Rate to Base",
     },
     sample:
-      "ISIN/Symbol,Transaction Type,Units,Gross Amount,Charges,Value Date,Local CCY,FX Used\nSAP,BUY,8,156.10,3.50,2024-02-10,EUR,1.08\nNESN,BUY,15,108.45,4.20,2024-04-02,CHF,1.11",
+      "Symbol,Transaction Type,Quantity,Trade Price,Commissions,Trade Date,Currency,FX Rate to Base\nMSFT,BUY,6,320.12,2.10,2024-02-10,USD,1.33\nUOB,BUY,120,28.45,10.00,2024-04-02,SGD,1",
+  },
+  {
+    id: "poems",
+    name: "POEMS / FSMOne / CMC / LongBridge",
+    defaultCurrency: "SGD",
+    description: "Generic SG broker export with mappable columns for POEMS, FSMOne, CMC Invest, or LongBridge.",
+    mapping: {
+      ticker: "Security",
+      type: "Type",
+      quantity: "Units",
+      price: "Price",
+      fees: "Fee",
+      date: "Date",
+      currency: "CCY",
+      fxRate: "FX",
+    },
+    sample:
+      "Security,Type,Units,Price,Fee,Date,CCY,FX\nD05,BUY,100,32.10,8.00,2024-06-12,SGD,1\n0700.DIF,BUY,50,390.00,15.00,2024-06-20,HKD,0.17",
   },
 ];
 
@@ -130,67 +140,20 @@ const tradeSchema = z.object({
   fees: z.coerce.number().min(0, "Fees cannot be negative"),
   date: z.string().min(1, "Trade date is required"),
   broker: z.string().min(1, "Broker is required"),
-  currency: z.string().min(1, "Currency is required"),
+  currency: z
+    .string()
+    .min(1, "Currency is required")
+    .refine((value) => SUPPORTED_CURRENCIES.includes(value), "Currency not supported"),
   fxRate: z.coerce.number().positive().optional(),
   notes: z.string().optional(),
 });
-
-const seedTrades: TradeEntry[] = [
-  {
-    id: "seed-1",
-    type: "buy",
-    ticker: "AAPL",
-    quantity: 15,
-    price: 188.4,
-    fees: 4.95,
-    date: "2024-05-01",
-    broker: "Evergreen",
-    currency: "USD",
-  },
-  {
-    id: "seed-2",
-    type: "buy",
-    ticker: "SHOP",
-    quantity: 25,
-    price: 93.1,
-    fees: 7,
-    date: "2024-05-10",
-    broker: "Northline",
-    currency: "CAD",
-    fxRate: 0.74,
-  },
-  {
-    id: "seed-3",
-    type: "sell",
-    ticker: "AAPL",
-    quantity: 5,
-    price: 196,
-    fees: 4.95,
-    date: "2024-09-02",
-    broker: "Evergreen",
-    currency: "USD",
-  },
-  {
-    id: "seed-4",
-    type: "dividend",
-    ticker: "TD",
-    quantity: 20,
-    price: 0.96,
-    fees: 0,
-    date: "2024-08-15",
-    broker: "Northline",
-    currency: "CAD",
-    fxRate: 0.74,
-  },
-];
-
-function getFxRate(currency: string, provided?: number) {
+function getFxRate(currency: string, fxRates: Record<string, number>, provided?: number) {
   if (currency === BASE_CURRENCY) return 1;
   if (provided) return provided;
-  return fxRateLookup[currency] ?? 1;
+  return fxRates[currency] ?? 1;
 }
 
-function deriveMetrics(trades: TradeEntry[]): MetricsSummary {
+function deriveMetrics(trades: TradeEntry[], fxRates: Record<string, number>): MetricsSummary {
   const holdings = new Map<string, { quantity: number; costBasis: number; latestPriceBase: number }>();
   const realized = new Map<string, number>();
   const dividendsByTicker = new Map<string, number>();
@@ -199,7 +162,7 @@ function deriveMetrics(trades: TradeEntry[]): MetricsSummary {
   const currentYear = new Date().getFullYear();
 
   trades.forEach((trade) => {
-    const fx = getFxRate(trade.currency, trade.fxRate);
+    const fx = getFxRate(trade.currency, fxRates, trade.fxRate);
     const gross = trade.price * trade.quantity;
     const feesBase = trade.fees * fx;
     totalFees += feesBase;
@@ -264,10 +227,15 @@ function formatCurrency(amount: number) {
 type TradeEntryFormProps = {
   onAddTrade: (trade: TradeEntry) => void;
   defaultFxRate: (currency: string) => number;
+  onRefreshFx?: (currency: string) => Promise<void>;
+  brokers: string[];
+  baseCurrency: string;
+  supportedCurrencies: string[];
+  isFetchingFx: boolean;
 };
 /* eslint-enable no-unused-vars */
 
-function TradeEntryForm({ onAddTrade, defaultFxRate }: TradeEntryFormProps) {
+function TradeEntryForm({ onAddTrade, defaultFxRate, onRefreshFx, brokers, baseCurrency, supportedCurrencies, isFetchingFx }: TradeEntryFormProps) {
   const [formData, setFormData] = useState({
     type: "buy" as TradeType,
     ticker: "",
@@ -275,18 +243,25 @@ function TradeEntryForm({ onAddTrade, defaultFxRate }: TradeEntryFormProps) {
     price: "",
     fees: "0",
     date: new Date().toISOString().slice(0, 10),
-    broker: brokers[0],
-    currency: BASE_CURRENCY,
-    fxRate: "1",
+    broker: brokers[0] ?? "",
+    currency: baseCurrency,
+    fxRate: defaultFxRate(baseCurrency).toString(),
     notes: "",
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    if (!formData.broker && brokers[0]) {
+      setFormData((prev) => ({ ...prev, broker: brokers[0] }));
+    }
+  }, [brokers, formData.broker]);
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
     if (field === "currency") {
       const suggestedFx = defaultFxRate(value);
       setFormData((prev) => ({ ...prev, currency: value, fxRate: suggestedFx.toString() }));
+      if (onRefreshFx) onRefreshFx(value).catch(() => undefined);
     }
   };
 
@@ -352,7 +327,9 @@ function TradeEntryForm({ onAddTrade, defaultFxRate }: TradeEntryFormProps) {
             value={formData.broker}
             onChange={(event) => handleChange("broker", event.target.value)}
             className="w-full rounded-md border border-slate-200 px-3 py-2 focus:border-primary-500 focus:outline-none"
+            disabled={brokers.length === 0}
           >
+            {brokers.length === 0 && <option value="">Loading brokers…</option>}
             {brokers.map((broker) => (
               <option key={broker} value={broker}>
                 {broker}
@@ -444,7 +421,7 @@ function TradeEntryForm({ onAddTrade, defaultFxRate }: TradeEntryFormProps) {
             onChange={(event) => handleChange("currency", event.target.value)}
             className="w-full rounded-md border border-slate-200 px-3 py-2 focus:border-primary-500 focus:outline-none"
           >
-            {Object.keys(fxRateLookup).map((currency) => (
+            {supportedCurrencies.map((currency) => (
               <option key={currency} value={currency}>
                 {currency}
               </option>
@@ -453,7 +430,10 @@ function TradeEntryForm({ onAddTrade, defaultFxRate }: TradeEntryFormProps) {
           {errors.currency && <p className="text-sm text-red-600">{errors.currency}</p>}
         </div>
         <div className="space-y-2">
-          <label className="text-sm font-medium text-slate-700">FX rate</label>
+          <div className="flex items-center justify-between text-sm font-medium text-slate-700">
+            <label>FX rate</label>
+            {isFetchingFx && <span className="text-xs font-semibold uppercase text-primary-600">Refreshing…</span>}
+          </div>
           <input
             type="number"
             min={0}
@@ -666,7 +646,7 @@ function CsvTemplatePanel() {
   );
 }
 
-function TradeLedger({ trades }: { trades: TradeEntry[] }) {
+function TradeLedger({ trades, fxRates }: { trades: TradeEntry[]; fxRates: Record<string, number> }) {
   return (
     <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <div className="flex items-center justify-between">
@@ -704,7 +684,7 @@ function TradeLedger({ trades }: { trades: TradeEntry[] }) {
                 <td className="px-3 py-2 text-slate-700">{trade.fees.toFixed(2)}</td>
                 <td className="px-3 py-2 text-slate-700">{trade.broker}</td>
                 <td className="px-3 py-2 text-slate-700">{trade.currency}</td>
-                <td className="px-3 py-2 text-slate-700">{getFxRate(trade.currency, trade.fxRate).toFixed(4)}</td>
+                <td className="px-3 py-2 text-slate-700">{getFxRate(trade.currency, fxRates, trade.fxRate).toFixed(4)}</td>
               </tr>
             ))}
           </tbody>
@@ -715,14 +695,53 @@ function TradeLedger({ trades }: { trades: TradeEntry[] }) {
 }
 
 export function TradingWorkspace() {
-  const [trades, setTrades] = useState<TradeEntry[]>(seedTrades);
-  const metrics = useMemo(() => deriveMetrics(trades), [trades]);
+  const [trades, setTrades] = useState<TradeEntry[]>([]);
+  const [brokers, setBrokers] = useState<string[]>([]);
+  const [fxRates, setFxRates] = useState<Record<string, number>>({ [BASE_CURRENCY]: 1 });
+  const [isFetchingFx, setIsFetchingFx] = useState(false);
+
+  useEffect(() => {
+    const loadBrokers = async () => {
+      const response = await fetch("/api/brokers");
+      if (!response.ok) {
+        setBrokers(brokerTemplates.map((template) => template.name));
+        return;
+      }
+      const payload = (await response.json()) as { name: string }[];
+      const names = payload.map((item) => item.name);
+      setBrokers(names.length ? names : brokerTemplates.map((template) => template.name));
+    };
+    loadBrokers().catch(() => undefined);
+  }, []);
+
+  const refreshFxRate = useCallback(async (currency: string) => {
+    if (currency === BASE_CURRENCY) return;
+    setIsFetchingFx(true);
+    try {
+      const response = await fetch(`/api/fx?base=${BASE_CURRENCY}&quote=${currency}`);
+      if (!response.ok) return;
+      const payload = (await response.json()) as { rate?: number };
+      if (payload.rate) {
+        setFxRates((prev) => ({ ...prev, [currency]: payload.rate }));
+      }
+    } finally {
+      setIsFetchingFx(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    SUPPORTED_CURRENCIES.filter((currency) => currency !== BASE_CURRENCY).forEach((currency) => {
+      refreshFxRate(currency).catch(() => undefined);
+    });
+  }, [refreshFxRate]);
+
+  const metrics = useMemo(() => deriveMetrics(trades, fxRates), [trades, fxRates]);
 
   const handleAddTrade = (trade: TradeEntry) => {
     setTrades((prev) => [...prev, trade]);
   };
 
-  const defaultFxRate = (currency: string) => getFxRate(currency);
+  const defaultFxRate = useCallback((currency: string) => getFxRate(currency, fxRates), [fxRates]);
 
   return (
     <div className="space-y-8">
@@ -736,7 +755,15 @@ export function TradingWorkspace() {
             </div>
             <span className="rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary-700">Validated</span>
           </div>
-          <TradeEntryForm onAddTrade={handleAddTrade} defaultFxRate={defaultFxRate} />
+          <TradeEntryForm
+            onAddTrade={handleAddTrade}
+            defaultFxRate={defaultFxRate}
+            onRefreshFx={refreshFxRate}
+            brokers={brokers}
+            baseCurrency={BASE_CURRENCY}
+            supportedCurrencies={SUPPORTED_CURRENCIES}
+            isFetchingFx={isFetchingFx}
+          />
         </div>
         <MetricsPanel metrics={metrics} />
       </div>
@@ -745,15 +772,15 @@ export function TradingWorkspace() {
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <TradeLedger trades={trades} />
+          <TradeLedger trades={trades} fxRates={fxRates} />
         </div>
         <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide">Multi-currency control</p>
           <ul className="list-disc space-y-2 pl-4">
-            <li>Auto-apply FX rates for CAD, EUR, GBP, and JPY—override any value to lock fills.</li>
+            <li>Auto-refresh FX for USD, SGD, and MYR via Yahoo Finance (RapidAPI) with manual override.</li>
             <li>Base totals shown in {BASE_CURRENCY} include commissions for apples-to-apples cost and P/L.</li>
             <li>Derived metrics roll up realized and unrealized P/L, average cost, and dividends YTD/by ticker.</li>
-            <li>CSV templates per broker include sample files and a mapping UI to align columns before importing.</li>
+            <li>CSV templates for SG-first brokers (MooMoo, Tiger, IBKR, POEMS/FSMOne/CMC/LongBridge) include mapping UI.</li>
           </ul>
         </div>
       </div>
