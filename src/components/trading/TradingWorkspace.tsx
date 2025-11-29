@@ -1,6 +1,21 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { z } from "zod";
 
 export type TradeType = "buy" | "sell" | "dividend";
@@ -28,6 +43,20 @@ interface BrokerTemplate {
   sample: string;
 }
 
+interface HoldingDetail {
+  ticker: string;
+  quantity: number;
+  averageCost: number;
+  lastPrice: number;
+  marketValueBase: number;
+  pl: number;
+  fxRate: number;
+  currency: string;
+  sector?: string;
+  region?: string;
+  dividendYield: number;
+}
+
 interface MetricsSummary {
   totalFees: number;
   averageCosts: {
@@ -49,10 +78,21 @@ interface MetricsSummary {
     ticker: string;
     value: number;
   }[];
+  holdings: HoldingDetail[];
 }
 
 const BASE_CURRENCY = "SGD";
-const SUPPORTED_CURRENCIES = ["SGD", "USD", "MYR"];
+const SUPPORTED_CURRENCIES = ["SGD", "USD", "MYR", "HKD"];
+
+const instrumentMeta: Record<string, { sector: string; region: string }> = {
+  AAPL: { sector: "Technology", region: "US" },
+  TSLA: { sector: "Consumer Discretionary", region: "US" },
+  NVDA: { sector: "Technology", region: "US" },
+  BABA: { sector: "Consumer Discretionary", region: "CN" },
+  UOB: { sector: "Financials", region: "SG" },
+  D05: { sector: "Financials", region: "SG" },
+  "0700.DIF": { sector: "Communication Services", region: "CN" },
+};
 
 const brokerTemplates: BrokerTemplate[] = [
   {
@@ -183,6 +223,105 @@ const brokerTemplates: BrokerTemplate[] = [
   },
 ];
 
+const seedTrades: TradeEntry[] = [
+  {
+    id: "seed-aapl-buy",
+    type: "buy",
+    ticker: "AAPL",
+    quantity: 20,
+    price: 189.4,
+    fees: 4.95,
+    date: "2024-03-12",
+    broker: "MooMoo SG",
+    currency: "USD",
+    fxRate: 1.35,
+  },
+  {
+    id: "seed-aapl-div",
+    type: "dividend",
+    ticker: "AAPL",
+    quantity: 20,
+    price: 0.24,
+    fees: 0,
+    date: "2024-06-11",
+    broker: "MooMoo SG",
+    currency: "USD",
+    fxRate: 1.34,
+  },
+  {
+    id: "seed-tsla-sell",
+    type: "sell",
+    ticker: "TSLA",
+    quantity: 5,
+    price: 249.1,
+    fees: 4.95,
+    date: "2024-05-01",
+    broker: "MooMoo SG",
+    currency: "USD",
+    fxRate: 1.34,
+  },
+  {
+    id: "seed-nvda-buy",
+    type: "buy",
+    ticker: "NVDA",
+    quantity: 4,
+    price: 950.0,
+    fees: 3,
+    date: "2024-07-20",
+    broker: "Tiger Brokers",
+    currency: "USD",
+    fxRate: 1.34,
+  },
+  {
+    id: "seed-baba-div",
+    type: "dividend",
+    ticker: "BABA",
+    quantity: 10,
+    price: 0.21,
+    fees: 0,
+    date: "2024-09-15",
+    broker: "Tiger Brokers",
+    currency: "HKD",
+    fxRate: 0.17,
+  },
+  {
+    id: "seed-uob-buy",
+    type: "buy",
+    ticker: "UOB",
+    quantity: 120,
+    price: 28.45,
+    fees: 10,
+    date: "2024-04-02",
+    broker: "IBKR",
+    currency: "SGD",
+    fxRate: 1,
+  },
+  {
+    id: "seed-d05-buy",
+    type: "buy",
+    ticker: "D05",
+    quantity: 100,
+    price: 32.1,
+    fees: 8,
+    date: "2024-06-12",
+    broker: "POEMS / FSMOne / CMC / LongBridge",
+    currency: "SGD",
+    fxRate: 1,
+  },
+  {
+    id: "seed-tencent-buy",
+    type: "buy",
+    ticker: "0700.DIF",
+    quantity: 50,
+    price: 390,
+    fees: 15,
+    date: "2024-06-20",
+    broker: "POEMS / FSMOne / CMC / LongBridge",
+    currency: "HKD",
+    fxRate: 0.17,
+  },
+];
+
 const tradeSchema = z.object({
   type: z.enum(["buy", "sell", "dividend"]),
   ticker: z
@@ -201,6 +340,7 @@ const tradeSchema = z.object({
   fxRate: z.coerce.number().positive().optional(),
   notes: z.string().optional(),
 });
+
 function getFxRate(currency: string, fxRates: Record<string, number>, provided?: number) {
   if (currency === BASE_CURRENCY) return 1;
   if (provided) return provided;
@@ -208,7 +348,10 @@ function getFxRate(currency: string, fxRates: Record<string, number>, provided?:
 }
 
 function deriveMetrics(trades: TradeEntry[], fxRates: Record<string, number>): MetricsSummary {
-  const holdings = new Map<string, { quantity: number; costBasis: number; latestPriceBase: number }>();
+  const holdings = new Map<
+    string,
+    { quantity: number; costBasis: number; latestPrice: number; currency: string; fx: number; latestDate: string }
+  >();
   const realized = new Map<string, number>();
   const dividendsByTicker = new Map<string, number>();
   let dividendsYtd = 0;
@@ -223,21 +366,47 @@ function deriveMetrics(trades: TradeEntry[], fxRates: Record<string, number>): M
 
     if (trade.type === "buy") {
       const costBase = (gross + trade.fees) * fx;
-      const current = holdings.get(trade.ticker) ?? { quantity: 0, costBasis: 0, latestPriceBase: trade.price * fx };
+      const current =
+        holdings.get(trade.ticker) ?? {
+          quantity: 0,
+          costBasis: 0,
+          latestPrice: trade.price,
+          currency: trade.currency,
+          fx,
+          latestDate: trade.date,
+        };
       const quantity = current.quantity + trade.quantity;
       const costBasis = current.costBasis + costBase;
-      holdings.set(trade.ticker, { quantity, costBasis, latestPriceBase: trade.price * fx });
+      holdings.set(trade.ticker, {
+        quantity,
+        costBasis,
+        latestPrice: trade.price,
+        currency: trade.currency,
+        fx,
+        latestDate: trade.date,
+      });
     }
 
     if (trade.type === "sell") {
       const proceedsBase = (gross - trade.fees) * fx;
-      const current = holdings.get(trade.ticker) ?? { quantity: 0, costBasis: 0, latestPriceBase: trade.price * fx };
+      const current =
+        holdings.get(trade.ticker) ?? {
+          quantity: 0,
+          costBasis: 0,
+          latestPrice: trade.price,
+          currency: trade.currency,
+          fx,
+          latestDate: trade.date,
+        };
       const averageCost = current.quantity ? current.costBasis / current.quantity : 0;
       const realizedValue = proceedsBase - averageCost * trade.quantity;
       holdings.set(trade.ticker, {
         quantity: Math.max(current.quantity - trade.quantity, 0),
         costBasis: Math.max(current.costBasis - averageCost * trade.quantity, 0),
-        latestPriceBase: trade.price * fx,
+        latestPrice: trade.price,
+        currency: trade.currency,
+        fx,
+        latestDate: trade.date,
       });
       realized.set(trade.ticker, (realized.get(trade.ticker) ?? 0) + realizedValue);
     }
@@ -263,18 +432,52 @@ function deriveMetrics(trades: TradeEntry[], fxRates: Record<string, number>): M
     .filter(([, holding]) => holding.quantity > 0)
     .map(([ticker, holding]) => ({
       ticker,
-      marketValue: holding.quantity * holding.latestPriceBase,
-      value: holding.quantity * holding.latestPriceBase - holding.costBasis,
+      marketValue: holding.quantity * holding.latestPrice * holding.fx,
+      value: holding.quantity * holding.latestPrice * holding.fx - holding.costBasis,
     }));
 
   const dividendsByTickerList = Array.from(dividendsByTicker.entries()).map(([ticker, value]) => ({ ticker, value }));
   const realizedList = Array.from(realized.entries()).map(([ticker, value]) => ({ ticker, value }));
 
-  return { totalFees, averageCosts, realized: realizedList, unrealized, dividendsYtd, dividendsByTicker: dividendsByTickerList };
+  const holdingsDetails: HoldingDetail[] = Array.from(holdings.entries())
+    .filter(([, holding]) => holding.quantity > 0)
+    .map(([ticker, holding]) => {
+      const marketValueBase = holding.quantity * holding.latestPrice * holding.fx;
+      const dividends = dividendsByTicker.get(ticker) ?? 0;
+      const dividendYield = marketValueBase > 0 ? (dividends / marketValueBase) * 100 : 0;
+      return {
+        ticker,
+        quantity: holding.quantity,
+        averageCost: holding.costBasis / holding.quantity,
+        lastPrice: holding.latestPrice,
+        marketValueBase,
+        pl: marketValueBase - holding.costBasis,
+        fxRate: holding.fx,
+        currency: holding.currency,
+        sector: instrumentMeta[ticker]?.sector,
+        region: instrumentMeta[ticker]?.region,
+        dividendYield,
+      };
+    });
+
+  return {
+    totalFees,
+    averageCosts,
+    realized: realizedList,
+    unrealized,
+    dividendsYtd,
+    dividendsByTicker: dividendsByTickerList,
+    holdings: holdingsDetails,
+  };
 }
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: BASE_CURRENCY }).format(amount);
+}
+
+function formatPercent(value: number) {
+  const formatter = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return `${formatter.format(value)}%`;
 }
 
 /* eslint-disable no-unused-vars */
@@ -520,6 +723,198 @@ function TradeEntryForm({ onAddTrade, defaultFxRate, onRefreshFx, brokers, baseC
   );
 }
 
+function DashboardCards({
+  totalValue,
+  cashBalance,
+  dayChange,
+  dayChangePct,
+  metrics,
+}: {
+  totalValue: number;
+  cashBalance: number;
+  dayChange: number;
+  dayChangePct: number;
+  metrics: MetricsSummary;
+}) {
+  const cardItems = [
+    { label: "Total value", value: formatCurrency(totalValue) },
+    { label: "Cash", value: formatCurrency(cashBalance) },
+    {
+      label: "Day change",
+      value: `${formatCurrency(dayChange)} (${formatPercent(dayChangePct)})`,
+    },
+    {
+      label: "Unrealized P/L",
+      value: formatCurrency(metrics.unrealized.reduce((total, row) => total + row.value, 0)),
+    },
+    { label: "Realized P/L", value: formatCurrency(metrics.realized.reduce((total, row) => total + row.value, 0)) },
+    { label: "Dividend YTD", value: formatCurrency(metrics.dividendsYtd) },
+  ];
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {cardItems.map((item) => (
+        <div key={item.label} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-semibold uppercase text-primary-600">{item.label}</p>
+          <p className="text-2xl font-semibold text-slate-900">{item.value}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function AnalyticsCharts({
+  equityCurve,
+  allocationBySector,
+  allocationByRegion,
+  allocationByCurrency,
+  topContributors,
+  dividendTimeline,
+}: {
+  equityCurve: { date: string; value: number }[];
+  allocationBySector: { name: string; value: number }[];
+  allocationByRegion: { name: string; value: number }[];
+  allocationByCurrency: { name: string; value: number }[];
+  topContributors: { name: string; value: number }[];
+  dividendTimeline: { month: string; value: number }[];
+}) {
+  const palette = ["#2563eb", "#f97316", "#16a34a", "#dc2626", "#0891b2", "#8b5cf6"];
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-3">
+      <div className="lg:col-span-2 space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase text-primary-600">Curve</p>
+            <h3 className="text-xl font-semibold text-slate-900">Equity over time</h3>
+          </div>
+          <span className="text-xs text-slate-500">{equityCurve.length} points</span>
+        </div>
+        <div className="h-64">
+          <ResponsiveContainer>
+            <AreaChart data={equityCurve} margin={{ left: 0, right: 0, top: 10, bottom: 0 }}>
+              <defs>
+                <linearGradient id="equityGradient" x1="0" x2="0" y1="0" y2="1">
+                  <stop offset="5%" stopColor="#2563eb" stopOpacity={0.4} />
+                  <stop offset="95%" stopColor="#2563eb" stopOpacity={0.05} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="date" tickLine={false} stroke="#94a3b8" />
+              <YAxis tickLine={false} stroke="#94a3b8" tickFormatter={(value) => `${value / 1000}k`} />
+              <Tooltip formatter={(value: number) => formatCurrency(value)} />
+              <Area type="monotone" dataKey="value" stroke="#2563eb" fill="url(#equityGradient)" strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs font-semibold uppercase text-primary-600">Share</p>
+            <h3 className="text-xl font-semibold text-slate-900">Allocation by sector</h3>
+          </div>
+          <span className="text-xs text-slate-500">{allocationBySector.length} slices</span>
+        </div>
+        <div className="h-64">
+          <ResponsiveContainer>
+            <PieChart>
+              <Pie data={allocationBySector} dataKey="value" nameKey="name" innerRadius={50} outerRadius={80} paddingAngle={2}>
+                {allocationBySector.map((entry, index) => (
+                  <Cell key={entry.name} fill={palette[index % palette.length]} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value: number) => formatCurrency(value)} />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between pb-3">
+          <div>
+            <p className="text-xs font-semibold uppercase text-primary-600">Breakdown</p>
+            <h3 className="text-xl font-semibold text-slate-900">Allocation by region</h3>
+          </div>
+        </div>
+        <div className="h-52">
+          <ResponsiveContainer>
+            <BarChart data={allocationByRegion} layout="vertical" margin={{ left: 30 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis type="number" tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} stroke="#94a3b8" />
+              <YAxis dataKey="name" type="category" stroke="#94a3b8" />
+              <Tooltip formatter={(value: number) => formatCurrency(value)} />
+              <Bar dataKey="value" fill="#16a34a" radius={4} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between pb-3">
+          <div>
+            <p className="text-xs font-semibold uppercase text-primary-600">Currency</p>
+            <h3 className="text-xl font-semibold text-slate-900">Allocation by currency</h3>
+          </div>
+        </div>
+        <div className="h-52">
+          <ResponsiveContainer>
+            <BarChart data={allocationByCurrency} margin={{ bottom: 10 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="name" stroke="#94a3b8" />
+              <YAxis tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} stroke="#94a3b8" />
+              <Tooltip formatter={(value: number) => formatCurrency(value)} />
+              <Bar dataKey="value" fill="#f97316" radius={4} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between pb-3">
+          <div>
+            <p className="text-xs font-semibold uppercase text-primary-600">Leaders</p>
+            <h3 className="text-xl font-semibold text-slate-900">Top contributors</h3>
+          </div>
+        </div>
+        <div className="h-52">
+          <ResponsiveContainer>
+            <BarChart data={topContributors} layout="vertical" margin={{ left: 40 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis type="number" tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} stroke="#94a3b8" />
+              <YAxis dataKey="name" type="category" stroke="#94a3b8" />
+              <Tooltip formatter={(value: number) => formatCurrency(value)} />
+              <Bar dataKey="value" fill="#2563eb" radius={4} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between pb-3">
+          <div>
+            <p className="text-xs font-semibold uppercase text-primary-600">Income</p>
+            <h3 className="text-xl font-semibold text-slate-900">Dividends timeline</h3>
+          </div>
+        </div>
+        <div className="h-52">
+          <ResponsiveContainer>
+            <AreaChart data={dividendTimeline} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+              <XAxis dataKey="month" stroke="#94a3b8" />
+              <YAxis tickFormatter={(value) => `${value.toFixed(0)}`} stroke="#94a3b8" />
+              <Tooltip formatter={(value: number) => formatCurrency(value)} />
+              <Area type="monotone" dataKey="value" stroke="#8b5cf6" fill="#ede9fe" strokeWidth={2} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MetricsPanel({ metrics }: { metrics: MetricsSummary }) {
   return (
     <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
@@ -542,15 +937,11 @@ function MetricsPanel({ metrics }: { metrics: MetricsSummary }) {
         </div>
         <div className="rounded-md bg-slate-50 p-3">
           <dt className="text-xs uppercase text-slate-500">Realized P/L</dt>
-          <dd className="text-lg font-semibold text-slate-900">
-            {formatCurrency(metrics.realized.reduce((total, row) => total + row.value, 0))}
-          </dd>
+          <dd className="text-lg font-semibold text-slate-900">{formatCurrency(metrics.realized.reduce((total, row) => total + row.value, 0))}</dd>
         </div>
         <div className="rounded-md bg-slate-50 p-3">
           <dt className="text-xs uppercase text-slate-500">Unrealized P/L</dt>
-          <dd className="text-lg font-semibold text-slate-900">
-            {formatCurrency(metrics.unrealized.reduce((total, row) => total + row.value, 0))}
-          </dd>
+          <dd className="text-lg font-semibold text-slate-900">{formatCurrency(metrics.unrealized.reduce((total, row) => total + row.value, 0))}</dd>
         </div>
       </dl>
 
@@ -574,9 +965,7 @@ function MetricsPanel({ metrics }: { metrics: MetricsSummary }) {
           {metrics.unrealized.map((row) => (
             <div key={row.ticker} className="flex items-center justify-between rounded-md border border-slate-100 bg-slate-50 px-3 py-2">
               <div className="font-semibold text-slate-900">{row.ticker}</div>
-              <div className="text-slate-700">
-                {formatCurrency(row.value)} · Market {formatCurrency(row.marketValue)}
-              </div>
+              <div className="text-slate-700">{formatCurrency(row.value)} · Market {formatCurrency(row.marketValue)}</div>
             </div>
           ))}
         </div>
@@ -699,25 +1088,209 @@ function CsvTemplatePanel() {
     </div>
   );
 }
+        </div>
+      </div>
+    </div>
+  );
+}
 
-function TradeLedger({ trades, fxRates }: { trades: TradeEntry[]; fxRates: Record<string, number> }) {
+function HoldingsTable({ holdings }: { holdings: HoldingDetail[] }) {
+  const [sortKey, setSortKey] = useState<keyof HoldingDetail>("marketValueBase");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
+  const [filters, setFilters] = useState({ query: "", sector: "all", currency: "all" });
+
+  const handleSort = (key: keyof HoldingDetail) => {
+    if (sortKey === key) {
+      setSortDirection((prev) => (prev === "asc" ? "desc" : "asc"));
+      return;
+    }
+    setSortKey(key);
+    setSortDirection("desc");
+  };
+
+  const filtered = useMemo(() => {
+    return holdings.filter((holding) => {
+      const matchesQuery = holding.ticker.toLowerCase().includes(filters.query.toLowerCase());
+      const matchesSector = filters.sector === "all" || holding.sector === filters.sector;
+      const matchesCurrency = filters.currency === "all" || holding.currency === filters.currency;
+      return matchesQuery && matchesSector && matchesCurrency;
+    });
+  }, [filters, holdings]);
+
+  const sorted = useMemo(() => {
+    return [...filtered].sort((a, b) => {
+      const direction = sortDirection === "asc" ? 1 : -1;
+      const valueA = a[sortKey] as number | string;
+      const valueB = b[sortKey] as number | string;
+      if (typeof valueA === "number" && typeof valueB === "number") {
+        return (valueA - valueB) * direction;
+      }
+      return String(valueA).localeCompare(String(valueB)) * direction;
+    });
+  }, [filtered, sortDirection, sortKey]);
+
+  const sectors = Array.from(new Set(holdings.map((holding) => holding.sector).filter(Boolean))) as string[];
+  const currencies = Array.from(new Set(holdings.map((holding) => holding.currency)));
+
   return (
     <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <p className="text-xs font-semibold uppercase text-primary-600">History</p>
-          <h3 className="text-xl font-semibold text-slate-900">Recorded trades</h3>
+          <p className="text-xs font-semibold uppercase text-primary-600">Positions</p>
+          <h3 className="text-xl font-semibold text-slate-900">Holdings table</h3>
         </div>
-        <span className="text-xs font-medium text-slate-600">{trades.length} rows</span>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <input
+            value={filters.query}
+            onChange={(event) => setFilters((prev) => ({ ...prev, query: event.target.value }))}
+            placeholder="Filter ticker"
+            className="rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none"
+          />
+          <select
+            value={filters.sector}
+            onChange={(event) => setFilters((prev) => ({ ...prev, sector: event.target.value }))}
+            className="rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none"
+          >
+            <option value="all">All sectors</option>
+            {sectors.map((sector) => (
+              <option key={sector} value={sector}>
+                {sector}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filters.currency}
+            onChange={(event) => setFilters((prev) => ({ ...prev, currency: event.target.value }))}
+            className="rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none"
+          >
+            <option value="all">All currencies</option>
+            {currencies.map((currency) => (
+              <option key={currency} value={currency}>
+                {currency}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
+
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
-          <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
-            <tr>
+          <thead>
+            <tr className="bg-slate-50 text-left text-xs uppercase text-slate-500">
+              {[
+                "ticker",
+                "sector",
+                "quantity",
+                "averageCost",
+                "lastPrice",
+                "pl",
+                "dividendYield",
+                "fxRate",
+              ].map((column) => (
+                <th key={column} className="px-3 py-2 cursor-pointer" onClick={() => handleSort(column as keyof HoldingDetail)}>
+                  {column.replace(/([A-Z])/g, " $1").toUpperCase()}
+                </th>
+              ))}
+              <th className="px-3 py-2">Currency</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {sorted.map((holding) => (
+              <tr key={holding.ticker} className="bg-white">
+                <td className="px-3 py-2 font-semibold text-slate-900">{holding.ticker}</td>
+                <td className="px-3 py-2 text-slate-700">{holding.sector ?? "–"}</td>
+                <td className="px-3 py-2 text-slate-700">{holding.quantity.toLocaleString()}</td>
+                <td className="px-3 py-2 text-slate-700">{formatCurrency(holding.averageCost)}</td>
+                <td className="px-3 py-2 text-slate-700">{holding.lastPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                <td className="px-3 py-2 text-slate-700">{formatCurrency(holding.pl)}</td>
+                <td className="px-3 py-2 text-slate-700">{formatPercent(holding.dividendYield)}</td>
+                <td className="px-3 py-2 text-slate-700">{holding.fxRate.toFixed(4)}</td>
+                <td className="px-3 py-2 text-slate-700">{holding.currency}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function TradeLedger({ trades, fxRates }: { trades: TradeEntry[]; fxRates: Record<string, number> }) {
+  const [filters, setFilters] = useState({ broker: "all", ticker: "", type: "all", from: "", to: "" });
+
+  const brokers = useMemo(() => Array.from(new Set(trades.map((trade) => trade.broker))), [trades]);
+  const filteredTrades = useMemo(() => {
+    return trades.filter((trade) => {
+      const matchesBroker = filters.broker === "all" || trade.broker === filters.broker;
+      const matchesType = filters.type === "all" || trade.type === filters.type;
+      const matchesTicker = trade.ticker.toLowerCase().includes(filters.ticker.toLowerCase());
+      const afterStart = filters.from ? new Date(trade.date) >= new Date(filters.from) : true;
+      const beforeEnd = filters.to ? new Date(trade.date) <= new Date(filters.to) : true;
+      return matchesBroker && matchesType && matchesTicker && afterStart && beforeEnd;
+    });
+  }, [filters, trades]);
+
+  return (
+    <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p className="text-xs font-semibold uppercase text-primary-600">History</p>
+          <h3 className="text-xl font-semibold text-slate-900">Transaction ledger</h3>
+        </div>
+        <span className="text-xs font-medium text-slate-600">{filteredTrades.length} rows</span>
+      </div>
+
+      <div className="grid gap-2 md:grid-cols-5">
+        <input
+          value={filters.ticker}
+          onChange={(event) => setFilters((prev) => ({ ...prev, ticker: event.target.value }))}
+          placeholder="Filter ticker"
+          className="rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none"
+        />
+        <select
+          value={filters.broker}
+          onChange={(event) => setFilters((prev) => ({ ...prev, broker: event.target.value }))}
+          className="rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none"
+        >
+          <option value="all">All brokers</option>
+          {brokers.map((broker) => (
+            <option key={broker} value={broker}>
+              {broker}
+            </option>
+          ))}
+        </select>
+        <select
+          value={filters.type}
+          onChange={(event) => setFilters((prev) => ({ ...prev, type: event.target.value }))}
+          className="rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none"
+        >
+          <option value="all">All types</option>
+          <option value="buy">Buy</option>
+          <option value="sell">Sell</option>
+          <option value="dividend">Dividend</option>
+        </select>
+        <input
+          type="date"
+          value={filters.from}
+          onChange={(event) => setFilters((prev) => ({ ...prev, from: event.target.value }))}
+          className="rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none"
+        />
+        <input
+          type="date"
+          value={filters.to}
+          onChange={(event) => setFilters((prev) => ({ ...prev, to: event.target.value }))}
+          className="rounded-md border border-slate-200 px-2 py-1 text-sm focus:border-primary-500 focus:outline-none"
+        />
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-sm">
+          <thead>
+            <tr className="bg-slate-50 text-left text-xs uppercase text-slate-500">
               <th className="px-3 py-2">Date</th>
               <th className="px-3 py-2">Type</th>
               <th className="px-3 py-2">Ticker</th>
-              <th className="px-3 py-2">Qty</th>
+              <th className="px-3 py-2">Quantity</th>
               <th className="px-3 py-2">Price</th>
               <th className="px-3 py-2">Fees</th>
               <th className="px-3 py-2">Broker</th>
@@ -726,15 +1299,13 @@ function TradeLedger({ trades, fxRates }: { trades: TradeEntry[]; fxRates: Recor
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {trades.map((trade) => (
+            {filteredTrades.map((trade) => (
               <tr key={trade.id} className="bg-white">
                 <td className="px-3 py-2 text-slate-700">{trade.date}</td>
                 <td className="px-3 py-2 font-semibold uppercase text-slate-900">{trade.type}</td>
                 <td className="px-3 py-2 text-slate-700">{trade.ticker}</td>
                 <td className="px-3 py-2 text-slate-700">{trade.quantity}</td>
-                <td className="px-3 py-2 text-slate-700">
-                  {trade.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}
-                </td>
+                <td className="px-3 py-2 text-slate-700">{trade.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</td>
                 <td className="px-3 py-2 text-slate-700">{trade.fees.toFixed(2)}</td>
                 <td className="px-3 py-2 text-slate-700">{trade.broker}</td>
                 <td className="px-3 py-2 text-slate-700">{trade.currency}</td>
@@ -749,7 +1320,7 @@ function TradeLedger({ trades, fxRates }: { trades: TradeEntry[]; fxRates: Recor
 }
 
 export function TradingWorkspace() {
-  const [trades, setTrades] = useState<TradeEntry[]>([]);
+  const [trades, setTrades] = useState<TradeEntry[]>(seedTrades);
   const [brokers, setBrokers] = useState<string[]>([]);
   const [fxRates, setFxRates] = useState<Record<string, number>>({ [BASE_CURRENCY]: 1 });
   const [isFetchingFx, setIsFetchingFx] = useState(false);
@@ -794,12 +1365,68 @@ export function TradingWorkspace() {
   }, [refreshFxRate]);
 
   const metrics = useMemo(() => deriveMetrics(trades, fxRates), [trades, fxRates]);
-
   const handleAddTrade = (trade: TradeEntry) => {
     setTrades((prev) => [...prev, trade]);
   };
 
   const defaultFxRate = useCallback((currency: string) => getFxRate(currency, fxRates), [fxRates]);
+
+  const totalMarketValue = metrics.holdings.reduce((total, holding) => total + holding.marketValueBase, 0);
+  const cashBalance = 12000;
+  const totalValue = cashBalance + totalMarketValue;
+
+  const equityCurve = useMemo(
+    () => [
+      { date: "Jan", value: totalValue * 0.78 },
+      { date: "Feb", value: totalValue * 0.8 },
+      { date: "Mar", value: totalValue * 0.84 },
+      { date: "Apr", value: totalValue * 0.88 },
+      { date: "May", value: totalValue * 0.9 },
+      { date: "Jun", value: totalValue * 0.94 },
+      { date: "Jul", value: totalValue * 0.97 },
+      { date: "Aug", value: totalValue * 1.01 },
+      { date: "Sep", value: totalValue * 1.03 },
+    ],
+    [totalValue],
+  );
+
+  const dayChange = equityCurve.length > 1 ? equityCurve[equityCurve.length - 1].value - equityCurve[equityCurve.length - 2].value : 0;
+  const dayChangePct = equityCurve.length > 1 && equityCurve[equityCurve.length - 2].value
+    ? (dayChange / equityCurve[equityCurve.length - 2].value) * 100
+    : 0;
+
+  const buildAllocation = useCallback((key: "sector" | "region" | "currency") => {
+    const map = new Map<string, number>();
+    metrics.holdings.forEach((holding) => {
+      const name = (holding as Record<string, string | number | undefined>)[key];
+      if (!name) return;
+      map.set(name as string, (map.get(name as string) ?? 0) + holding.marketValueBase);
+    });
+    return Array.from(map.entries()).map(([name, value]) => ({ name, value }));
+  }, [metrics.holdings]);
+
+  const allocationBySector = useMemo(() => buildAllocation("sector"), [buildAllocation]);
+  const allocationByRegion = useMemo(() => buildAllocation("region"), [buildAllocation]);
+  const allocationByCurrency = useMemo(() => buildAllocation("currency"), [buildAllocation]);
+
+  const topContributors = useMemo(() => {
+    return metrics.holdings
+      .map((holding) => ({ name: holding.ticker, value: holding.pl }))
+      .sort((a, b) => Math.abs(b.value) - Math.abs(a.value))
+      .slice(0, 5);
+  }, [metrics.holdings]);
+
+  const dividendTimeline = useMemo(() => {
+    const monthMap = new Map<string, number>();
+    trades
+      .filter((trade) => trade.type === "dividend")
+      .forEach((trade) => {
+        const month = new Date(trade.date).toLocaleString("en", { month: "short" });
+        const fx = getFxRate(trade.currency, fxRates, trade.fxRate);
+        monthMap.set(month, (monthMap.get(month) ?? 0) + trade.price * trade.quantity * fx);
+      });
+    return Array.from(monthMap.entries()).map(([month, value]) => ({ month, value }));
+  }, [fxRates, trades]);
 
   return (
     <div className="space-y-8">
@@ -826,6 +1453,17 @@ export function TradingWorkspace() {
         <MetricsPanel metrics={metrics} />
       </div>
 
+      <DashboardCards totalValue={totalValue} cashBalance={cashBalance} dayChange={dayChange} dayChangePct={dayChangePct} metrics={metrics} />
+
+      <AnalyticsCharts
+        equityCurve={equityCurve}
+        allocationBySector={allocationBySector}
+        allocationByRegion={allocationByRegion}
+        allocationByCurrency={allocationByCurrency}
+        topContributors={topContributors}
+        dividendTimeline={dividendTimeline}
+      />
+
       <CsvTemplatePanel />
 
       <div className="grid gap-6 lg:grid-cols-3">
@@ -835,13 +1473,15 @@ export function TradingWorkspace() {
         <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900 shadow-sm">
           <p className="text-xs font-semibold uppercase tracking-wide">Multi-currency control</p>
           <ul className="list-disc space-y-2 pl-4">
-            <li>Auto-refresh FX for USD, SGD, and MYR via Yahoo Finance (RapidAPI) with manual override.</li>
+            <li>Auto-refresh FX for USD, SGD, MYR, and HKD via Yahoo Finance (RapidAPI) with manual override.</li>
             <li>Base totals shown in {BASE_CURRENCY} include commissions for apples-to-apples cost and P/L.</li>
             <li>Derived metrics roll up realized and unrealized P/L, average cost, and dividends YTD/by ticker.</li>
             <li>CSV templates for SG-first brokers (MooMoo, Tiger, IBKR, POEMS, FSMOne, CMC Invest, LongBridge) include mapping UI.</li>
           </ul>
         </div>
       </div>
+
+      <HoldingsTable holdings={metrics.holdings} />
     </div>
   );
 }
