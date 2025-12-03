@@ -45,8 +45,8 @@ interface QuoteResponse {
   asOf: string | null;
 }
 
-const brokers = ['Moo Moo', 'CMC Invest', 'DBS', 'HSBC', 'POEMS', 'FSMOne', 'IBKR', 'Other'];
-const categories = ['Unit Trusts', 'Stocks', 'REITs', 'ETF', 'Bond', 'Cash', 'Other'];
+const brokers = ['Moo Moo', 'Webull', 'OCBC', 'CMC Invest', 'DBS', 'HSBC', 'POEMS', 'FSMOne', 'IBKR', 'Other'];
+const categories = ['Unit Trusts', 'Stocks', 'ETF', 'Bond', 'Cash', 'Other'];
 const currencies = ['SGD', 'USD', 'MYR'];
 
 function formatCurrency(value: number | null, currency: string) {
@@ -616,7 +616,7 @@ export default function HomePage() {
                   <td>{row.category}</td>
                   <td>{row.broker}</td>
                   <td>{row.currency}</td>
-                  <td>{formatNumber(row.quantity, 4)}</td>
+                  <td>{formatNumber(row.quantity, 2)}</td>
                   <td>{row.averagePrice !== null ? row.averagePrice.toFixed(4) : '-'}</td>
                   <td>{formatCurrency(row.currentPrice, row.currency)}</td>
                   <td>{formatCurrency(row.totalCost, row.currency)}</td>
