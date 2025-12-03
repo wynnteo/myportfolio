@@ -176,3 +176,27 @@ th {
   font-size: 12px;
   color: #475569;
 }
+
+.field-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.field-header button {
+  padding: 8px 10px;
+}
+
+.helper-text {
+  font-size: 12px;
+  color: #475569;
+}
+
+.helper-text.success {
+  color: #166534;
+}
+
+.helper-text.error {
+  color: #991b1b;
+}

@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 interface Transaction {
   id: string;
@@ -58,6 +58,9 @@ export default function HomePage() {
   const [statusTone, setStatusTone] = useState<'info' | 'success' | 'error'>('info');
   const [brokerFilter, setBrokerFilter] = useState<string>('All');
   const [currencyFilter, setCurrencyFilter] = useState<string>('All');
+  const [isFetchingPrice, setIsFetchingPrice] = useState(false);
+  const [priceStatus, setPriceStatus] = useState<{ message: string; tone: 'info' | 'success' | 'error' } | null>(null);
+  const formRef = useRef<HTMLFormElement | null>(null);
 
   async function loadTransactions() {
   try {
@@ -235,6 +238,43 @@ export default function HomePage() {
     [transactions]
   );
 
+  async function fetchLatestPrice() {
+    const symbolInput = formRef.current?.elements.namedItem('symbol') as HTMLInputElement | null;
+    const currentPriceInput = formRef.current?.elements.namedItem('currentPrice') as HTMLInputElement | null;
+
+    if (!symbolInput?.value) {
+      setPriceStatus({ message: 'Enter a symbol before fetching the latest price.', tone: 'error' });
+      return;
+    }
+
+    try {
+      setIsFetchingPrice(true);
+      setPriceStatus({ message: 'Fetching latest price...', tone: 'info' });
+      const response = await fetch(`/api/quote?symbol=${encodeURIComponent(symbolInput.value.trim())}`);
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        setPriceStatus({ message: errorData?.error ?? 'Unable to fetch price.', tone: 'error' });
+        return;
+      }
+
+      const data: { price: number; currency?: string | null; symbol: string; asOf?: string | null } = await response.json();
+      const formatted = `${data.symbol} latest price: ${data.price}${data.currency ? ` ${data.currency}` : ''}`;
+      const dated = data.asOf ? `${formatted} (as of ${new Date(data.asOf).toLocaleString()})` : formatted;
+
+      if (currentPriceInput) {
+        currentPriceInput.value = data.price.toString();
+      }
+
+      setPriceStatus({ message: dated, tone: 'success' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to fetch price.';
+      setPriceStatus({ message, tone: 'error' });
+    } finally {
+      setIsFetchingPrice(false);
+    }
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -288,7 +328,7 @@ export default function HomePage() {
         <div className="section-title">
           <h2 id="add-transaction">Add transaction</h2>
         </div>
-        <form onSubmit={(event) => void handleSubmit(event)} className="form-grid">
+        <form ref={formRef} onSubmit={(event) => void handleSubmit(event)} className="form-grid">
           <label>
             Symbol
             <input name="symbol" type="text" required placeholder="e.g. M44U" />
@@ -352,8 +392,18 @@ export default function HomePage() {
             <input name="dividendAmount" type="number" step="0.01" min="0" defaultValue={0} />
           </label>
           <label>
-            Current Price (optional)
+            <div className="field-header">
+              <span>Current Price (optional)</span>
+              <button type="button" onClick={() => void fetchLatestPrice()} disabled={isFetchingPrice}>
+                {isFetchingPrice ? 'Fetching...' : 'Fetch latest price'}
+              </button>
+            </div>
             <input name="currentPrice" type="number" step="0.0001" min="0" />
+            {priceStatus && (
+              <span className={`helper-text ${priceStatus.tone}`}>
+                {priceStatus.message}
+              </span>
+            )}
           </label>
           <label>
             Trade Date
