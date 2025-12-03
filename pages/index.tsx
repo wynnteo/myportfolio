@@ -809,7 +809,7 @@ export default function HomePage() {
                   <td>{row.category}</td>
                   <td>{row.broker}</td>
                   <td>{row.currency}</td>
-                  <td>{formatNumber(row.quantity, 4)}</td>
+                  <td>{formatNumber(row.quantity, 2)}</td>
                   <td>{row.averagePrice !== null ? row.averagePrice.toFixed(4) : '-'}</td>
                   <td>{formatCurrency(row.currentPrice, row.currency)}</td>
                   <td>{formatCurrency(row.totalCost, row.currency)}</td>
