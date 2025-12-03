@@ -50,9 +50,7 @@ function getClient(): Client {
   const missing = getMissingEnvVars();
   if (missing.length > 0) {
     throw new Error(
-      `Missing database keys (${missing.join(
-        ', '
-      )}). Add them in .env.local or Vercel project settings.`
+      `Missing database keys (${missing.join(', ')}). Add them in .env.local or Vercel project settings.`
     );
   }
 
@@ -270,12 +268,98 @@ export default async function handler(
       return;
     }
 
-    // DELETE: clear demo user's transactions
-    if (req.method === 'DELETE') {
+    // PUT: update a transaction
+    if (req.method === 'PUT') {
+      const body: InsertPayload & { id?: string } =
+        typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      if (!body.id) {
+        res.status(400).json({ error: 'id is required for update' });
+        return;
+      }
+
+      const payload: InsertPayload = {
+        symbol: body.symbol?.trim(),
+        productName: body.productName?.trim(),
+        category: body.category?.trim(),
+        broker: body.broker?.trim(),
+        currency: body.currency?.trim(),
+        type: body.type,
+        quantity: parseNumber(body.quantity),
+        price: parseNumber(body.price),
+        commission: parseNumber(body.commission) ?? 0,
+        dividendAmount: parseNumber(body.dividendAmount),
+        tradeDate: body.tradeDate,
+        notes: body.notes?.trim() ?? null,
+        currentPrice: parseNumber(body.currentPrice),
+      };
+
+      const error = validatePayload(payload);
+      if (error) {
+        res.status(400).json({ error });
+        return;
+      }
+
+      const quantity =
+        payload.type === 'SELL' && payload.quantity !== undefined
+          ? -Math.abs(payload.quantity)
+          : payload.quantity ?? null;
+      const price = payload.price ?? null;
+      const commission = payload.commission ?? 0;
+      const dividendAmount =
+        payload.type === 'DIVIDEND'
+          ? payload.dividendAmount ?? 0
+          : payload.dividendAmount ?? 0;
+
       await client.execute(
-        'DELETE FROM transactions WHERE user_id = ?;',
-        [DEMO_USER_ID]
+        `
+          UPDATE transactions
+          SET symbol = ?, product_name = ?, category = ?, broker = ?, currency = ?, type = ?,
+              quantity = ?, price = ?, commission = ?, dividend_amount = ?, trade_date = ?,
+              notes = ?, current_price = ?
+          WHERE id = ? AND user_id = ?;
+        `,
+        [
+          payload.symbol ?? '',
+          payload.productName ?? '',
+          payload.category ?? '',
+          payload.broker ?? '',
+          payload.currency ?? '',
+          payload.type ?? 'BUY',
+          quantity,
+          price,
+          commission,
+          dividendAmount,
+          payload.tradeDate ?? null,
+          payload.notes ?? null,
+          payload.currentPrice ?? null,
+          body.id,
+          DEMO_USER_ID,
+        ]
       );
+
+      res.status(200).json({ ok: true });
+      return;
+    }
+
+    // DELETE: delete a transaction (or clear all when no id is provided)
+    if (req.method === 'DELETE') {
+      const idParam =
+        typeof req.query.id === 'string'
+          ? req.query.id
+          : Array.isArray(req.query.id)
+            ? req.query.id[0]
+            : undefined;
+
+      if (idParam) {
+        await client.execute('DELETE FROM transactions WHERE user_id = ? AND id = ?;', [
+          DEMO_USER_ID,
+          idParam,
+        ]);
+        res.status(200).json({ ok: true, deleted: idParam });
+        return;
+      }
+
+      await client.execute('DELETE FROM transactions WHERE user_id = ?;', [DEMO_USER_ID]);
       res.status(200).json({ ok: true });
       return;
     }
