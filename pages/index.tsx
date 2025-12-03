@@ -45,9 +45,27 @@ interface QuoteResponse {
   asOf: string | null;
 }
 
-const brokers = ['Moo Moo', 'Webull', 'OCBC', 'CMC Invest', 'DBS', 'HSBC', 'POEMS', 'FSMOne', 'IBKR', 'Other'];
-const categories = ['Unit Trusts', 'Stocks', 'ETF', 'Bond', 'Cash', 'Other'];
+interface TransactionFormState {
+  symbol?: string;
+  productName?: string;
+  category?: string;
+  broker?: string;
+  currency?: string;
+  type?: Transaction['type'];
+  quantity?: string;
+  price?: string;
+  commission?: string;
+  dividendAmount?: string;
+  tradeDate?: string;
+  notes?: string;
+  currentPrice?: string;
+}
+
+const brokers = ['Moo Moo', 'CMC Invest', 'DBS', 'HSBC', 'POEMS', 'FSMOne', 'IBKR', 'Other'];
+const categories = ['Unit Trusts', 'Stocks', 'REITs', 'ETF', 'Bond', 'Cash', 'Other'];
 const currencies = ['SGD', 'USD', 'MYR'];
+
+const chartPalette = ['#0ea5e9', '#6366f1', '#22c55e', '#f97316', '#e11d48', '#14b8a6', '#a855f7'];
 
 function formatCurrency(value: number | null, currency: string) {
   if (value === null || Number.isNaN(value)) return '-';
@@ -57,6 +75,81 @@ function formatCurrency(value: number | null, currency: string) {
 function formatNumber(value: number | null, decimals = 2) {
   if (value === null || Number.isNaN(value)) return '-';
   return value.toFixed(decimals);
+}
+
+function getHoldingKey(symbol: string, broker: string | null | undefined) {
+  return `${broker || 'Unknown'}__${symbol}`;
+}
+
+function parseInputNumber(value?: string) {
+  if (value === undefined) return undefined;
+  if (value.trim() === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function PieChart({
+  data,
+  title,
+}: {
+  data: Array<{ name: string; pct: number; value: number }>;
+  title: string;
+}) {
+  const radius = 52;
+  const circumference = 2 * Math.PI * radius;
+  let offset = 0;
+
+  if (data.length === 0 || data.every((entry) => entry.value === 0)) {
+    return (
+      <div className="pie-chart empty">
+        <div className="empty-pie">No data</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="chart-card">
+      <div className="chart-header">{title}</div>
+      <div className="chart-body">
+        <svg viewBox="0 0 120 120" role="img" aria-label={title}>
+          <g transform="rotate(-90 60 60)">
+            {data.map((entry, index) => {
+              const dash = (entry.pct / 100) * circumference;
+              const circle = (
+                <circle
+                  key={entry.name}
+                  r={radius}
+                  cx="60"
+                  cy="60"
+                  fill="transparent"
+                  stroke={chartPalette[index % chartPalette.length]}
+                  strokeWidth="18"
+                  strokeDasharray={`${dash} ${circumference}`}
+                  strokeDashoffset={offset}
+                />
+              );
+              offset -= dash;
+              return circle;
+            })}
+          </g>
+        </svg>
+        <div className="chart-legend">
+          {data.map((entry, index) => (
+            <div key={entry.name} className="legend-row">
+              <span
+                className="legend-swatch"
+                style={{ background: chartPalette[index % chartPalette.length] }}
+              />
+              <div>
+                <div className="legend-name">{entry.name}</div>
+                <div className="legend-subtext">{entry.pct.toFixed(1)}%</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function HomePage() {
@@ -70,6 +163,10 @@ export default function HomePage() {
     null
   );
   const [quotes, setQuotes] = useState<Record<string, QuoteResponse>>({});
+  const [selectedHoldingKey, setSelectedHoldingKey] = useState<string | null>(null);
+  const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<TransactionFormState>({});
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
 
   async function loadTransactions() {
@@ -125,14 +222,11 @@ export default function HomePage() {
     void loadTransactions();
   }, []);
 
-  // Base holdings calculated from transactions (including any stored current_price)
   const holdings = useMemo(() => {
     const map = new Map<string, HoldingRow>();
 
-    const getKey = (tx: Transaction) => `${tx.broker || 'Unknown'}__${tx.symbol}`;
-
     for (const tx of transactions) {
-      const key = getKey(tx);
+      const key = getHoldingKey(tx.symbol, tx.broker);
       const existing: HoldingRow =
         map.get(key) ??
         ({
@@ -159,7 +253,6 @@ export default function HomePage() {
         const price = tx.price ?? 0;
         const commission = tx.commission ?? 0;
         existing.quantity += qty;
-        // treat commission as part of cost
         existing.totalCost += qty * price + commission;
         existing.totalCommission += commission;
       }
@@ -168,7 +261,6 @@ export default function HomePage() {
         existing.dividends += tx.dividend_amount ?? 0;
       }
 
-      // Use stored current_price if present and newer
       if (tx.current_price !== null && !Number.isNaN(tx.current_price)) {
         const txDate = new Date(tx.trade_date ?? tx.created_at).getTime();
         if (txDate >= existing.lastPriceTimestamp) {
@@ -180,7 +272,6 @@ export default function HomePage() {
       map.set(key, existing);
     }
 
-    // Compute average price & P/L based on whatever currentPrice we have so far
     map.forEach((row) => {
       if (row.quantity !== 0) {
         row.averagePrice = row.totalCost / row.quantity;
@@ -202,7 +293,6 @@ export default function HomePage() {
     return filtered;
   }, [transactions, brokerFilter, currencyFilter]);
 
-  // Fetch latest quotes from /api/quote for the symbols in current holdings
   useEffect(() => {
     async function fetchQuotesForHoldings() {
       const symbols = Array.from(new Set(holdings.map((h) => h.symbol))).filter(Boolean);
@@ -218,7 +308,6 @@ export default function HomePage() {
           try {
             const resp = await fetch(`/api/quote?symbol=${encodeURIComponent(symbol)}`);
             if (!resp.ok) {
-              // Don't break everything if one fails
               return;
             }
             const data: QuoteResponse = await resp.json();
@@ -235,7 +324,6 @@ export default function HomePage() {
     void fetchQuotesForHoldings();
   }, [holdings]);
 
-  // Holdings with latest prices from Yahoo (if available)
   const displayHoldings = useMemo(() => {
     return holdings.map((row) => {
       const quote = quotes[row.symbol];
@@ -324,6 +412,16 @@ export default function HomePage() {
     [transactions]
   );
 
+  const selectedHolding = useMemo(
+    () => displayHoldings.find((h) => h.key === selectedHoldingKey) ?? null,
+    [displayHoldings, selectedHoldingKey]
+  );
+
+  const selectedHoldingTransactions = useMemo(
+    () => sortedTransactions.filter((tx) => getHoldingKey(tx.symbol, tx.broker) === selectedHoldingKey),
+    [sortedTransactions, selectedHoldingKey]
+  );
+
   async function fetchLatestPrice() {
     const symbolInput = formRef.current?.elements.namedItem('symbol') as HTMLInputElement | null;
     const currentPriceInput = formRef.current?.elements.namedItem('currentPrice') as HTMLInputElement | null;
@@ -403,6 +501,112 @@ export default function HomePage() {
     form.reset();
     await loadTransactions();
   }
+
+  function startEditing(tx: Transaction) {
+    setEditingTransactionId(tx.id);
+    setActionMessage(null);
+    setEditForm({
+      symbol: tx.symbol,
+      productName: tx.product_name,
+      category: tx.category,
+      broker: tx.broker,
+      currency: tx.currency,
+      type: tx.type,
+      quantity: tx.quantity !== null ? Math.abs(tx.quantity).toString() : '',
+      price: tx.price !== null ? tx.price.toString() : '',
+      commission: tx.commission !== null ? tx.commission.toString() : '',
+      dividendAmount: tx.dividend_amount !== null ? tx.dividend_amount.toString() : '',
+      tradeDate: tx.trade_date ?? '',
+      notes: tx.notes ?? '',
+      currentPrice: tx.current_price !== null ? tx.current_price.toString() : '',
+    });
+  }
+
+  function cancelEditing() {
+    setEditingTransactionId(null);
+    setEditForm({});
+  }
+
+  async function saveEdit() {
+    if (!editingTransactionId) return;
+    const original = transactions.find((tx) => tx.id === editingTransactionId);
+    if (!original) return;
+
+    const payload = {
+      id: editingTransactionId,
+      symbol: editForm.symbol ?? original.symbol,
+      productName: editForm.productName ?? original.product_name,
+      category: editForm.category ?? original.category,
+      broker: editForm.broker ?? original.broker,
+      currency: editForm.currency ?? original.currency,
+      type: (editForm.type as Transaction['type']) ?? original.type,
+      quantity: parseInputNumber(editForm.quantity) ?? Math.abs(original.quantity ?? 0),
+      price: parseInputNumber(editForm.price) ?? original.price ?? undefined,
+      commission: parseInputNumber(editForm.commission) ?? original.commission ?? 0,
+      dividendAmount: parseInputNumber(editForm.dividendAmount) ?? original.dividend_amount ?? undefined,
+      tradeDate: editForm.tradeDate ?? original.trade_date ?? undefined,
+      notes: editForm.notes ?? original.notes ?? undefined,
+      currentPrice: parseInputNumber(editForm.currentPrice) ?? original.current_price ?? undefined,
+    };
+
+    const response = await fetch('/api/transactions', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      setActionMessage((error as any)?.error ?? 'Failed to update transaction');
+      return;
+    }
+
+    setActionMessage('Transaction updated.');
+    setEditingTransactionId(null);
+    setEditForm({});
+    await loadTransactions();
+  }
+
+  async function deleteTransaction(id: string) {
+    const confirmed = window.confirm('Delete this transaction?');
+    if (!confirmed) return;
+
+    const response = await fetch(`/api/transactions?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      setActionMessage((error as any)?.error ?? 'Failed to delete transaction');
+      return;
+    }
+
+    setActionMessage('Transaction deleted.');
+    if (editingTransactionId === id) {
+      setEditingTransactionId(null);
+      setEditForm({});
+    }
+    await loadTransactions();
+  }
+
+  const totalCapital = useMemo(
+    () => Array.from(totals.capitalByCurrency.values()).reduce((sum, val) => sum + val, 0),
+    [totals.capitalByCurrency]
+  );
+  const totalCurrentValue = useMemo(
+    () => Array.from(totals.currentValueByCurrency.values()).reduce((sum, val) => sum + val, 0),
+    [totals.currentValueByCurrency]
+  );
+  const totalPl = useMemo(
+    () => Array.from(totals.plByCurrency.values()).reduce((sum, val) => sum + val, 0),
+    [totals.plByCurrency]
+  );
+  const totalDividends = useMemo(
+    () => Array.from(totals.dividendsByCurrency.values()).reduce((sum, val) => sum + val, 0),
+    [totals.dividendsByCurrency]
+  );
 
   return (
     <main>
@@ -508,60 +712,48 @@ export default function HomePage() {
 
       <section aria-labelledby="summary">
         <div className="section-title">
-          <h2 id="summary">Summary / Stats</h2>
+          <h2 id="summary">Portfolio overview</h2>
         </div>
-        <div className="summary-grid">
-          <div className="summary-card">
-            <div className="stat-text">Holdings</div>
-            <div className="stat-text">
-              <strong>{displayHoldings.length}</strong> positions /{' '}
-              <strong>{symbols.size}</strong> symbols
+        <div className="overview-grid">
+          <div className="summary-card highlight">
+            <div className="stat-title">Holdings</div>
+            <div className="stat-value">
+              <strong>{displayHoldings.length}</strong> positions / <strong>{symbols.size}</strong> symbols
             </div>
-            <div className="stat-text">Transactions: {transactions.length}</div>
+            <div className="stat-sub">Transactions: {transactions.length}</div>
           </div>
           <div className="summary-card">
-            <div className="stat-text">Capital by currency</div>
-            {[...totals.capitalByCurrency.entries()].map(([ccy, val]) => (
-              <div key={ccy} className="stat-text">
-                {ccy}: {formatCurrency(val, ccy)}
-              </div>
-            ))}
+            <div className="stat-title">Invested capital</div>
+            <div className="stat-value">{formatCurrency(totalCapital || null, 'SGD')}</div>
+            <div className="stat-sub">By currency: {allocations.byCurrency.length}</div>
           </div>
           <div className="summary-card">
-            <div className="stat-text">Current value / P&L</div>
-            {[...totals.currentValueByCurrency.entries()].map(([ccy, val]) => (
-              <div key={ccy} className="stat-text">
-                {ccy}: {formatCurrency(val, ccy)} (
-                {formatCurrency(totals.plByCurrency.get(ccy) ?? 0, ccy)})
-              </div>
-            ))}
-            <div className="small">Based on holdings with a provided current price.</div>
+            <div className="stat-title">Current value</div>
+            <div className="stat-value">{formatCurrency(totalCurrentValue || null, 'SGD')}</div>
+            <div className="stat-sub">P/L: {formatCurrency(totalPl, 'SGD')}</div>
           </div>
           <div className="summary-card">
-            <div className="stat-text">Dividends received</div>
-            {[...totals.dividendsByCurrency.entries()].map(([ccy, val]) => (
-              <div key={ccy} className="stat-text">
-                {ccy}: {formatCurrency(val, ccy)}
-              </div>
-            ))}
+            <div className="stat-title">Dividends received</div>
+            <div className="stat-value">{formatCurrency(totalDividends || null, 'SGD')}</div>
+            <div className="stat-sub">Includes all currencies</div>
           </div>
         </div>
-        <div className="section-title" style={{ marginTop: 12 }}>
-          <div>
-            <div className="stat-text">Allocation by category</div>
-            {allocations.byCategory.map((entry) => (
-              <div key={entry.name} className="stat-text">
-                {entry.name}: {formatCurrency(entry.value, 'SGD')} ({entry.pct.toFixed(1)}%)
-              </div>
-            ))}
-          </div>
-          <div>
-            <div className="stat-text">Allocation by currency</div>
-            {allocations.byCurrency.map((entry) => (
-              <div key={entry.name} className="stat-text">
-                {entry.name}: {formatCurrency(entry.value, entry.name)} ({entry.pct.toFixed(1)}%)
-              </div>
-            ))}
+        <div className="chart-grid">
+          <PieChart title="Allocation by category" data={allocations.byCategory} />
+          <PieChart title="Allocation by currency" data={allocations.byCurrency} />
+          <div className="chart-card">
+            <div className="chart-header">Breakdown by currency</div>
+            <div className="chart-body column">
+              {allocations.byCurrency.map((entry) => (
+                <div key={entry.name} className="stat-line">
+                  <div className="legend-name">{entry.name}</div>
+                  <div className="legend-subtext">
+                    {formatCurrency(entry.value, entry.name)} · {entry.pct.toFixed(1)}%
+                  </div>
+                </div>
+              ))}
+              <div className="stat-line muted">Live prices fetched for {Object.keys(quotes).length} symbols</div>
+            </div>
           </div>
         </div>
       </section>
@@ -606,6 +798,7 @@ export default function HomePage() {
                 <th>P/L %</th>
                 <th>Dividends</th>
                 <th>Total Commission</th>
+                <th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -625,6 +818,11 @@ export default function HomePage() {
                   <td>{row.plPct !== null ? `${row.plPct.toFixed(4)}%` : '-'}</td>
                   <td>{formatCurrency(row.dividends, row.currency)}</td>
                   <td>{formatCurrency(row.totalCommission, row.currency)}</td>
+                  <td>
+                    <button type="button" onClick={() => setSelectedHoldingKey(row.key)}>
+                      View
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -632,47 +830,229 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section aria-labelledby="transactions">
-        <div className="section-title">
-          <h2 id="transactions">Transactions</h2>
+      {selectedHolding && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal">
+            <div className="modal-header">
+              <div>
+                <div className="modal-title">
+                  {selectedHolding.symbol} · {selectedHolding.productName}
+                </div>
+                <div className="small">
+                  Broker: {selectedHolding.broker} · Currency: {selectedHolding.currency}
+                </div>
+              </div>
+              <button type="button" className="ghost" onClick={() => setSelectedHoldingKey(null)}>
+                Close
+              </button>
+            </div>
+            {actionMessage && <div className="helper-text info">{actionMessage}</div>}
+            {selectedHoldingTransactions.length === 0 ? (
+              <p className="muted">No transactions for this holding yet.</p>
+            ) : (
+              <div className="table-wrapper modal-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Type</th>
+                      <th>Category</th>
+                      <th>Product</th>
+                      <th>Symbol</th>
+                      <th>Broker</th>
+                      <th>Currency</th>
+                      <th>Quantity</th>
+                      <th>Price</th>
+                      <th>Commission</th>
+                      <th>Dividend</th>
+                      <th>Notes</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedHoldingTransactions.map((tx) => {
+                      const isEditing = editingTransactionId === tx.id;
+                      return (
+                        <tr key={tx.id}>
+                          <td>
+                            {isEditing ? (
+                              <input
+                                type="date"
+                                value={editForm.tradeDate ?? tx.trade_date ?? ''}
+                                onChange={(e) => setEditForm((prev) => ({ ...prev, tradeDate: e.target.value }))}
+                              />
+                            ) : (
+                              tx.trade_date ?? '-'
+                            )}
+                          </td>
+                          <td>
+                            {isEditing ? (
+                              <select
+                                value={(editForm.type as Transaction['type']) ?? tx.type}
+                                onChange={(e) =>
+                                  setEditForm((prev) => ({ ...prev, type: e.target.value as Transaction['type'] }))
+                                }
+                              >
+                                <option value="BUY">BUY</option>
+                                <option value="SELL">SELL</option>
+                                <option value="DIVIDEND">DIVIDEND</option>
+                              </select>
+                            ) : (
+                              tx.type
+                            )}
+                          </td>
+                          <td>
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={editForm.category ?? tx.category}
+                                onChange={(e) => setEditForm((prev) => ({ ...prev, category: e.target.value }))}
+                              />
+                            ) : (
+                              tx.category
+                            )}
+                          </td>
+                          <td>
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={editForm.productName ?? tx.product_name}
+                                onChange={(e) => setEditForm((prev) => ({ ...prev, productName: e.target.value }))}
+                              />
+                            ) : (
+                              tx.product_name
+                            )}
+                          </td>
+                          <td>{tx.symbol}</td>
+                          <td>
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={editForm.broker ?? tx.broker}
+                                onChange={(e) => setEditForm((prev) => ({ ...prev, broker: e.target.value }))}
+                              />
+                            ) : (
+                              tx.broker
+                            )}
+                          </td>
+                          <td>
+                            {isEditing ? (
+                              <select
+                                value={editForm.currency ?? tx.currency}
+                                onChange={(e) => setEditForm((prev) => ({ ...prev, currency: e.target.value }))}
+                              >
+                                {currencies.map((ccy) => (
+                                  <option key={ccy} value={ccy}>
+                                    {ccy}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              tx.currency
+                            )}
+                          </td>
+                          <td>
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                step="0.0001"
+                                value={editForm.quantity ?? (tx.quantity !== null ? Math.abs(tx.quantity) : '')}
+                                onChange={(e) => setEditForm((prev) => ({ ...prev, quantity: e.target.value }))}
+                              />
+                            ) : tx.quantity !== null ? (
+                              tx.quantity
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                          <td>
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                step="0.0001"
+                                value={editForm.price ?? (tx.price ?? '')}
+                                onChange={(e) => setEditForm((prev) => ({ ...prev, price: e.target.value }))}
+                              />
+                            ) : tx.price !== null ? (
+                              tx.price
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                          <td>
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={editForm.commission ?? (tx.commission ?? '')}
+                                onChange={(e) => setEditForm((prev) => ({ ...prev, commission: e.target.value }))}
+                              />
+                            ) : tx.commission !== null ? (
+                              tx.commission
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                          <td>
+                            {isEditing ? (
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={editForm.dividendAmount ?? (tx.dividend_amount ?? '')}
+                                onChange={(e) => setEditForm((prev) => ({ ...prev, dividendAmount: e.target.value }))}
+                              />
+                            ) : tx.dividend_amount !== null ? (
+                              tx.dividend_amount
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                          <td>
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                value={editForm.notes ?? (tx.notes ?? '')}
+                                onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
+                              />
+                            ) : (
+                              tx.notes
+                            )}
+                          </td>
+                          <td>
+                            {isEditing ? (
+                              <div className="action-row">
+                                <button type="button" onClick={() => void saveEdit()}>
+                                  Save
+                                </button>
+                                <button type="button" className="ghost" onClick={() => cancelEditing()}>
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="action-row">
+                                <button type="button" onClick={() => startEditing(tx)}>
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  className="ghost danger"
+                                  onClick={() => void deleteTransaction(tx.id)}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
-        <div className="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Type</th>
-                <th>Category</th>
-                <th>Product</th>
-                <th>Symbol</th>
-                <th>Broker</th>
-                <th>Currency</th>
-                <th>Quantity</th>
-                <th>Price</th>
-                <th>Commission</th>
-                <th>Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedTransactions.map((tx) => (
-                <tr key={tx.id}>
-                  <td>{tx.trade_date ?? '-'}</td>
-                  <td>{tx.type}</td>
-                  <td>{tx.category}</td>
-                  <td>{tx.product_name}</td>
-                  <td>{tx.symbol}</td>
-                  <td>{tx.broker}</td>
-                  <td>{tx.currency}</td>
-                  <td>{tx.quantity !== null ? tx.quantity : '-'}</td>
-                  <td>{tx.price !== null ? tx.price : '-'}</td>
-                  <td>{tx.commission !== null ? tx.commission : '-'}</td>
-                  <td>{tx.notes}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+      )}
     </main>
   );
 }
