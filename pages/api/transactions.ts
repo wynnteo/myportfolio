@@ -38,7 +38,7 @@ interface InsertPayload {
   commission?: number;
   dividendAmount?: number;
   tradeDate?: string;
-  notes?: string;
+  notes?: string | null;
   currentPrice?: number | null;
 }
 
@@ -49,7 +49,6 @@ function getMissingEnvVars(): string[] {
 function getClient(): Client {
   const missing = getMissingEnvVars();
   if (missing.length > 0) {
-    // This message now reflects the real env var names
     throw new Error(
       `Missing database keys (${missing.join(
         ', '
@@ -63,8 +62,8 @@ function getClient(): Client {
   });
 }
 
-
 async function ensureTables(client: Client) {
+  // users table
   await client.execute(`
     CREATE TABLE IF NOT EXISTS users (
       id TEXT PRIMARY KEY,
@@ -74,11 +73,12 @@ async function ensureTables(client: Client) {
     );
   `);
 
-  await client.execute({
-    sql: 'INSERT OR IGNORE INTO users (id, email, name) VALUES (?, ?, ?);',
-    args: [DEMO_USER_ID, 'demo@example.com', 'Demo User'],
-  });
+  await client.execute(
+    'INSERT OR IGNORE INTO users (id, email, name) VALUES (?, ?, ?);',
+    [DEMO_USER_ID, 'demo@example.com', 'Demo User']
+  );
 
+  // transactions table
   await client.execute(`
     CREATE TABLE IF NOT EXISTS transactions (
       id TEXT PRIMARY KEY,
@@ -115,9 +115,15 @@ async function ensureTables(client: Client) {
   });
 }
 
-async function ensureColumns(client: Client, table: string, columns: Record<string, string>) {
+async function ensureColumns(
+  client: Client,
+  table: string,
+  columns: Record<string, string>
+) {
   const columnInfo = await client.execute(`PRAGMA table_info(${table});`);
-  const existingColumns = new Set((columnInfo.rows as Array<{ name?: string }>).map((row) => row.name));
+  const existingColumns = new Set(
+    (columnInfo.rows as Array<{ name?: string }>).map((row) => row.name)
+  );
 
   for (const [name, type] of Object.entries(columns)) {
     if (!existingColumns.has(name)) {
@@ -155,38 +161,50 @@ function validatePayload(payload: InsertPayload) {
   }
 
   if (payload.type === 'DIVIDEND') {
-    if (payload.dividendAmount === undefined) return 'dividendAmount is required for DIVIDEND';
+    if (payload.dividendAmount === undefined) {
+      return 'dividendAmount is required for DIVIDEND';
+    }
   }
 
   return null;
 }
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse
+) {
   try {
     const client = getClient();
     await ensureTables(client);
 
+    // GET: list transactions
     if (req.method === 'GET') {
-      const rows = await client.execute({
-        sql: 'SELECT * FROM transactions WHERE user_id = ? ORDER BY trade_date DESC, created_at DESC;',
-        args: [DEMO_USER_ID],
-      });
+      const rows = await client.execute(
+        'SELECT * FROM transactions WHERE user_id = ? ORDER BY trade_date DESC, created_at DESC;',
+        [DEMO_USER_ID]
+      );
 
-      const data: TransactionRow[] = (rows.rows as TransactionRow[]).map((row) => ({
-        ...row,
-        quantity: row.quantity !== null ? Number(row.quantity) : null,
-        price: row.price !== null ? Number(row.price) : null,
-        commission: row.commission !== null ? Number(row.commission) : null,
-        dividend_amount: row.dividend_amount !== null ? Number(row.dividend_amount) : null,
-        current_price: row.current_price !== null ? Number(row.current_price) : null,
-      }));
+      const data: TransactionRow[] = (rows.rows as unknown as TransactionRow[]).map(
+        (row) => ({
+          ...row,
+          quantity: row.quantity !== null ? Number(row.quantity) : null,
+          price: row.price !== null ? Number(row.price) : null,
+          commission: row.commission !== null ? Number(row.commission) : null,
+          dividend_amount:
+            row.dividend_amount !== null ? Number(row.dividend_amount) : null,
+          current_price:
+            row.current_price !== null ? Number(row.current_price) : null,
+        })
+      );
 
       res.status(200).json(data);
       return;
     }
 
+    // POST: insert transaction
     if (req.method === 'POST') {
-      const body: InsertPayload = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+      const body: InsertPayload =
+        typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
 
       const payload: InsertPayload = {
         symbol: body.symbol?.trim(),
@@ -211,18 +229,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       }
 
       const id = crypto.randomUUID();
-      const quantity = payload.type === 'SELL' && payload.quantity !== undefined ? -Math.abs(payload.quantity) : payload.quantity ?? null;
+      const quantity =
+        payload.type === 'SELL' && payload.quantity !== undefined
+          ? -Math.abs(payload.quantity)
+          : payload.quantity ?? null;
       const price = payload.price ?? null;
       const commission = payload.commission ?? 0;
-      const dividendAmount = payload.type === 'DIVIDEND' ? payload.dividendAmount ?? 0 : payload.dividendAmount ?? 0;
+      const dividendAmount =
+        payload.type === 'DIVIDEND'
+          ? payload.dividendAmount ?? 0
+          : payload.dividendAmount ?? 0;
 
-      await client.execute({
-        sql: `
+      await client.execute(
+        `
           INSERT INTO transactions (
-            id, user_id, symbol, product_name, category, broker, currency, type, quantity, price, commission, dividend_amount, trade_date, notes, current_price
+            id, user_id, symbol, product_name, category, broker, currency, type,
+            quantity, price, commission, dividend_amount, trade_date, notes, current_price
           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
         `,
-        args: [
+        [
           id,
           DEMO_USER_ID,
           payload.symbol ?? '',
@@ -230,26 +255,27 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
           payload.category ?? '',
           payload.broker ?? '',
           payload.currency ?? '',
-          payload.type,
+          payload.type ?? 'BUY',
           quantity,
           price,
           commission,
           dividendAmount,
           payload.tradeDate ?? null,
-          payload.notes,
+          payload.notes ?? null,
           payload.currentPrice ?? null,
-        ],
-      });
+        ]
+      );
 
       res.status(201).json({ ok: true, id });
       return;
     }
 
+    // DELETE: clear demo user's transactions
     if (req.method === 'DELETE') {
-      await client.execute({
-        sql: 'DELETE FROM transactions WHERE user_id = ?;',
-        args: [DEMO_USER_ID],
-      });
+      await client.execute(
+        'DELETE FROM transactions WHERE user_id = ?;',
+        [DEMO_USER_ID]
+      );
       res.status(200).json({ ok: true });
       return;
     }
@@ -258,8 +284,16 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     res.status(405).end('Method Not Allowed');
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unexpected error';
-    if (message.includes('LIBSQL_URL') || message.includes('LIBSQL_AUTH_TOKEN')) {
-      res.status(500).json({ error: 'Missing database keys (LIBSQL_URL / LIBSQL_AUTH_TOKEN). Add them in .env.local or Vercel settings.' });
+    if (
+      message.includes('TURSO_DATABASE_URL') ||
+      message.includes('TURSO_AUTH_TOKEN')
+    ) {
+      res
+        .status(500)
+        .json({
+          error:
+            'Missing database keys (TURSO_DATABASE_URL / TURSO_AUTH_TOKEN). Add them in .env.local or Vercel settings.',
+        });
       return;
     }
     res.status(500).json({ error: message });
