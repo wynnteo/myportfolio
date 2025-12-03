@@ -60,34 +60,58 @@ export default function HomePage() {
   const [currencyFilter, setCurrencyFilter] = useState<string>('All');
 
   async function loadTransactions() {
-    try {
-      setStatusText('Loading transactions from database...');
-      const response = await fetch('/api/transactions');
-      if (!response.ok) {
-        const errorData = await response.json();
-        const message: string = errorData?.error ?? 'Unknown error';
-        if (message.includes('LIBSQL_URL') || message.includes('LIBSQL_AUTH_TOKEN')) {
-          setStatusText('Missing database keys (LIBSQL_URL / LIBSQL_AUTH_TOKEN). Add them in .env.local or Vercel settings.');
-        } else {
-          setStatusText('Unable to load data from the database. Verify Turso credentials and connectivity.');
-        }
-        setStatusTone('error');
-        return;
-      }
-      const data: Transaction[] = await response.json();
-      setTransactions(data);
-      setStatusText('Connected to database');
-      setStatusTone('success');
-    } catch (error) {
-      const message = error instanceof Error ? error.message : '';
-      if (message.includes('LIBSQL_URL') || message.includes('LIBSQL_AUTH_TOKEN')) {
-        setStatusText('Missing database keys (LIBSQL_URL / LIBSQL_AUTH_TOKEN). Add them in .env.local or Vercel settings.');
+  try {
+    setStatusText('Loading transactions from database...');
+    const response = await fetch('/api/transactions');
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.log(errorData);
+      const message: string = errorData?.error ?? 'Unknown error';
+
+      if (
+        message.includes('TURSO_DATABASE_URL') ||
+        message.includes('TURSO_AUTH_TOKEN') ||
+        message.includes('Missing database keys')
+      ) {
+        setStatusText(
+          'Missing database keys (TURSO_DATABASE_URL / TURSO_AUTH_TOKEN). Add them in .env.local or Vercel project settings.'
+        );
       } else {
-        setStatusText('Unable to load data from the database. Verify Turso credentials and connectivity.');
+        setStatusText(
+          'Unable to load data from the database. Verify Turso credentials and connectivity.'
+        );
       }
+
       setStatusTone('error');
+      return;
     }
+
+    const data: Transaction[] = await response.json();
+    setTransactions(data);
+    setStatusText('Connected to database');
+    setStatusTone('success');
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+
+    if (
+      message.includes('TURSO_DATABASE_URL') ||
+      message.includes('TURSO_AUTH_TOKEN') ||
+      message.includes('Missing database keys')
+    ) {
+      setStatusText(
+        'Missing database keys (TURSO_DATABASE_URL / TURSO_AUTH_TOKEN). Add them in .env.local or Vercel project settings.'
+      );
+    } else {
+      setStatusText(
+        'Unable to load data from the database. Verify Turso credentials and connectivity.'
+      );
+    }
+
+    setStatusTone('error');
   }
+}
+
 
   useEffect(() => {
     void loadTransactions();
@@ -454,12 +478,12 @@ export default function HomePage() {
                   <td>{row.broker}</td>
                   <td>{row.currency}</td>
                   <td>{formatNumber(row.quantity, 4)}</td>
-                  <td>{formatCurrency(row.averagePrice, row.currency)}</td>
+                  <td>{row.averagePrice !== null ? row.averagePrice.toFixed(4) : '-'}</td>
                   <td>{formatCurrency(row.currentPrice, row.currency)}</td>
                   <td>{formatCurrency(row.totalCost, row.currency)}</td>
                   <td>{formatCurrency(row.currentValue, row.currency)}</td>
                   <td>{formatCurrency(row.pl, row.currency)}</td>
-                  <td>{row.plPct !== null ? `${row.plPct.toFixed(2)}%` : '-'}</td>
+                  <td>{row.plPct !== null ? `${row.plPct.toFixed(4)}%` : '-'}</td>
                   <td>{formatCurrency(row.dividends, row.currency)}</td>
                   <td>{formatCurrency(row.totalCommission, row.currency)}</td>
                 </tr>
@@ -486,7 +510,6 @@ export default function HomePage() {
                 <th>Currency</th>
                 <th>Quantity</th>
                 <th>Price</th>
-                <th>Dividend Amount</th>
                 <th>Commission</th>
                 <th>Notes</th>
               </tr>
@@ -503,7 +526,6 @@ export default function HomePage() {
                   <td>{tx.currency}</td>
                   <td>{tx.quantity !== null ? tx.quantity : '-'}</td>
                   <td>{tx.price !== null ? tx.price : '-'}</td>
-                  <td>{tx.dividend_amount !== null ? tx.dividend_amount : '-'}</td>
                   <td>{tx.commission !== null ? tx.commission : '-'}</td>
                   <td>{tx.notes}</td>
                 </tr>

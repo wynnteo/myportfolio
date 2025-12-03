@@ -3,7 +3,7 @@ import { createClient, type Client } from '@libsql/client';
 
 const DEMO_USER_ID = 'demo-user';
 
-const REQUIRED_ENV_VARS = ['LIBSQL_URL', 'LIBSQL_AUTH_TOKEN'] as const;
+const REQUIRED_ENV_VARS = ['TURSO_DATABASE_URL', 'TURSO_AUTH_TOKEN'] as const;
 
 type TransactionType = 'BUY' | 'SELL' | 'DIVIDEND';
 
@@ -49,14 +49,20 @@ function getMissingEnvVars(): string[] {
 function getClient(): Client {
   const missing = getMissingEnvVars();
   if (missing.length > 0) {
-    throw new Error('Missing database keys (LIBSQL_URL / LIBSQL_AUTH_TOKEN). Add them in .env.local or Vercel settings.');
+    // This message now reflects the real env var names
+    throw new Error(
+      `Missing database keys (${missing.join(
+        ', '
+      )}). Add them in .env.local or Vercel project settings.`
+    );
   }
 
   return createClient({
-    url: process.env.LIBSQL_URL as string,
-    authToken: process.env.LIBSQL_AUTH_TOKEN as string,
+    url: process.env.TURSO_DATABASE_URL as string,
+    authToken: process.env.TURSO_AUTH_TOKEN as string,
   });
 }
+
 
 async function ensureTables(client: Client) {
   await client.execute(`
