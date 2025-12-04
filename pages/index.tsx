@@ -1,4 +1,5 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 interface Transaction {
   id: string;
@@ -58,7 +59,6 @@ interface TransactionFormState {
   dividendAmount?: string;
   tradeDate?: string;
   notes?: string;
-  currentPrice?: string;
 }
 
 const brokers = ['Moo Moo', 'CMC Invest', 'DBS', 'HSBC', 'POEMS', 'FSMOne', 'IBKR', 'Other'];
@@ -79,6 +79,20 @@ function formatNumber(value: number | null, decimals = 2) {
 
 function getHoldingKey(symbol: string, broker: string | null | undefined) {
   return `${broker || 'Unknown'}__${symbol}`;
+}
+
+function getCategoryColor(category: string) {
+  const palette: Record<string, string> = {
+    'Unit Trusts': '#0ea5e9',
+    Stocks: '#6366f1',
+    REITs: '#22c55e',
+    ETF: '#f59e0b',
+    Bond: '#14b8a6',
+    Cash: '#e11d48',
+    Other: '#475569',
+  };
+
+  return palette[category] || '#475569';
 }
 
 function parseInputNumber(value?: string) {
@@ -158,16 +172,11 @@ export default function HomePage() {
   const [statusTone, setStatusTone] = useState<'info' | 'success' | 'error'>('info');
   const [brokerFilter, setBrokerFilter] = useState<string>('All');
   const [currencyFilter, setCurrencyFilter] = useState<string>('All');
-  const [isFetchingPrice, setIsFetchingPrice] = useState(false);
-  const [priceStatus, setPriceStatus] = useState<{ message: string; tone: 'info' | 'success' | 'error' } | null>(
-    null
-  );
   const [quotes, setQuotes] = useState<Record<string, QuoteResponse>>({});
   const [selectedHoldingKey, setSelectedHoldingKey] = useState<string | null>(null);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<TransactionFormState>({});
   const [actionMessage, setActionMessage] = useState<string | null>(null);
-  const formRef = useRef<HTMLFormElement | null>(null);
 
   async function loadTransactions() {
     try {
@@ -422,46 +431,6 @@ export default function HomePage() {
     [sortedTransactions, selectedHoldingKey]
   );
 
-  async function fetchLatestPrice() {
-    const symbolInput = formRef.current?.elements.namedItem('symbol') as HTMLInputElement | null;
-    const currentPriceInput = formRef.current?.elements.namedItem('currentPrice') as HTMLInputElement | null;
-
-    if (!symbolInput?.value) {
-      setPriceStatus({ message: 'Enter a symbol before fetching the latest price.', tone: 'error' });
-      return;
-    }
-
-    try {
-      setIsFetchingPrice(true);
-      setPriceStatus({ message: 'Fetching latest price...', tone: 'info' });
-      const response = await fetch(`/api/quote?symbol=${encodeURIComponent(symbolInput.value.trim())}`);
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        setPriceStatus({ message: (errorData as any)?.error ?? 'Unable to fetch price.', tone: 'error' });
-        return;
-      }
-
-      const data: { price: number; currency?: string | null; symbol: string; asOf?: string | null } =
-        await response.json();
-      const formatted = `${data.symbol} latest price: ${data.price}${
-        data.currency ? ` ${data.currency}` : ''
-      }`;
-      const dated = data.asOf ? `${formatted} (as of ${new Date(data.asOf).toLocaleString()})` : formatted;
-
-      if (currentPriceInput) {
-        currentPriceInput.value = data.price.toString();
-      }
-
-      setPriceStatus({ message: dated, tone: 'success' });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to fetch price.';
-      setPriceStatus({ message, tone: 'error' });
-    } finally {
-      setIsFetchingPrice(false);
-    }
-  }
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -481,7 +450,6 @@ export default function HomePage() {
       dividendAmount: formData.get('dividendAmount') ? Number(formData.get('dividendAmount')) : undefined,
       tradeDate: formData.get('tradeDate')?.toString(),
       notes: formData.get('notes')?.toString(),
-      currentPrice: formData.get('currentPrice') ? Number(formData.get('currentPrice')) : undefined,
     };
 
     const response = await fetch('/api/transactions', {
@@ -518,7 +486,6 @@ export default function HomePage() {
       dividendAmount: tx.dividend_amount !== null ? tx.dividend_amount.toString() : '',
       tradeDate: tx.trade_date ?? '',
       notes: tx.notes ?? '',
-      currentPrice: tx.current_price !== null ? tx.current_price.toString() : '',
     });
   }
 
@@ -546,7 +513,6 @@ export default function HomePage() {
       dividendAmount: parseInputNumber(editForm.dividendAmount) ?? original.dividend_amount ?? undefined,
       tradeDate: editForm.tradeDate ?? original.trade_date ?? undefined,
       notes: editForm.notes ?? original.notes ?? undefined,
-      currentPrice: parseInputNumber(editForm.currentPrice) ?? original.current_price ?? undefined,
     };
 
     const response = await fetch('/api/transactions', {
@@ -610,18 +576,30 @@ export default function HomePage() {
 
   return (
     <main>
-      <header>
-        <h1>Personal Portfolio Tracker</h1>
+      <header className="topbar">
+        <div>
+          <p className="eyebrow">Dashboard</p>
+          <h1>Personal Portfolio Tracker</h1>
+          <p className="muted">Stay on top of holdings, performance, and income at a glance.</p>
+        </div>
+        <nav className="nav-links" aria-label="Primary navigation">
+          <Link href="/">Dashboard</Link>
+          <Link href="/referrals">Referral hub</Link>
+        </nav>
         <span id="sync-status" className="badge" data-tone={statusTone}>
           {statusText}
         </span>
       </header>
 
-      <section aria-labelledby="add-transaction">
+      <section aria-labelledby="add-transaction" className="panel">
         <div className="section-title">
-          <h2 id="add-transaction">Add transaction</h2>
+          <div>
+            <p className="eyebrow">Journal</p>
+            <h2 id="add-transaction">Add transaction</h2>
+            <p className="muted">Keep the form lean—no manual current price entry needed.</p>
+          </div>
         </div>
-        <form ref={formRef} onSubmit={(event) => void handleSubmit(event)} className="form-grid">
+        <form onSubmit={(event) => void handleSubmit(event)} className="form-grid">
           <label>
             Symbol
             <input name="symbol" type="text" required placeholder="e.g. M44U" />
@@ -685,18 +663,6 @@ export default function HomePage() {
             <input name="dividendAmount" type="number" step="0.01" min="0" defaultValue={0} />
           </label>
           <label>
-            <div className="field-header">
-              <span>Current Price (optional)</span>
-              <button type="button" onClick={() => void fetchLatestPrice()} disabled={isFetchingPrice}>
-                {isFetchingPrice ? 'Fetching...' : 'Fetch latest price'}
-              </button>
-            </div>
-            <input name="currentPrice" type="number" step="0.0001" min="0" />
-            {priceStatus && (
-              <span className={`helper-text ${priceStatus.tone}`}>{priceStatus.message}</span>
-            )}
-          </label>
-          <label>
             Trade Date
             <input name="tradeDate" type="date" />
           </label>
@@ -704,38 +670,44 @@ export default function HomePage() {
             Notes
             <textarea name="notes" placeholder="Optional notes" />
           </label>
-          <div style={{ alignSelf: 'end' }}>
-            <button type="submit">Add Transaction</button>
+          <div className="form-actions">
+            <button type="submit">Add transaction</button>
           </div>
         </form>
       </section>
 
       <section aria-labelledby="summary">
         <div className="section-title">
-          <h2 id="summary">Portfolio overview</h2>
+          <div>
+            <p className="eyebrow">Overview</p>
+            <h2 id="summary">Portfolio snapshot</h2>
+          </div>
+          <div className="chip-group">
+            <span className="chip">{displayHoldings.length} holdings</span>
+            <span className="chip">{symbols.size} symbols</span>
+            <span className="chip">{transactions.length} transactions</span>
+          </div>
         </div>
         <div className="overview-grid">
           <div className="summary-card highlight">
-            <div className="stat-title">Holdings</div>
-            <div className="stat-value">
-              <strong>{displayHoldings.length}</strong> positions / <strong>{symbols.size}</strong> symbols
-            </div>
-            <div className="stat-sub">Transactions: {transactions.length}</div>
-          </div>
-          <div className="summary-card">
             <div className="stat-title">Invested capital</div>
             <div className="stat-value">{formatCurrency(totalCapital || null, 'SGD')}</div>
-            <div className="stat-sub">By currency: {allocations.byCurrency.length}</div>
+            <div className="stat-sub">Across {allocations.byCurrency.length} currencies</div>
           </div>
           <div className="summary-card">
             <div className="stat-title">Current value</div>
             <div className="stat-value">{formatCurrency(totalCurrentValue || null, 'SGD')}</div>
-            <div className="stat-sub">P/L: {formatCurrency(totalPl, 'SGD')}</div>
+            <div className="stat-sub">Live prices for {Object.keys(quotes).length} symbols</div>
+          </div>
+          <div className="summary-card">
+            <div className="stat-title">Total P/L</div>
+            <div className="stat-value">{formatCurrency(totalPl, 'SGD')}</div>
+            <div className="stat-sub">Unrealised basis</div>
           </div>
           <div className="summary-card">
             <div className="stat-title">Dividends received</div>
             <div className="stat-value">{formatCurrency(totalDividends || null, 'SGD')}</div>
-            <div className="stat-sub">Includes all currencies</div>
+            <div className="stat-sub">All currencies included</div>
           </div>
         </div>
         <div className="chart-grid">
@@ -752,7 +724,6 @@ export default function HomePage() {
                   </div>
                 </div>
               ))}
-              <div className="stat-line muted">Live prices fetched for {Object.keys(quotes).length} symbols</div>
             </div>
           </div>
         </div>
@@ -760,7 +731,10 @@ export default function HomePage() {
 
       <section aria-labelledby="holdings">
         <div className="section-title">
-          <h2 id="holdings">Holdings</h2>
+          <div>
+            <p className="eyebrow">Positions</p>
+            <h2 id="holdings">Holdings</h2>
+          </div>
           <div className="filters">
             <select value={brokerFilter} onChange={(e) => setBrokerFilter(e.target.value)}>
               <option value="All">All brokers</option>
@@ -787,37 +761,45 @@ export default function HomePage() {
                 <th>Symbol</th>
                 <th>Product</th>
                 <th>Category</th>
-                <th>Broker</th>
                 <th>Currency</th>
                 <th>Quantity</th>
                 <th>Avg Price</th>
                 <th>Current Price</th>
                 <th>Capital</th>
                 <th>Current Value</th>
+                <th>Dividends</th>
                 <th>P/L</th>
                 <th>P/L %</th>
-                <th>Dividends</th>
-                <th>Total Commission</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {displayHoldings.map((row) => (
                 <tr key={row.key}>
-                  <td>{row.symbol}</td>
+                  <td>
+                    <div className="cell-main">{row.symbol}</div>
+                    <div className="muted small">{row.broker}</div>
+                  </td>
                   <td>{row.productName}</td>
-                  <td>{row.category}</td>
-                  <td>{row.broker}</td>
+                  <td>
+                    <span className="category-pill">
+                      <span
+                        className="category-dot"
+                        style={{ backgroundColor: getCategoryColor(row.category) }}
+                        aria-hidden
+                      />
+                      {row.category}
+                    </span>
+                  </td>
                   <td>{row.currency}</td>
                   <td>{formatNumber(row.quantity, 2)}</td>
                   <td>{row.averagePrice !== null ? row.averagePrice.toFixed(4) : '-'}</td>
                   <td>{formatCurrency(row.currentPrice, row.currency)}</td>
                   <td>{formatCurrency(row.totalCost, row.currency)}</td>
                   <td>{formatCurrency(row.currentValue, row.currency)}</td>
+                  <td>{formatCurrency(row.dividends, row.currency)}</td>
                   <td>{formatCurrency(row.pl, row.currency)}</td>
                   <td>{row.plPct !== null ? `${row.plPct.toFixed(4)}%` : '-'}</td>
-                  <td>{formatCurrency(row.dividends, row.currency)}</td>
-                  <td>{formatCurrency(row.totalCommission, row.currency)}</td>
                   <td>
                     <button type="button" onClick={() => setSelectedHoldingKey(row.key)}>
                       View
@@ -845,6 +827,11 @@ export default function HomePage() {
               <button type="button" className="ghost" onClick={() => setSelectedHoldingKey(null)}>
                 Close
               </button>
+            </div>
+            <div className="modal-summary">
+              <span className="chip muted">Total commission {formatCurrency(selectedHolding.totalCommission, selectedHolding.currency)}</span>
+              <span className="chip">Capital {formatCurrency(selectedHolding.totalCost, selectedHolding.currency)}</span>
+              <span className="chip success">P/L {formatCurrency(selectedHolding.pl, selectedHolding.currency)}</span>
             </div>
             {actionMessage && <div className="helper-text info">{actionMessage}</div>}
             {selectedHoldingTransactions.length === 0 ? (
