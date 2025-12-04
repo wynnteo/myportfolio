@@ -758,8 +758,7 @@ export default function HomePage() {
           <table>
             <thead>
               <tr>
-                <th>Symbol</th>
-                <th>Product</th>
+                <th>Instrument</th>
                 <th>Category</th>
                 <th>Currency</th>
                 <th>Quantity</th>
@@ -769,44 +768,54 @@ export default function HomePage() {
                 <th>Current Value</th>
                 <th>Dividends</th>
                 <th>P/L</th>
-                <th>P/L %</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {displayHoldings.map((row) => (
-                <tr key={row.key}>
-                  <td>
-                    <div className="cell-main">{row.symbol}</div>
-                    <div className="muted small">{row.broker}</div>
-                  </td>
-                  <td>{row.productName}</td>
-                  <td>
-                    <span className="category-pill">
-                      <span
-                        className="category-dot"
-                        style={{ backgroundColor: getCategoryColor(row.category) }}
-                        aria-hidden
-                      />
-                      {row.category}
-                    </span>
-                  </td>
-                  <td>{row.currency}</td>
-                  <td>{formatNumber(row.quantity, 2)}</td>
-                  <td>{row.averagePrice !== null ? row.averagePrice.toFixed(4) : '-'}</td>
-                  <td>{formatCurrency(row.currentPrice, row.currency)}</td>
-                  <td>{formatCurrency(row.totalCost, row.currency)}</td>
-                  <td>{formatCurrency(row.currentValue, row.currency)}</td>
-                  <td>{formatCurrency(row.dividends, row.currency)}</td>
-                  <td>{formatCurrency(row.pl, row.currency)}</td>
-                  <td>{row.plPct !== null ? `${row.plPct.toFixed(4)}%` : '-'}</td>
-                  <td>
-                    <button type="button" onClick={() => setSelectedHoldingKey(row.key)}>
-                      View
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {displayHoldings.map((row) => {
+                const plClass = row.pl && row.pl !== 0 ? (row.pl > 0 ? 'pl-positive' : 'pl-negative') : 'pl-neutral';
+
+                return (
+                  <tr key={row.key}>
+                    <td>
+                      <div className="instrument-cell">
+                        <div className="cell-main">{row.symbol}</div>
+                        {row.productName && <div className="muted small">{row.productName}</div>}
+                      </div>
+                    </td>
+                    <td>
+                      <span className="category-pill">
+                        <span
+                          className="category-dot"
+                          style={{ backgroundColor: getCategoryColor(row.category) }}
+                          aria-hidden
+                        />
+                        {row.category}
+                      </span>
+                    </td>
+                    <td>{row.currency}</td>
+                    <td>{formatNumber(row.quantity, 2)}</td>
+                    <td>{row.averagePrice !== null ? row.averagePrice.toFixed(4) : '-'}</td>
+                    <td>{formatCurrency(row.currentPrice, row.currency)}</td>
+                    <td>{formatCurrency(row.totalCost, row.currency)}</td>
+                    <td>{formatCurrency(row.currentValue, row.currency)}</td>
+                    <td>{formatCurrency(row.dividends, row.currency)}</td>
+                    <td>
+                      <div className="pl-stack">
+                        <span>{formatCurrency(row.pl, row.currency)}</span>
+                        <span className={`pl-percent ${plClass}`}>
+                          {row.plPct !== null ? `${row.plPct.toFixed(2)}%` : '-'}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
+                      <button type="button" onClick={() => setSelectedHoldingKey(row.key)}>
+                        View
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
