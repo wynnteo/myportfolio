@@ -65,7 +65,7 @@ const brokers = ['Moo Moo', 'CMC Invest', 'DBS', 'HSBC', 'POEMS', 'FSMOne', 'IBK
 const categories = ['Unit Trusts', 'Stocks', 'REITs', 'ETF', 'Bond', 'Cash', 'Other'];
 const currencies = ['SGD', 'USD', 'MYR'];
 
-const chartPalette = ['#0ea5e9', '#6366f1', '#22c55e', '#f97316', '#e11d48', '#14b8a6', '#a855f7'];
+const chartPalette = ['#0ea5e9', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#84cc16', '#f97316'];
 
 function formatCurrency(value: number | null, currency: string) {
   if (value === null || Number.isNaN(value)) return '-';
@@ -84,15 +84,15 @@ function getHoldingKey(symbol: string, broker: string | null | undefined) {
 function getCategoryColor(category: string) {
   const palette: Record<string, string> = {
     'Unit Trusts': '#0ea5e9',
-    Stocks: '#6366f1',
-    REITs: '#22c55e',
+    Stocks: '#8b5cf6',
+    REITs: '#10b981',
     ETF: '#f59e0b',
-    Bond: '#14b8a6',
-    Cash: '#e11d48',
-    Other: '#475569',
+    Bond: '#06b6d4',
+    Cash: '#64748b',
+    Other: '#94a3b8',
   };
 
-  return palette[category] || '#475569';
+  return palette[category] || '#64748b';
 }
 
 function parseInputNumber(value?: string) {
@@ -362,10 +362,12 @@ export default function HomePage() {
   const allocations = useMemo(() => {
     const byCategory = new Map<string, number>();
     const byCurrency = new Map<string, number>();
+    const byHolding = new Map<string, number>();
 
     for (const row of displayHoldings) {
       byCategory.set(row.category, (byCategory.get(row.category) ?? 0) + row.totalCost);
       byCurrency.set(row.currency, (byCurrency.get(row.currency) ?? 0) + row.totalCost);
+      byHolding.set(row.symbol, (byHolding.get(row.symbol) ?? 0) + row.totalCost);
     }
 
     const totalCapital = Array.from(byCurrency.values()).reduce((sum, val) => sum + val, 0);
@@ -381,6 +383,11 @@ export default function HomePage() {
         value,
         pct: totalCapital ? (value / totalCapital) * 100 : 0,
       })),
+      byHolding: Array.from(byHolding.entries()).map(([name, value]) => ({
+        name,
+        value,
+        pct: totalCapital ? (value / totalCapital) * 100 : 0,
+      })).sort((a, b) => b.value - a.value),
     };
   }, [displayHoldings]);
 
@@ -427,7 +434,12 @@ export default function HomePage() {
   );
 
   const selectedHoldingTransactions = useMemo(
-    () => sortedTransactions.filter((tx) => getHoldingKey(tx.symbol, tx.broker) === selectedHoldingKey),
+    () => sortedTransactions.filter((tx) => getHoldingKey(tx.symbol, tx.broker) === selectedHoldingKey && tx.type !== 'DIVIDEND'),
+    [sortedTransactions, selectedHoldingKey]
+  );
+
+  const selectedHoldingDividends = useMemo(
+    () => sortedTransactions.filter((tx) => getHoldingKey(tx.symbol, tx.broker) === selectedHoldingKey && tx.type === 'DIVIDEND'),
     [sortedTransactions, selectedHoldingKey]
   );
 
@@ -473,20 +485,32 @@ export default function HomePage() {
   function startEditing(tx: Transaction) {
     setEditingTransactionId(tx.id);
     setActionMessage(null);
-    setEditForm({
-      symbol: tx.symbol,
-      productName: tx.product_name,
-      category: tx.category,
-      broker: tx.broker,
-      currency: tx.currency,
-      type: tx.type,
-      quantity: tx.quantity !== null ? Math.abs(tx.quantity).toString() : '',
-      price: tx.price !== null ? tx.price.toString() : '',
-      commission: tx.commission !== null ? tx.commission.toString() : '',
-      dividendAmount: tx.dividend_amount !== null ? tx.dividend_amount.toString() : '',
-      tradeDate: tx.trade_date ?? '',
-      notes: tx.notes ?? '',
-    });
+    
+    if (tx.type === 'DIVIDEND') {
+      setEditForm({
+        symbol: tx.symbol,
+        broker: tx.broker,
+        currency: tx.currency,
+        type: tx.type,
+        dividendAmount: tx.dividend_amount !== null ? tx.dividend_amount.toString() : '',
+        tradeDate: tx.trade_date ?? '',
+        notes: tx.notes ?? '',
+      });
+    } else {
+      setEditForm({
+        symbol: tx.symbol,
+        productName: tx.product_name,
+        category: tx.category,
+        broker: tx.broker,
+        currency: tx.currency,
+        type: tx.type,
+        quantity: tx.quantity !== null ? Math.abs(tx.quantity).toString() : '',
+        price: tx.price !== null ? tx.price.toString() : '',
+        commission: tx.commission !== null ? tx.commission.toString() : '',
+        tradeDate: tx.trade_date ?? '',
+        notes: tx.notes ?? '',
+      });
+    }
   }
 
   function cancelEditing() {
@@ -499,21 +523,31 @@ export default function HomePage() {
     const original = transactions.find((tx) => tx.id === editingTransactionId);
     if (!original) return;
 
-    const payload = {
+    const payload: any = {
       id: editingTransactionId,
       symbol: editForm.symbol ?? original.symbol,
-      productName: editForm.productName ?? original.product_name,
-      category: editForm.category ?? original.category,
       broker: editForm.broker ?? original.broker,
       currency: editForm.currency ?? original.currency,
       type: (editForm.type as Transaction['type']) ?? original.type,
-      quantity: parseInputNumber(editForm.quantity) ?? Math.abs(original.quantity ?? 0),
-      price: parseInputNumber(editForm.price) ?? original.price ?? undefined,
-      commission: parseInputNumber(editForm.commission) ?? original.commission ?? 0,
-      dividendAmount: parseInputNumber(editForm.dividendAmount) ?? original.dividend_amount ?? undefined,
       tradeDate: editForm.tradeDate ?? original.trade_date ?? undefined,
       notes: editForm.notes ?? original.notes ?? undefined,
     };
+
+    if (original.type === 'DIVIDEND') {
+      payload.dividendAmount = parseInputNumber(editForm.dividendAmount) ?? original.dividend_amount ?? undefined;
+      payload.quantity = undefined;
+      payload.price = undefined;
+      payload.commission = 0;
+      payload.productName = original.product_name;
+      payload.category = original.category;
+    } else {
+      payload.productName = editForm.productName ?? original.product_name;
+      payload.category = editForm.category ?? original.category;
+      payload.quantity = parseInputNumber(editForm.quantity) ?? Math.abs(original.quantity ?? 0);
+      payload.price = parseInputNumber(editForm.price) ?? original.price ?? undefined;
+      payload.commission = parseInputNumber(editForm.commission) ?? original.commission ?? 0;
+      payload.dividendAmount = undefined;
+    }
 
     const response = await fetch('/api/transactions', {
       method: 'PUT',
@@ -569,6 +603,10 @@ export default function HomePage() {
     () => Array.from(totals.plByCurrency.values()).reduce((sum, val) => sum + val, 0),
     [totals.plByCurrency]
   );
+  const totalPlPct = useMemo(
+    () => (totalCapital !== 0 ? (totalPl / totalCapital) * 100 : 0),
+    [totalPl, totalCapital]
+  );
   const totalDividends = useMemo(
     () => Array.from(totals.dividendsByCurrency.values()).reduce((sum, val) => sum + val, 0),
     [totals.dividendsByCurrency]
@@ -590,6 +628,46 @@ export default function HomePage() {
           {statusText}
         </span>
       </header>
+
+      <section aria-labelledby="summary">
+        <div className="section-title">
+          <div>
+            <p className="eyebrow">Overview</p>
+            <h2 id="summary">Portfolio snapshot</h2>
+          </div>
+          <div className="chip-group">
+            <span className="chip">{displayHoldings.length} holdings</span>
+            <span className="chip">{transactions.length} transactions</span>
+          </div>
+        </div>
+        <div className="overview-grid">
+          <div className="summary-card">
+            <div className="stat-title">Invested capital</div>
+            <div className="stat-value">{formatCurrency(totalCapital || null, 'SGD')}</div>
+            <div className="stat-sub">Across {allocations.byCurrency.length} currencies</div>
+          </div>
+          <div className="summary-card">
+            <div className="stat-title">Current value</div>
+            <div className="stat-value">{formatCurrency(totalCurrentValue || null, 'SGD')}</div>
+            <div className="stat-sub">Live prices for {Object.keys(quotes).length} symbols</div>
+          </div>
+          <div className={`summary-card ${totalPl > 0 ? 'profit' : totalPl < 0 ? 'loss' : ''}`}>
+            <div className="stat-title">Total P/L</div>
+            <div className="stat-value">{formatCurrency(totalPl, 'SGD')}</div>
+            <div className="stat-sub">{totalPlPct !== null && totalPlPct !== 0 ? `${totalPlPct.toFixed(2)}% ${totalPl >= 0 ? 'gain' : 'loss'}` : 'Unrealised basis'}</div>
+          </div>
+          <div className="summary-card">
+            <div className="stat-title">Dividends received</div>
+            <div className="stat-value">{formatCurrency(totalDividends || null, 'SGD')}</div>
+            <div className="stat-sub">All currencies included</div>
+          </div>
+        </div>
+        <div className="chart-grid">
+          <PieChart title="Allocation by category" data={allocations.byCategory} />
+          <PieChart title="Allocation by holding" data={allocations.byHolding} />
+          <PieChart title="Allocation by currency" data={allocations.byCurrency} />
+        </div>
+      </section>
 
       <section aria-labelledby="add-transaction" className="panel">
         <div className="section-title">
@@ -676,59 +754,6 @@ export default function HomePage() {
         </form>
       </section>
 
-      <section aria-labelledby="summary">
-        <div className="section-title">
-          <div>
-            <p className="eyebrow">Overview</p>
-            <h2 id="summary">Portfolio snapshot</h2>
-          </div>
-          <div className="chip-group">
-            <span className="chip">{displayHoldings.length} holdings</span>
-            <span className="chip">{symbols.size} symbols</span>
-            <span className="chip">{transactions.length} transactions</span>
-          </div>
-        </div>
-        <div className="overview-grid">
-          <div className="summary-card highlight">
-            <div className="stat-title">Invested capital</div>
-            <div className="stat-value">{formatCurrency(totalCapital || null, 'SGD')}</div>
-            <div className="stat-sub">Across {allocations.byCurrency.length} currencies</div>
-          </div>
-          <div className="summary-card">
-            <div className="stat-title">Current value</div>
-            <div className="stat-value">{formatCurrency(totalCurrentValue || null, 'SGD')}</div>
-            <div className="stat-sub">Live prices for {Object.keys(quotes).length} symbols</div>
-          </div>
-          <div className="summary-card">
-            <div className="stat-title">Total P/L</div>
-            <div className="stat-value">{formatCurrency(totalPl, 'SGD')}</div>
-            <div className="stat-sub">Unrealised basis</div>
-          </div>
-          <div className="summary-card">
-            <div className="stat-title">Dividends received</div>
-            <div className="stat-value">{formatCurrency(totalDividends || null, 'SGD')}</div>
-            <div className="stat-sub">All currencies included</div>
-          </div>
-        </div>
-        <div className="chart-grid">
-          <PieChart title="Allocation by category" data={allocations.byCategory} />
-          <PieChart title="Allocation by currency" data={allocations.byCurrency} />
-          <div className="chart-card">
-            <div className="chart-header">Breakdown by currency</div>
-            <div className="chart-body column">
-              {allocations.byCurrency.map((entry) => (
-                <div key={entry.name} className="stat-line">
-                  <div className="legend-name">{entry.name}</div>
-                  <div className="legend-subtext">
-                    {formatCurrency(entry.value, entry.name)} · {entry.pct.toFixed(1)}%
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </section>
-
       <section aria-labelledby="holdings">
         <div className="section-title">
           <div>
@@ -794,15 +819,15 @@ export default function HomePage() {
                       </span>
                     </td>
                     <td>{row.currency}</td>
-                    <td>{formatNumber(row.quantity, 2)}</td>
+                    <td>{formatNumber(row.quantity, 4)}</td>
                     <td>{row.averagePrice !== null ? row.averagePrice.toFixed(4) : '-'}</td>
-                    <td>{formatCurrency(row.currentPrice, row.currency)}</td>
+                    <td>{row.currentPrice !== null ? row.currentPrice.toFixed(4) : '-'}</td>
                     <td>{formatCurrency(row.totalCost, row.currency)}</td>
                     <td>{formatCurrency(row.currentValue, row.currency)}</td>
                     <td>{formatCurrency(row.dividends, row.currency)}</td>
                     <td>
                       <div className="pl-stack">
-                        <span>{formatCurrency(row.pl, row.currency)}</span>
+                        <span className={plClass}>{formatCurrency(row.pl, row.currency)}</span>
                         <span className={`pl-percent ${plClass}`}>
                           {row.plPct !== null ? `${row.plPct.toFixed(2)}%` : '-'}
                         </span>
@@ -829,223 +854,285 @@ export default function HomePage() {
                 <div className="modal-title">
                   {selectedHolding.symbol} · {selectedHolding.productName}
                 </div>
-                <div className="small">
-                  Broker: {selectedHolding.broker} · Currency: {selectedHolding.currency}
+                <div className="modal-meta">
+                  <span>Broker: {selectedHolding.broker}</span>
+                  <span>Currency: {selectedHolding.currency}</span>
                 </div>
               </div>
               <button type="button" className="ghost" onClick={() => setSelectedHoldingKey(null)}>
                 Close
               </button>
             </div>
-            <div className="modal-summary">
-              <span className="chip muted">Total commission {formatCurrency(selectedHolding.totalCommission, selectedHolding.currency)}</span>
-              <span className="chip">Capital {formatCurrency(selectedHolding.totalCost, selectedHolding.currency)}</span>
-              <span className="chip success">P/L {formatCurrency(selectedHolding.pl, selectedHolding.currency)}</span>
+            <div className="modal-stats">
+              <div className="modal-stat-item">
+                <div className="modal-stat-label">Total Commission</div>
+                <div className="modal-stat-value">{formatCurrency(selectedHolding.totalCommission, selectedHolding.currency)}</div>
+              </div>
+              <div className="modal-stat-item">
+                <div className="modal-stat-label">Capital Invested</div>
+                <div className="modal-stat-value">{formatCurrency(selectedHolding.totalCost, selectedHolding.currency)}</div>
+              </div>
+              <div className="modal-stat-item">
+                <div className="modal-stat-label">P/L</div>
+                <div className={`modal-stat-value ${selectedHolding.pl && selectedHolding.pl > 0 ? 'pl-positive' : selectedHolding.pl && selectedHolding.pl < 0 ? 'pl-negative' : ''}`}>
+                  {formatCurrency(selectedHolding.pl, selectedHolding.currency)}
+                  {selectedHolding.plPct !== null && (
+                    <span className="modal-stat-pct"> ({selectedHolding.plPct.toFixed(2)}%)</span>
+                  )}
+                </div>
+              </div>
             </div>
             {actionMessage && <div className="helper-text info">{actionMessage}</div>}
-            {selectedHoldingTransactions.length === 0 ? (
-              <p className="muted">No transactions for this holding yet.</p>
-            ) : (
-              <div className="table-wrapper modal-table">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Date</th>
-                      <th>Type</th>
-                      <th>Category</th>
-                      <th>Product</th>
-                      <th>Symbol</th>
-                      <th>Broker</th>
-                      <th>Currency</th>
-                      <th>Quantity</th>
-                      <th>Price</th>
-                      <th>Commission</th>
-                      <th>Dividend</th>
-                      <th>Notes</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedHoldingTransactions.map((tx) => {
-                      const isEditing = editingTransactionId === tx.id;
-                      return (
-                        <tr key={tx.id}>
-                          <td>
-                            {isEditing ? (
-                              <input
-                                type="date"
-                                value={editForm.tradeDate ?? tx.trade_date ?? ''}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, tradeDate: e.target.value }))}
-                              />
-                            ) : (
-                              tx.trade_date ?? '-'
-                            )}
-                          </td>
-                          <td>
-                            {isEditing ? (
-                              <select
-                                value={(editForm.type as Transaction['type']) ?? tx.type}
-                                onChange={(e) =>
-                                  setEditForm((prev) => ({ ...prev, type: e.target.value as Transaction['type'] }))
-                                }
-                              >
-                                <option value="BUY">BUY</option>
-                                <option value="SELL">SELL</option>
-                                <option value="DIVIDEND">DIVIDEND</option>
-                              </select>
-                            ) : (
-                              tx.type
-                            )}
-                          </td>
-                          <td>
-                            {isEditing ? (
-                              <input
-                                type="text"
-                                value={editForm.category ?? tx.category}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, category: e.target.value }))}
-                              />
-                            ) : (
-                              tx.category
-                            )}
-                          </td>
-                          <td>
-                            {isEditing ? (
-                              <input
-                                type="text"
-                                value={editForm.productName ?? tx.product_name}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, productName: e.target.value }))}
-                              />
-                            ) : (
-                              tx.product_name
-                            )}
-                          </td>
-                          <td>{tx.symbol}</td>
-                          <td>
-                            {isEditing ? (
-                              <input
-                                type="text"
-                                value={editForm.broker ?? tx.broker}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, broker: e.target.value }))}
-                              />
-                            ) : (
-                              tx.broker
-                            )}
-                          </td>
-                          <td>
-                            {isEditing ? (
-                              <select
-                                value={editForm.currency ?? tx.currency}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, currency: e.target.value }))}
-                              >
-                                {currencies.map((ccy) => (
-                                  <option key={ccy} value={ccy}>
-                                    {ccy}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : (
-                              tx.currency
-                            )}
-                          </td>
-                          <td>
-                            {isEditing ? (
-                              <input
-                                type="number"
-                                step="0.0001"
-                                value={editForm.quantity ?? (tx.quantity !== null ? Math.abs(tx.quantity) : '')}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, quantity: e.target.value }))}
-                              />
-                            ) : tx.quantity !== null ? (
-                              tx.quantity
-                            ) : (
-                              '-'
-                            )}
-                          </td>
-                          <td>
-                            {isEditing ? (
-                              <input
-                                type="number"
-                                step="0.0001"
-                                value={editForm.price ?? (tx.price ?? '')}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, price: e.target.value }))}
-                              />
-                            ) : tx.price !== null ? (
-                              tx.price
-                            ) : (
-                              '-'
-                            )}
-                          </td>
-                          <td>
-                            {isEditing ? (
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={editForm.commission ?? (tx.commission ?? '')}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, commission: e.target.value }))}
-                              />
-                            ) : tx.commission !== null ? (
-                              tx.commission
-                            ) : (
-                              '-'
-                            )}
-                          </td>
-                          <td>
-                            {isEditing ? (
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={editForm.dividendAmount ?? (tx.dividend_amount ?? '')}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, dividendAmount: e.target.value }))}
-                              />
-                            ) : tx.dividend_amount !== null ? (
-                              tx.dividend_amount
-                            ) : (
-                              '-'
-                            )}
-                          </td>
-                          <td>
-                            {isEditing ? (
-                              <input
-                                type="text"
-                                value={editForm.notes ?? (tx.notes ?? '')}
-                                onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
-                              />
-                            ) : (
-                              tx.notes
-                            )}
-                          </td>
-                          <td>
-                            {isEditing ? (
-                              <div className="action-row">
-                                <button type="button" onClick={() => void saveEdit()}>
-                                  Save
-                                </button>
-                                <button type="button" className="ghost" onClick={() => cancelEditing()}>
-                                  Cancel
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="action-row">
-                                <button type="button" onClick={() => startEditing(tx)}>
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  className="ghost danger"
-                                  onClick={() => void deleteTransaction(tx.id)}
+            
+            <div className="modal-section">
+              <h3 className="modal-section-title">Buy/Sell Transactions</h3>
+              {selectedHoldingTransactions.length === 0 ? (
+                <p className="muted">No transactions for this holding yet.</p>
+              ) : (
+                <div className="table-wrapper modal-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Type</th>
+                        <th>Category</th>
+                        <th>Product</th>
+                        <th>Quantity</th>
+                        <th>Price ({selectedHolding.currency})</th>
+                        <th>Commission ({selectedHolding.currency})</th>
+                        <th>Notes</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedHoldingTransactions.map((tx) => {
+                        const isEditing = editingTransactionId === tx.id;
+                        return (
+                          <tr key={tx.id}>
+                            <td>
+                              {isEditing ? (
+                                <input
+                                  type="date"
+                                  value={editForm.tradeDate ?? tx.trade_date ?? ''}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, tradeDate: e.target.value }))}
+                                />
+                              ) : (
+                                tx.trade_date ?? '-'
+                              )}
+                            </td>
+                            <td>
+                              {isEditing ? (
+                                <select
+                                  value={(editForm.type as Transaction['type']) ?? tx.type}
+                                  onChange={(e) =>
+                                    setEditForm((prev) => ({ ...prev, type: e.target.value as Transaction['type'] }))
+                                  }
                                 >
-                                  Delete
-                                </button>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                                  <option value="BUY">BUY</option>
+                                  <option value="SELL">SELL</option>
+                                </select>
+                              ) : (
+                                tx.type
+                              )}
+                            </td>
+                            <td>
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={editForm.category ?? tx.category}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, category: e.target.value }))}
+                                />
+                              ) : (
+                                tx.category
+                              )}
+                            </td>
+                            <td>
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={editForm.productName ?? tx.product_name}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, productName: e.target.value }))}
+                                />
+                              ) : (
+                                tx.product_name
+                              )}
+                            </td>
+                            <td>
+                              {isEditing ? (
+                                <input
+                                  type="number"
+                                  step="0.0001"
+                                  value={editForm.quantity ?? (tx.quantity !== null ? Math.abs(tx.quantity) : '')}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, quantity: e.target.value }))}
+                                />
+                              ) : tx.quantity !== null ? (
+                                Math.abs(tx.quantity).toFixed(4)
+                              ) : (
+                                '-'
+                              )}
+                            </td>
+                            <td>
+                              {isEditing ? (
+                                <input
+                                  type="number"
+                                  step="0.0001"
+                                  value={editForm.price ?? (tx.price ?? '')}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, price: e.target.value }))}
+                                />
+                              ) : tx.price !== null ? (
+                                tx.price.toFixed(4)
+                              ) : (
+                                '-'
+                              )}
+                            </td>
+                            <td>
+                              {isEditing ? (
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={editForm.commission ?? (tx.commission ?? '')}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, commission: e.target.value }))}
+                                />
+                              ) : tx.commission !== null ? (
+                                tx.commission.toFixed(2)
+                              ) : (
+                                '-'
+                              )}
+                            </td>
+                            <td>
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={editForm.notes ?? (tx.notes ?? '')}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
+                                />
+                              ) : (
+                                tx.notes
+                              )}
+                            </td>
+                            <td>
+                              {isEditing ? (
+                                <div className="action-row">
+                                  <button type="button" onClick={() => void saveEdit()}>
+                                    Save
+                                  </button>
+                                  <button type="button" className="ghost" onClick={() => cancelEditing()}>
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="action-row">
+                                  <button type="button" onClick={() => startEditing(tx)}>
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="ghost danger"
+                                    onClick={() => void deleteTransaction(tx.id)}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="modal-section">
+              <h3 className="modal-section-title">Dividend History</h3>
+              {selectedHoldingDividends.length === 0 ? (
+                <p className="muted">No dividends received yet.</p>
+              ) : (
+                <div className="table-wrapper modal-table">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th>Amount ({selectedHolding.currency})</th>
+                        <th>Notes</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedHoldingDividends.map((tx) => {
+                        const isEditing = editingTransactionId === tx.id;
+                        return (
+                          <tr key={tx.id}>
+                            <td>
+                              {isEditing ? (
+                                <input
+                                  type="date"
+                                  value={editForm.tradeDate ?? tx.trade_date ?? ''}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, tradeDate: e.target.value }))}
+                                />
+                              ) : (
+                                tx.trade_date ?? '-'
+                              )}
+                            </td>
+                            <td>
+                              {isEditing ? (
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={editForm.dividendAmount ?? (tx.dividend_amount ?? '')}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, dividendAmount: e.target.value }))}
+                                />
+                              ) : tx.dividend_amount !== null ? (
+                                tx.dividend_amount.toFixed(2)
+                              ) : (
+                                '-'
+                              )}
+                            </td>
+                            <td>
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={editForm.notes ?? (tx.notes ?? '')}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
+                                />
+                              ) : (
+                                tx.notes
+                              )}
+                            </td>
+                            <td>
+                              {isEditing ? (
+                                <div className="action-row">
+                                  <button type="button" onClick={() => void saveEdit()}>
+                                    Save
+                                  </button>
+                                  <button type="button" className="ghost" onClick={() => cancelEditing()}>
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="action-row">
+                                  <button type="button" onClick={() => startEditing(tx)}>
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="ghost danger"
+                                    onClick={() => void deleteTransaction(tx.id)}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

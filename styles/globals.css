@@ -1,8 +1,8 @@
 :root {
   font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   color: #0f172a;
-  background: radial-gradient(circle at 10% 20%, #e0f2fe, transparent 25%),
-    radial-gradient(circle at 90% 0%, #eef2ff, transparent 30%), #f8fafc;
+  background: radial-gradient(circle at 10% 20%, #f1f5f9, transparent 25%),
+    radial-gradient(circle at 90% 0%, #f8fafc, transparent 30%), #ffffff;
 }
 
 * {
@@ -72,7 +72,7 @@ section {
   font-size: 11px;
   letter-spacing: 0.12em;
   font-weight: 800;
-  color: #0ea5e9;
+  color: #64748b;
   margin: 0;
 }
 
@@ -104,8 +104,8 @@ section {
 }
 
 .badge[data-tone='info'] {
-  background: #e0f2fe;
-  color: #075985;
+  background: #f1f5f9;
+  color: #475569;
 }
 
 .badge[data-tone='success'] {
@@ -182,19 +182,31 @@ textarea {
 }
 
 button {
-  background: #0ea5e9;
-  border: 1px solid #0ea5e9;
-  color: #fff;
-  font-weight: 700;
-  padding: 10px 14px;
-  border-radius: 10px;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 6px;
   cursor: pointer;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
+  transition: all 0.15s ease;
+  font-size: 13px;
 }
 
 button:hover {
-  background: #0284c7;
-  border-color: #0284c7;
+  background: #f8fafc;
+  border-color: #94a3b8;
+}
+
+button[type="submit"] {
+  background: #0f172a;
+  color: #fff;
+  border-color: #0f172a;
+}
+
+button[type="submit"]:hover {
+  background: #1e293b;
+  border-color: #1e293b;
 }
 
 .table-wrapper {
@@ -235,43 +247,54 @@ th {
 }
 
 .summary-card {
-  padding: 12px;
+  padding: 16px;
   border-radius: 10px;
-  background: linear-gradient(145deg, #f8fafc, #eef2ff);
+  background: #ffffff;
   border: 1px solid #e2e8f0;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
 }
 
-.summary-card.highlight {
-  background: linear-gradient(135deg, #0ea5e9, #6366f1);
-  color: #f8fafc;
-  border: none;
+.summary-card.profit {
+  background: linear-gradient(135deg, #dcfce7, #f0fdf4);
+  border-color: #86efac;
+}
+
+.summary-card.loss {
+  background: linear-gradient(135deg, #fee2e2, #fef2f2);
+  border-color: #fca5a5;
 }
 
 .stat-title {
   font-size: 13px;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.summary-card.profit .stat-title,
+.summary-card.loss .stat-title {
   color: #475569;
 }
 
-.summary-card.highlight .stat-title {
-  color: #e2e8f0;
+.stat-value {
+  font-size: 24px;
+  font-weight: 800;
+  margin: 8px 0;
+  color: #0f172a;
 }
 
-.stat-value {
-  font-size: 20px;
-  font-weight: 800;
-  margin: 6px 0;
+.summary-card.profit .stat-value {
+  color: #16a34a;
+}
+
+.summary-card.loss .stat-value {
+  color: #dc2626;
 }
 
 .stat-sub {
   font-size: 13px;
-  color: #475569;
-}
-
-.summary-card.highlight .stat-sub {
-  color: #e2e8f0;
+  color: #64748b;
 }
 
 .chart-grid {
@@ -379,10 +402,6 @@ th {
   border-bottom: none;
 }
 
-.muted {
-  color: #64748b;
-}
-
 .table-wrapper.modal-table table {
   min-width: 900px;
 }
@@ -410,22 +429,75 @@ th {
 
 .modal-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .modal-title {
   font-size: 18px;
   font-weight: 800;
+  margin-bottom: 4px;
 }
 
-.modal-summary {
+.modal-meta {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 10px;
+  gap: 12px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.modal-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.modal-stat-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.modal-stat-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.modal-stat-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.modal-stat-pct {
+  font-size: 14px;
+  margin-left: 4px;
+}
+
+.modal-section {
+  margin-bottom: 24px;
+}
+
+.modal-section:last-child {
+  margin-bottom: 0;
+}
+
+.modal-section-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 12px 0;
+  color: #0f172a;
 }
 
 .action-row {
@@ -436,12 +508,14 @@ th {
 
 .ghost {
   background: #fff;
-  color: #0f172a;
+  color: #64748b;
   border: 1px solid #cbd5e1;
 }
 
 .ghost:hover {
-  background: #e2e8f0;
+  background: #f8fafc;
+  color: #0f172a;
+  border-color: #94a3b8;
 }
 
 .ghost.danger {
