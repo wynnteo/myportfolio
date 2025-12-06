@@ -121,6 +121,20 @@ function PieChart({
     );
   }
 
+  // Get color based on category name or use chart palette
+  const getColor = (name: string, index: number) => {
+    const categoryColors: Record<string, string> = {
+      'Unit Trusts': '#1e40af',
+      Stocks: '#7c3aed',
+      REITs: '#059669',
+      ETF: '#d97706',
+      Bond: '#0891b2',
+      Cash: '#64748b',
+      Other: '#94a3b8',
+    };
+    return categoryColors[name] || chartPalette[index % chartPalette.length];
+  };
+
   return (
     <div className="chart-card">
       <div className="chart-header">{title}</div>
@@ -136,7 +150,7 @@ function PieChart({
                   cx="60"
                   cy="60"
                   fill="transparent"
-                  stroke={chartPalette[index % chartPalette.length]}
+                  stroke={getColor(entry.name, index)}
                   strokeWidth="18"
                   strokeDasharray={`${dash} ${circumference}`}
                   strokeDashoffset={offset}
@@ -152,9 +166,9 @@ function PieChart({
             <div key={entry.name} className="legend-row">
               <span
                 className="legend-swatch"
-                style={{ background: chartPalette[index % chartPalette.length] }}
+                style={{ background: getColor(entry.name, index) }}
               />
-              <div>
+              <div className="legend-content">
                 <div className="legend-name">{entry.name}</div>
                 <div className="legend-subtext">{entry.pct.toFixed(1)}%</div>
               </div>
@@ -791,7 +805,7 @@ export default function HomePage() {
                 <th>Current Price</th>
                 <th>Capital</th>
                 <th>Current Value</th>
-                <th>Dividends</th>
+                <th>Total Dividends</th>
                 <th>P/L</th>
                 <th>Actions</th>
               </tr>
@@ -857,6 +871,7 @@ export default function HomePage() {
                 <div className="modal-meta">
                   <span>Broker: {selectedHolding.broker}</span>
                   <span>Currency: {selectedHolding.currency}</span>
+                  <span>Quantity: {selectedHolding.quantity.toFixed(4)}</span>
                 </div>
               </div>
               <button type="button" className="ghost" onClick={() => setSelectedHoldingKey(null)}>
@@ -865,12 +880,20 @@ export default function HomePage() {
             </div>
             <div className="modal-stats">
               <div className="modal-stat-item">
-                <div className="modal-stat-label">Total Commission</div>
-                <div className="modal-stat-value">{formatCurrency(selectedHolding.totalCommission, selectedHolding.currency)}</div>
-              </div>
-              <div className="modal-stat-item">
                 <div className="modal-stat-label">Capital Invested</div>
                 <div className="modal-stat-value">{formatCurrency(selectedHolding.totalCost, selectedHolding.currency)}</div>
+              </div>
+              <div className="modal-stat-item">
+                <div className="modal-stat-label">Current Value</div>
+                <div className="modal-stat-value">{formatCurrency(selectedHolding.currentValue, selectedHolding.currency)}</div>
+              </div>
+              <div className="modal-stat-item">
+                <div className="modal-stat-label">Total Dividends</div>
+                <div className="modal-stat-value">{formatCurrency(selectedHolding.dividends, selectedHolding.currency)}</div>
+              </div>
+              <div className="modal-stat-item">
+                <div className="modal-stat-label">Total Commission</div>
+                <div className="modal-stat-value">{formatCurrency(selectedHolding.totalCommission, selectedHolding.currency)}</div>
               </div>
               <div className="modal-stat-item">
                 <div className="modal-stat-label">P/L</div>
