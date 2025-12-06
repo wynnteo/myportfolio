@@ -65,7 +65,7 @@ const brokers = ['Moo Moo', 'CMC Invest', 'DBS', 'HSBC', 'POEMS', 'FSMOne', 'IBK
 const categories = ['Unit Trusts', 'Stocks', 'REITs', 'ETF', 'Bond', 'Cash', 'Other'];
 const currencies = ['SGD', 'USD', 'MYR'];
 
-const chartPalette = ['#1e40af', '#7c3aed', '#059669', '#d97706', '#dc2626', '#db2777', '#0891b2', '#65a30d', '#ea580c'];
+const chartPalette = ['#1e40af', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#dbeafe', '#eff6ff', '#7c3aed'];
 
 function formatCurrency(value: number | null, currency: string) {
   if (value === null || Number.isNaN(value)) return '-';
@@ -86,13 +86,31 @@ function getHoldingKey(symbol: string, broker: string | null | undefined) {
   return `${broker || 'Unknown'}__${symbol}`;
 }
 
+// Generate gradient colors based on position
+function getGradientColor(index: number, total: number) {
+  // Navy blue gradient from dark to light
+  const startHue = 220;
+  const endHue = 220;
+  const startSat = 70;
+  const endSat = 85;
+  const startLight = 25;
+  const endLight = 75;
+  
+  const ratio = total > 1 ? index / (total - 1) : 0;
+  const hue = startHue + (endHue - startHue) * ratio;
+  const sat = startSat + (endSat - startSat) * ratio;
+  const light = startLight + (endLight - startLight) * ratio;
+  
+  return `hsl(${hue}, ${sat}%, ${light}%)`;
+}
+
 function getCategoryColor(category: string) {
   const palette: Record<string, string> = {
     'Unit Trusts': '#1e40af',
-    Stocks: '#7c3aed',
-    REITs: '#059669',
-    ETF: '#d97706',
-    Bond: '#0891b2',
+    Stocks: '#2563eb',
+    REITs: '#3b82f6',
+    ETF: '#60a5fa',
+    Bond: '#93c5fd',
     Cash: '#64748b',
     Other: '#94a3b8',
   };
@@ -130,14 +148,21 @@ function PieChart({
   const getColor = (name: string, index: number) => {
     const categoryColors: Record<string, string> = {
       'Unit Trusts': '#1e40af',
-      Stocks: '#7c3aed',
-      REITs: '#059669',
-      ETF: '#d97706',
-      Bond: '#0891b2',
+      Stocks: '#2563eb',
+      REITs: '#3b82f6',
+      ETF: '#60a5fa',
+      Bond: '#93c5fd',
       Cash: '#64748b',
       Other: '#94a3b8',
     };
-    return categoryColors[name] || chartPalette[index % chartPalette.length];
+    
+    // For categories, use fixed colors
+    if (categoryColors[name]) {
+      return categoryColors[name];
+    }
+    
+    // For holdings and currencies, use gradient based on position
+    return getGradientColor(index, data.length);
   };
 
   return (
@@ -917,8 +942,8 @@ export default function HomePage() {
           <table>
             <thead>
               <tr>
-                <th>Instrument</th>
                 <th>Category</th>
+                <th>Instrument</th>
                 <th>Currency</th>
                 <th>Quantity</th>
                 <th>Avg Price</th>
@@ -937,12 +962,6 @@ export default function HomePage() {
                 return (
                   <tr key={row.key}>
                     <td>
-                      <div className="instrument-cell">
-                        <div className="cell-main">{row.symbol}</div>
-                        {row.productName && <div className="muted small">{row.productName}</div>}
-                      </div>
-                    </td>
-                    <td>
                       <span className="category-pill">
                         <span
                           className="category-dot"
@@ -951,6 +970,12 @@ export default function HomePage() {
                         />
                         {row.category}
                       </span>
+                    </td>
+                    <td>
+                      <div className="instrument-cell">
+                        <div className="cell-main">{row.symbol}</div>
+                        {row.productName && <div className="muted small">{row.productName}</div>}
+                      </div>
                     </td>
                     <td>{row.currency}</td>
                     <td>{formatQuantity(row.quantity)}</td>
@@ -991,7 +1016,8 @@ export default function HomePage() {
                 <div className="modal-meta">
                   <span>Broker: {selectedHolding.broker}</span>
                   <span>Currency: {selectedHolding.currency}</span>
-                  <span>Quantity: {selectedHolding.quantity.toFixed(4)}</span>
+                  <span>Qty: {formatQuantity(selectedHolding.quantity)}</span>
+                  <span>Commission: {formatCurrency(selectedHolding.totalCommission, selectedHolding.currency)}</span>
                 </div>
               </div>
               <button type="button" className="ghost" onClick={() => setSelectedHoldingKey(null)}>
@@ -1039,11 +1065,6 @@ export default function HomePage() {
                   </div>
                 </div>
               </div>
-
-              <div className="modal-stat-card compact">
-                <div className="stat-label-small">Total Commission</div>
-                <div className="stat-value-medium">{formatCurrency(selectedHolding.totalCommission, selectedHolding.currency)}</div>
-              </div>
             </div>
             {actionMessage && <div className="helper-text info">{actionMessage}</div>}
             
@@ -1061,8 +1082,8 @@ export default function HomePage() {
                         <th>Category</th>
                         <th>Product</th>
                         <th>Quantity</th>
-                        <th>Price ({selectedHolding.currency})</th>
-                        <th>Commission ({selectedHolding.currency})</th>
+                        <th>Price</th>
+                        <th>Commission</th>
                         <th>Notes</th>
                         <th>Actions</th>
                       </tr>
@@ -1129,7 +1150,7 @@ export default function HomePage() {
                                   onChange={(e) => setEditForm((prev) => ({ ...prev, quantity: e.target.value }))}
                                 />
                               ) : tx.quantity !== null ? (
-                                Math.abs(tx.quantity).toFixed(4)
+                                formatQuantity(Math.abs(tx.quantity))
                               ) : (
                                 '-'
                               )}
@@ -1143,7 +1164,7 @@ export default function HomePage() {
                                   onChange={(e) => setEditForm((prev) => ({ ...prev, price: e.target.value }))}
                                 />
                               ) : tx.price !== null ? (
-                                tx.price.toFixed(4)
+                                `${selectedHolding.currency} ${tx.price.toFixed(4)}`
                               ) : (
                                 '-'
                               )}
@@ -1157,7 +1178,7 @@ export default function HomePage() {
                                   onChange={(e) => setEditForm((prev) => ({ ...prev, commission: e.target.value }))}
                                 />
                               ) : tx.commission !== null ? (
-                                tx.commission.toFixed(2)
+                                `${selectedHolding.currency} ${tx.commission.toFixed(2)}`
                               ) : (
                                 '-'
                               )}
@@ -1260,7 +1281,7 @@ export default function HomePage() {
                     <thead>
                       <tr>
                         <th>Date</th>
-                        <th>Amount ({selectedHolding.currency})</th>
+                        <th>Amount</th>
                         <th>Notes</th>
                         <th>Actions</th>
                       </tr>
@@ -1290,7 +1311,7 @@ export default function HomePage() {
                                   onChange={(e) => setEditForm((prev) => ({ ...prev, dividendAmount: e.target.value }))}
                                 />
                               ) : tx.dividend_amount !== null ? (
-                                tx.dividend_amount.toFixed(2)
+                                `${selectedHolding.currency} ${tx.dividend_amount.toFixed(2)}`
                               ) : (
                                 '-'
                               )}
