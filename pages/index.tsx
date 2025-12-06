@@ -191,6 +191,8 @@ export default function HomePage() {
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<TransactionFormState>({});
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [showAddDividend, setShowAddDividend] = useState(false);
+  const [dividendForm, setDividendForm] = useState({ amount: '', date: '', notes: '' });
 
   async function loadTransactions() {
     try {
