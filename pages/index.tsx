@@ -65,7 +65,7 @@ const brokers = ['Moo Moo', 'CMC Invest', 'DBS', 'HSBC', 'POEMS', 'FSMOne', 'IBK
 const categories = ['Unit Trusts', 'Stocks', 'REITs', 'ETF', 'Bond', 'Cash', 'Other'];
 const currencies = ['SGD', 'USD', 'MYR'];
 
-const chartPalette = ['#0ea5e9', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#06b6d4', '#84cc16', '#f97316'];
+const chartPalette = ['#1e40af', '#7c3aed', '#059669', '#d97706', '#dc2626', '#db2777', '#0891b2', '#65a30d', '#ea580c'];
 
 function formatCurrency(value: number | null, currency: string) {
   if (value === null || Number.isNaN(value)) return '-';
@@ -83,11 +83,11 @@ function getHoldingKey(symbol: string, broker: string | null | undefined) {
 
 function getCategoryColor(category: string) {
   const palette: Record<string, string> = {
-    'Unit Trusts': '#0ea5e9',
-    Stocks: '#8b5cf6',
-    REITs: '#10b981',
-    ETF: '#f59e0b',
-    Bond: '#06b6d4',
+    'Unit Trusts': '#1e40af',
+    Stocks: '#7c3aed',
+    REITs: '#059669',
+    ETF: '#d97706',
+    Bond: '#0891b2',
     Cash: '#64748b',
     Other: '#94a3b8',
   };
