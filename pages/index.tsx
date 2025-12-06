@@ -475,7 +475,6 @@ export default function HomePage() {
       quantity: formData.get('quantity') ? Number(formData.get('quantity')) : undefined,
       price: formData.get('price') ? Number(formData.get('price')) : undefined,
       commission: formData.get('commission') ? Number(formData.get('commission')) : 0,
-      dividendAmount: formData.get('dividendAmount') ? Number(formData.get('dividendAmount')) : undefined,
       tradeDate: formData.get('tradeDate')?.toString(),
       notes: formData.get('notes')?.toString(),
     };
@@ -495,6 +494,41 @@ export default function HomePage() {
     }
 
     form.reset();
+    await loadTransactions();
+  }
+
+  async function handleAddDividend() {
+    if (!selectedHolding) return;
+    
+    const payload = {
+      symbol: selectedHolding.symbol,
+      productName: selectedHolding.productName,
+      category: selectedHolding.category,
+      broker: selectedHolding.broker,
+      currency: selectedHolding.currency,
+      type: 'DIVIDEND',
+      dividendAmount: Number(dividendForm.amount),
+      tradeDate: dividendForm.date,
+      notes: dividendForm.notes,
+    };
+
+    const response = await fetch('/api/transactions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      setActionMessage(`Failed to add dividend: ${(error as any)?.error ?? 'Unknown error'}`);
+      return;
+    }
+
+    setActionMessage('Dividend added successfully.');
+    setShowAddDividend(false);
+    setDividendForm({ amount: '', date: '', notes: '' });
     await loadTransactions();
   }
 
@@ -737,24 +771,19 @@ export default function HomePage() {
             <select name="type" defaultValue="BUY">
               <option value="BUY">BUY</option>
               <option value="SELL">SELL</option>
-              <option value="DIVIDEND">DIVIDEND</option>
             </select>
           </label>
           <label>
             Quantity
-            <input name="quantity" type="number" step="0.0001" min="0" />
+            <input name="quantity" type="number" step="0.0001" min="0" required />
           </label>
           <label>
             Price
-            <input name="price" type="number" step="0.0001" min="0" />
+            <input name="price" type="number" step="0.0001" min="0" required />
           </label>
           <label>
             Commission
             <input name="commission" type="number" step="0.01" min="0" defaultValue={0} />
-          </label>
-          <label>
-            Dividend Amount
-            <input name="dividendAmount" type="number" step="0.01" min="0" defaultValue={0} />
           </label>
           <label>
             Trade Date
@@ -1070,7 +1099,50 @@ export default function HomePage() {
             </div>
 
             <div className="modal-section">
-              <h3 className="modal-section-title">Dividend History</h3>
+              <div className="section-header">
+                <h3 className="modal-section-title">Dividend History</h3>
+                <button type="button" onClick={() => setShowAddDividend(!showAddDividend)}>
+                  {showAddDividend ? 'Cancel' : '+ Add Dividend'}
+                </button>
+              </div>
+              
+              {showAddDividend && (
+                <div className="add-dividend-form">
+                  <label>
+                    Amount ({selectedHolding.currency})
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={dividendForm.amount}
+                      onChange={(e) => setDividendForm({ ...dividendForm, amount: e.target.value })}
+                      placeholder="0.00"
+                      required
+                    />
+                  </label>
+                  <label>
+                    Date
+                    <input
+                      type="date"
+                      value={dividendForm.date}
+                      onChange={(e) => setDividendForm({ ...dividendForm, date: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Notes
+                    <input
+                      type="text"
+                      value={dividendForm.notes}
+                      onChange={(e) => setDividendForm({ ...dividendForm, notes: e.target.value })}
+                      placeholder="Optional notes"
+                    />
+                  </label>
+                  <button type="button" onClick={() => void handleAddDividend()}>
+                    Save Dividend
+                  </button>
+                </div>
+              )}
+              
               {selectedHoldingDividends.length === 0 ? (
                 <p className="muted">No dividends received yet.</p>
               ) : (
