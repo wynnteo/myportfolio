@@ -65,8 +65,6 @@ const brokers = ['Moo Moo', 'CMC Invest', 'DBS', 'HSBC', 'POEMS', 'FSMOne', 'IBK
 const categories = ['Unit Trusts', 'Stocks', 'REITs', 'ETF', 'Bond', 'Cash', 'Other'];
 const currencies = ['SGD', 'USD', 'MYR'];
 
-const chartPalette = ['#1e40af', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#dbeafe', '#eff6ff', '#7c3aed'];
-
 function formatCurrency(value: number | null, currency: string) {
   if (value === null || Number.isNaN(value)) return '-';
   return new Intl.NumberFormat('en-SG', { style: 'currency', currency }).format(value);
@@ -89,11 +87,9 @@ function getCurrencySymbol(currency: string) {
 
 function formatQuantity(value: number | null) {
   if (value === null || Number.isNaN(value)) return '-';
-  // If it's a whole number, show no decimals
   if (value === Math.floor(value)) {
     return value.toString();
   }
-  // Otherwise show up to 4 decimals, removing trailing zeros
   return value.toFixed(4).replace(/\.?0+$/, '');
 }
 
@@ -101,30 +97,13 @@ function getHoldingKey(symbol: string, broker: string | null | undefined) {
   return `${broker || 'Unknown'}__${symbol}`;
 }
 
-// Generate gradient colors based on position with more obvious differences
 function getGradientColor(index: number, total: number) {
-  // Navy blue to sky blue gradient with better contrast
   const colors = [
-    '#1e3a8a', // Very dark navy
-    '#1e40af', // Dark navy
-    '#2563eb', // Navy blue
-    '#3b82f6', // Blue
-    '#60a5fa', // Light blue
-    '#93c5fd', // Sky blue
-    '#bfdbfe', // Very light blue
-    '#dbeafe', // Pale blue
+    '#0f172a', '#1e40af', '#2563eb', '#3b82f6',
+    '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+    '#ec4899', '#06b6d4',
   ];
-  
-  if (total <= colors.length) {
-    return colors[index] || colors[colors.length - 1];
-  }
-  
-  // For more items, interpolate
-  const colorIndex = (index / (total - 1)) * (colors.length - 1);
-  const lowerIndex = Math.floor(colorIndex);
-  const upperIndex = Math.ceil(colorIndex);
-  
-  return colors[lowerIndex] || colors[0];
+  return colors[index % colors.length];
 }
 
 function getCategoryColor(category: string) {
@@ -132,12 +111,11 @@ function getCategoryColor(category: string) {
     'Unit Trusts': '#1e40af',
     Stocks: '#2563eb',
     REITs: '#3b82f6',
-    ETF: '#60a5fa',
-    Bond: '#93c5fd',
+    ETF: '#10b981',
+    Bond: '#f59e0b',
     Cash: '#64748b',
     Other: '#94a3b8',
   };
-
   return palette[category] || '#64748b';
 }
 
@@ -152,9 +130,10 @@ function PieChart({
   data,
   title,
 }: {
-  data: Array<{ name: string; pct: number; value: number }>;
+  data: Array<{ name: string; pct: number; value: number; currency?: string }>;
   title: string;
 }) {
+  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
   const radius = 52;
   const circumference = 2 * Math.PI * radius;
   let offset = 0;
@@ -167,24 +146,21 @@ function PieChart({
     );
   }
 
-  // Get color based on category name or use chart palette
   const getColor = (name: string, index: number) => {
     const categoryColors: Record<string, string> = {
       'Unit Trusts': '#1e40af',
       Stocks: '#2563eb',
       REITs: '#3b82f6',
-      ETF: '#60a5fa',
-      Bond: '#93c5fd',
+      ETF: '#10b981',
+      Bond: '#f59e0b',
       Cash: '#64748b',
       Other: '#94a3b8',
     };
     
-    // For categories, use fixed colors
     if (categoryColors[name]) {
       return categoryColors[name];
     }
     
-    // For holdings and currencies, use gradient based on position
     return getGradientColor(index, data.length);
   };
 
@@ -196,6 +172,9 @@ function PieChart({
           <g transform="rotate(-90 60 60)">
             {data.map((entry, index) => {
               const dash = (entry.pct / 100) * circumference;
+              const isSelected = selectedIndex === index;
+              const isOtherSelected = selectedIndex !== null && selectedIndex !== index;
+              
               const circle = (
                 <circle
                   key={entry.name}
@@ -204,9 +183,21 @@ function PieChart({
                   cy="60"
                   fill="transparent"
                   stroke={getColor(entry.name, index)}
-                  strokeWidth="18"
+                  strokeWidth={isSelected ? "22" : "18"}
                   strokeDasharray={`${dash} ${circumference}`}
                   strokeDashoffset={offset}
+                  style={{
+                    cursor: 'pointer',
+                    opacity: isOtherSelected ? 0.3 : 1,
+                    transition: 'all 0.2s ease',
+                  }}
+                  onClick={() => setSelectedIndex(selectedIndex === index ? null : index)}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.filter = 'brightness(1.2)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.filter = 'brightness(1)';
+                  }}
                 />
               );
               offset -= dash;
@@ -215,18 +206,38 @@ function PieChart({
           </g>
         </svg>
         <div className="chart-legend">
-          {data.map((entry, index) => (
-            <div key={entry.name} className="legend-row">
-              <span
-                className="legend-swatch"
-                style={{ background: getColor(entry.name, index) }}
-              />
-              <div className="legend-content">
-                <div className="legend-name">{entry.name}</div>
-                <div className="legend-subtext">{entry.pct.toFixed(1)}%</div>
+          {data.map((entry, index) => {
+            const isSelected = selectedIndex === index;
+            const isOtherSelected = selectedIndex !== null && selectedIndex !== index;
+            const currency = entry.currency || 'SGD';
+            
+            return (
+              <div 
+                key={entry.name} 
+                className={`legend-row ${isSelected ? 'legend-selected' : ''}`}
+                style={{
+                  cursor: 'pointer',
+                  opacity: isOtherSelected ? 0.4 : 1,
+                  transition: 'all 0.2s ease',
+                }}
+                onClick={() => setSelectedIndex(selectedIndex === index ? null : index)}
+              >
+                <span
+                  className="legend-swatch"
+                  style={{ background: getColor(entry.name, index) }}
+                />
+                <div className="legend-content">
+                  <div className="legend-name">{entry.name}</div>
+                  <div className="legend-subtext">{entry.pct.toFixed(1)}%</div>
+                  {isSelected && (
+                    <div className="legend-value">
+                      {getCurrencySymbol(currency)}{entry.value.toFixed(2)}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -419,7 +430,6 @@ export default function HomePage() {
         plPct = row.totalCost !== 0 ? (pl / row.totalCost) * 100 : null;
       }
 
-      // Calculate this year's dividends for yield
       const currentYear = new Date().getFullYear();
       const thisYearDividends = transactions
         .filter(tx => 
@@ -447,33 +457,42 @@ export default function HomePage() {
   }, [holdings, quotes, transactions]);
 
   const allocations = useMemo(() => {
-    const byCategory = new Map<string, number>();
+    const byCategory = new Map<string, { value: number; currency: string }>();
     const byCurrency = new Map<string, number>();
-    const byHolding = new Map<string, number>();
+    const byHolding = new Map<string, { value: number; currency: string }>();
 
     for (const row of displayHoldings) {
-      byCategory.set(row.category, (byCategory.get(row.category) ?? 0) + row.totalCost);
+      const catData = byCategory.get(row.category) ?? { value: 0, currency: row.currency };
+      catData.value += row.totalCost;
+      byCategory.set(row.category, catData);
+      
       byCurrency.set(row.currency, (byCurrency.get(row.currency) ?? 0) + row.totalCost);
-      byHolding.set(row.symbol, (byHolding.get(row.symbol) ?? 0) + row.totalCost);
+      
+      const holdData = byHolding.get(row.symbol) ?? { value: 0, currency: row.currency };
+      holdData.value += row.totalCost;
+      byHolding.set(row.symbol, holdData);
     }
 
     const totalCapital = Array.from(byCurrency.values()).reduce((sum, val) => sum + val, 0);
 
     return {
-      byCategory: Array.from(byCategory.entries()).map(([name, value]) => ({
+      byCategory: Array.from(byCategory.entries()).map(([name, data]) => ({
         name,
-        value,
-        pct: totalCapital ? (value / totalCapital) * 100 : 0,
+        value: data.value,
+        currency: data.currency,
+        pct: totalCapital ? (data.value / totalCapital) * 100 : 0,
       })),
       byCurrency: Array.from(byCurrency.entries()).map(([name, value]) => ({
         name,
         value,
+        currency: name,
         pct: totalCapital ? (value / totalCapital) * 100 : 0,
       })),
-      byHolding: Array.from(byHolding.entries()).map(([name, value]) => ({
+      byHolding: Array.from(byHolding.entries()).map(([name, data]) => ({
         name,
-        value,
-        pct: totalCapital ? (value / totalCapital) * 100 : 0,
+        value: data.value,
+        currency: data.currency,
+        pct: totalCapital ? (data.value / totalCapital) * 100 : 0,
       })).sort((a, b) => b.value - a.value),
     };
   }, [displayHoldings]);
@@ -513,18 +532,15 @@ export default function HomePage() {
       let aVal: any = a[sortField as keyof typeof a];
       let bVal: any = b[sortField as keyof typeof b];
       
-      // Handle null values
       if (aVal === null) return 1;
       if (bVal === null) return -1;
       
-      // String comparison for category and symbol
       if (typeof aVal === 'string') {
         return sortDirection === 'asc' 
           ? aVal.localeCompare(bVal) 
           : bVal.localeCompare(aVal);
       }
       
-      // Number comparison
       return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
     });
   }, [displayHoldings, sortField, sortDirection]);
@@ -552,7 +568,6 @@ export default function HomePage() {
       const holding = displayHoldings.find((h) => h.key === selectedHoldingKey);
       if (!holding) return null;
       
-      // Calculate this year's dividends for the selected holding
       const currentYear = new Date().getFullYear();
       const thisYearDividends = transactions
         .filter(tx => 
@@ -787,7 +802,6 @@ export default function HomePage() {
     [totals.dividendsByCurrency]
   );
   
-  // Calculate YTD dividends and yield
   const currentYear = new Date().getFullYear();
   const ytdDividends = useMemo(
     () => transactions
@@ -800,7 +814,6 @@ export default function HomePage() {
     [ytdDividends, totalCapital]
   );
   
-  // Calculate top performers
   const topGainer = useMemo(
     () => displayHoldings.reduce((top, holding) => 
       (holding.plPct !== null && (top === null || (holding.plPct > (top.plPct ?? -Infinity)))) ? holding : top
@@ -846,23 +859,23 @@ export default function HomePage() {
         <div className="overview-grid">
           <div className="summary-card">
             <div className="stat-title">Invested capital</div>
-            <div className="stat-value">{formatCurrency(totalCapital || null, 'SGD')}</div>
+            <div className="stat-value">{getCurrencySymbol('SGD')}{totalCapital.toFixed(2)}</div>
             <div className="stat-sub">{displayHoldings.length} holdings · {allocations.byCurrency.length} currencies</div>
           </div>
           <div className="summary-card">
             <div className="stat-title">Current value</div>
-            <div className="stat-value">{formatCurrency(totalCurrentValue || null, 'SGD')}</div>
+            <div className="stat-value">{getCurrencySymbol('SGD')}{totalCurrentValue.toFixed(2)}</div>
             <div className="stat-sub">{Object.keys(quotes).length} live prices</div>
           </div>
           <div className={`summary-card ${totalPl > 0 ? 'profit' : totalPl < 0 ? 'loss' : ''}`}>
             <div className="stat-title">Total P/L</div>
-            <div className="stat-value">{formatCurrency(totalPl, 'SGD')}</div>
+            <div className="stat-value">{getCurrencySymbol('SGD')}{totalPl.toFixed(2)}</div>
             <div className="stat-sub">{totalPlPct !== null && totalPlPct !== 0 ? `${totalPlPct > 0 ? '+' : ''}${totalPlPct.toFixed(2)}%` : '—'}</div>
           </div>
           <div className="summary-card">
             <div className="stat-title">Dividends ({currentYear})</div>
-            <div className="stat-value">{formatCurrency(ytdDividends || null, 'SGD')}</div>
-            <div className="stat-sub">{ytdYield > 0 ? `${ytdYield.toFixed(2)}% yield` : 'Total: ' + formatCurrency(totalDividends, 'SGD')}</div>
+            <div className="stat-value">{getCurrencySymbol('SGD')}{ytdDividends.toFixed(2)}</div>
+            <div className="stat-sub">{ytdYield > 0 ? `${ytdYield.toFixed(2)}% yield` : 'Total: ' + getCurrencySymbol('SGD') + totalDividends.toFixed(2)}</div>
           </div>
         </div>
         
@@ -1093,7 +1106,7 @@ export default function HomePage() {
                   <span>Broker: {selectedHolding.broker}</span>
                   <span>Currency: {selectedHolding.currency}</span>
                   <span>Qty: {formatQuantity(selectedHolding.quantity)}</span>
-                  <span>Commission: {formatCurrency(selectedHolding.totalCommission, selectedHolding.currency)}</span>
+                  <span>Commission: {getCurrencySymbol(selectedHolding.currency)}{selectedHolding.totalCommission.toFixed(2)}</span>
                 </div>
               </div>
               <button type="button" className="ghost" onClick={() => setSelectedHoldingKey(null)}>
@@ -1105,16 +1118,16 @@ export default function HomePage() {
                 <div className="stat-row">
                   <div className="stat-group">
                     <div className="stat-label-inline">Capital</div>
-                    <div className="stat-value-inline">{formatCurrency(selectedHolding.totalCost, selectedHolding.currency)}</div>
+                    <div className="stat-value-inline">{getCurrencySymbol(selectedHolding.currency)}{selectedHolding.totalCost.toFixed(2)}</div>
                   </div>
                   <div className="stat-divider">→</div>
                   <div className="stat-group">
                     <div className="stat-label-inline">Current</div>
-                    <div className="stat-value-inline">{formatCurrency(selectedHolding.currentValue, selectedHolding.currency)}</div>
+                    <div className="stat-value-inline">{getCurrencySymbol(selectedHolding.currency)}{(selectedHolding.currentValue ?? 0).toFixed(2)}</div>
                   </div>
                 </div>
                 <div className={`stat-pl ${selectedHolding.pl && selectedHolding.pl > 0 ? 'positive' : selectedHolding.pl && selectedHolding.pl < 0 ? 'negative' : ''}`}>
-                  <span className="pl-amount">{formatCurrency(selectedHolding.pl, selectedHolding.currency)}</span>
+                  <span className="pl-amount">{getCurrencySymbol(selectedHolding.currency)}{(selectedHolding.pl ?? 0).toFixed(2)}</span>
                   {selectedHolding.plPct !== null && (
                     <span className="pl-badge">{selectedHolding.plPct > 0 ? '+' : ''}{selectedHolding.plPct.toFixed(2)}%</span>
                   )}
@@ -1129,12 +1142,12 @@ export default function HomePage() {
                 <div className="stat-dual">
                   <div className="stat-item-small">
                     <div className="stat-label-small">Total Collected</div>
-                    <div className="stat-value-small">{formatCurrency(selectedHolding.dividends, selectedHolding.currency)}</div>
+                    <div className="stat-value-small">{getCurrencySymbol(selectedHolding.currency)}{selectedHolding.dividends.toFixed(2)}</div>
                   </div>
                   <div className="stat-divider-vertical"></div>
                   <div className="stat-item-small">
                     <div className="stat-label-small">YTD {new Date().getFullYear()}</div>
-                    <div className="stat-value-small">{formatCurrency(selectedHolding.thisYearDividends, selectedHolding.currency)}</div>
+                    <div className="stat-value-small">{getCurrencySymbol(selectedHolding.currency)}{selectedHolding.thisYearDividends.toFixed(2)}</div>
                     {selectedHolding.dividendYield !== null && (
                       <div className="stat-yield-badge">{selectedHolding.dividendYield.toFixed(2)}% yield</div>
                     )}

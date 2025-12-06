@@ -1057,3 +1057,29 @@ th.sortable:hover {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 12px;
 }
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.legend-row:hover {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.legend-row.legend-selected {
+  background: rgba(59, 130, 246, 0.1);
+  border: 1px solid #3b82f6;
+  padding: 3px; /* Adjust for border */
+}
+
+.legend-value {
+  font-size: 13px;
+  color: #0f172a;
+  font-weight: 700;
+  margin-top: 4px;
+}
