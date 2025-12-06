@@ -1006,6 +1006,16 @@ th {
   color: #475569;
 }
 
+th.sortable {
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.15s ease;
+}
+
+th.sortable:hover {
+  background: #e2e8f0;
+}
+
 .yield-cell {
   display: flex;
   flex-direction: column;
