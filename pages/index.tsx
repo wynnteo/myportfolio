@@ -947,40 +947,51 @@ export default function HomePage() {
                 Close
               </button>
             </div>
-            <div className="modal-stats">
-              <div className="modal-stat-item">
-                <div className="modal-stat-label">Capital Invested</div>
-                <div className="modal-stat-value">{formatCurrency(selectedHolding.totalCost, selectedHolding.currency)}</div>
-              </div>
-              <div className="modal-stat-item">
-                <div className="modal-stat-label">Current Value</div>
-                <div className="modal-stat-value">{formatCurrency(selectedHolding.currentValue, selectedHolding.currency)}</div>
-              </div>
-              <div className="modal-stat-item">
-                <div className="modal-stat-label">P/L</div>
-                <div className={`modal-stat-value ${selectedHolding.pl && selectedHolding.pl > 0 ? 'pl-positive' : selectedHolding.pl && selectedHolding.pl < 0 ? 'pl-negative' : ''}`}>
-                  {formatCurrency(selectedHolding.pl, selectedHolding.currency)}
+            <div className="modal-stats-grid">
+              <div className="modal-stat-card highlight">
+                <div className="stat-row">
+                  <div className="stat-group">
+                    <div className="stat-label-inline">Capital</div>
+                    <div className="stat-value-inline">{formatCurrency(selectedHolding.totalCost, selectedHolding.currency)}</div>
+                  </div>
+                  <div className="stat-divider">→</div>
+                  <div className="stat-group">
+                    <div className="stat-label-inline">Current</div>
+                    <div className="stat-value-inline">{formatCurrency(selectedHolding.currentValue, selectedHolding.currency)}</div>
+                  </div>
+                </div>
+                <div className={`stat-pl ${selectedHolding.pl && selectedHolding.pl > 0 ? 'positive' : selectedHolding.pl && selectedHolding.pl < 0 ? 'negative' : ''}`}>
+                  <span className="pl-amount">{formatCurrency(selectedHolding.pl, selectedHolding.currency)}</span>
                   {selectedHolding.plPct !== null && (
-                    <span className="modal-stat-pct"> ({selectedHolding.plPct.toFixed(2)}%)</span>
+                    <span className="pl-badge">{selectedHolding.plPct > 0 ? '+' : ''}{selectedHolding.plPct.toFixed(2)}%</span>
                   )}
                 </div>
               </div>
-              <div className="modal-stat-item">
-                <div className="modal-stat-label">Total Dividends</div>
-                <div className="modal-stat-value">{formatCurrency(selectedHolding.dividends, selectedHolding.currency)}</div>
-              </div>
-              <div className="modal-stat-item">
-                <div className="modal-stat-label">YTD Dividends</div>
-                <div className="modal-stat-value">
-                  {formatCurrency(selectedHolding.thisYearDividends, selectedHolding.currency)}
-                  {selectedHolding.dividendYield !== null && (
-                    <div className="modal-stat-subtext">Yield: {selectedHolding.dividendYield.toFixed(2)}%</div>
-                  )}
+
+              <div className="modal-stat-card">
+                <div className="stat-card-header">
+                  <span className="stat-icon">💰</span>
+                  <span className="stat-card-title">Dividends</span>
+                </div>
+                <div className="stat-dual">
+                  <div className="stat-item-small">
+                    <div className="stat-label-small">Total Collected</div>
+                    <div className="stat-value-small">{formatCurrency(selectedHolding.dividends, selectedHolding.currency)}</div>
+                  </div>
+                  <div className="stat-divider-vertical"></div>
+                  <div className="stat-item-small">
+                    <div className="stat-label-small">YTD {new Date().getFullYear()}</div>
+                    <div className="stat-value-small">{formatCurrency(selectedHolding.thisYearDividends, selectedHolding.currency)}</div>
+                    {selectedHolding.dividendYield !== null && (
+                      <div className="stat-yield-badge">{selectedHolding.dividendYield.toFixed(2)}% yield</div>
+                    )}
+                  </div>
                 </div>
               </div>
-              <div className="modal-stat-item">
-                <div className="modal-stat-label">Total Commission</div>
-                <div className="modal-stat-value">{formatCurrency(selectedHolding.totalCommission, selectedHolding.currency)}</div>
+
+              <div className="modal-stat-card compact">
+                <div className="stat-label-small">Total Commission</div>
+                <div className="stat-value-medium">{formatCurrency(selectedHolding.totalCommission, selectedHolding.currency)}</div>
               </div>
             </div>
             {actionMessage && <div className="helper-text info">{actionMessage}</div>}
