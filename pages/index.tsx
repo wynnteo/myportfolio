@@ -364,16 +364,32 @@ export default function HomePage() {
         plPct = row.totalCost !== 0 ? (pl / row.totalCost) * 100 : null;
       }
 
+      // Calculate this year's dividends for yield
+      const currentYear = new Date().getFullYear();
+      const thisYearDividends = transactions
+        .filter(tx => 
+          tx.type === 'DIVIDEND' && 
+          tx.symbol === row.symbol && 
+          tx.broker === row.broker &&
+          tx.trade_date && 
+          new Date(tx.trade_date).getFullYear() === currentYear
+        )
+        .reduce((sum, tx) => sum + (tx.dividend_amount ?? 0), 0);
+      
+      const dividendYield = row.totalCost !== 0 ? (thisYearDividends / row.totalCost) * 100 : null;
+
       return {
         ...row,
         currentPrice,
         currentValue,
         pl,
         plPct,
+        thisYearDividends,
+        dividendYield,
         lastPriceTimestamp: quote?.asOf ? Date.parse(quote.asOf) : row.lastPriceTimestamp,
       };
     });
-  }, [holdings, quotes]);
+  }, [holdings, quotes, transactions]);
 
   const allocations = useMemo(() => {
     const byCategory = new Map<string, number>();
@@ -445,8 +461,30 @@ export default function HomePage() {
   );
 
   const selectedHolding = useMemo(
-    () => displayHoldings.find((h) => h.key === selectedHoldingKey) ?? null,
-    [displayHoldings, selectedHoldingKey]
+    () => {
+      const holding = displayHoldings.find((h) => h.key === selectedHoldingKey);
+      if (!holding) return null;
+      
+      // Calculate this year's dividends for the selected holding
+      const currentYear = new Date().getFullYear();
+      const thisYearDividends = transactions
+        .filter(tx => 
+          tx.type === 'DIVIDEND' && 
+          getHoldingKey(tx.symbol, tx.broker) === selectedHoldingKey &&
+          tx.trade_date && 
+          new Date(tx.trade_date).getFullYear() === currentYear
+        )
+        .reduce((sum, tx) => sum + (tx.dividend_amount ?? 0), 0);
+      
+      const dividendYield = holding.totalCost !== 0 ? (thisYearDividends / holding.totalCost) * 100 : null;
+      
+      return {
+        ...holding,
+        thisYearDividends,
+        dividendYield,
+      };
+    },
+    [displayHoldings, selectedHoldingKey, transactions]
   );
 
   const selectedHoldingTransactions = useMemo(
@@ -919,14 +957,6 @@ export default function HomePage() {
                 <div className="modal-stat-value">{formatCurrency(selectedHolding.currentValue, selectedHolding.currency)}</div>
               </div>
               <div className="modal-stat-item">
-                <div className="modal-stat-label">Total Dividends</div>
-                <div className="modal-stat-value">{formatCurrency(selectedHolding.dividends, selectedHolding.currency)}</div>
-              </div>
-              <div className="modal-stat-item">
-                <div className="modal-stat-label">Total Commission</div>
-                <div className="modal-stat-value">{formatCurrency(selectedHolding.totalCommission, selectedHolding.currency)}</div>
-              </div>
-              <div className="modal-stat-item">
                 <div className="modal-stat-label">P/L</div>
                 <div className={`modal-stat-value ${selectedHolding.pl && selectedHolding.pl > 0 ? 'pl-positive' : selectedHolding.pl && selectedHolding.pl < 0 ? 'pl-negative' : ''}`}>
                   {formatCurrency(selectedHolding.pl, selectedHolding.currency)}
@@ -934,6 +964,23 @@ export default function HomePage() {
                     <span className="modal-stat-pct"> ({selectedHolding.plPct.toFixed(2)}%)</span>
                   )}
                 </div>
+              </div>
+              <div className="modal-stat-item">
+                <div className="modal-stat-label">Total Dividends</div>
+                <div className="modal-stat-value">{formatCurrency(selectedHolding.dividends, selectedHolding.currency)}</div>
+              </div>
+              <div className="modal-stat-item">
+                <div className="modal-stat-label">YTD Dividends</div>
+                <div className="modal-stat-value">
+                  {formatCurrency(selectedHolding.thisYearDividends, selectedHolding.currency)}
+                  {selectedHolding.dividendYield !== null && (
+                    <div className="modal-stat-subtext">Yield: {selectedHolding.dividendYield.toFixed(2)}%</div>
+                  )}
+                </div>
+              </div>
+              <div className="modal-stat-item">
+                <div className="modal-stat-label">Total Commission</div>
+                <div className="modal-stat-value">{formatCurrency(selectedHolding.totalCommission, selectedHolding.currency)}</div>
               </div>
             </div>
             {actionMessage && <div className="helper-text info">{actionMessage}</div>}
