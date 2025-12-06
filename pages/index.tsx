@@ -72,9 +72,14 @@ function formatCurrency(value: number | null, currency: string) {
   return new Intl.NumberFormat('en-SG', { style: 'currency', currency }).format(value);
 }
 
-function formatNumber(value: number | null, decimals = 2) {
+function formatQuantity(value: number | null) {
   if (value === null || Number.isNaN(value)) return '-';
-  return value.toFixed(decimals);
+  // If it's a whole number, show no decimals
+  if (value === Math.floor(value)) {
+    return value.toString();
+  }
+  // Otherwise show up to 4 decimals, removing trailing zeros
+  return value.toFixed(4).replace(/\.?0+$/, '');
 }
 
 function getHoldingKey(symbol: string, broker: string | null | undefined) {
@@ -699,6 +704,34 @@ export default function HomePage() {
     () => Array.from(totals.dividendsByCurrency.values()).reduce((sum, val) => sum + val, 0),
     [totals.dividendsByCurrency]
   );
+  
+  // Calculate YTD dividends and yield
+  const currentYear = new Date().getFullYear();
+  const ytdDividends = useMemo(
+    () => transactions
+      .filter(tx => tx.type === 'DIVIDEND' && tx.trade_date && new Date(tx.trade_date).getFullYear() === currentYear)
+      .reduce((sum, tx) => sum + (tx.dividend_amount ?? 0), 0),
+    [transactions, currentYear]
+  );
+  const ytdYield = useMemo(
+    () => (totalCapital !== 0 ? (ytdDividends / totalCapital) * 100 : 0),
+    [ytdDividends, totalCapital]
+  );
+  
+  // Calculate top performers
+  const topGainer = useMemo(
+    () => displayHoldings.reduce((top, holding) => 
+      (holding.plPct !== null && (top === null || (holding.plPct > (top.plPct ?? -Infinity)))) ? holding : top
+    , null as typeof displayHoldings[0] | null),
+    [displayHoldings]
+  );
+  
+  const topLoser = useMemo(
+    () => displayHoldings.reduce((bottom, holding) => 
+      (holding.plPct !== null && (bottom === null || (holding.plPct < (bottom.plPct ?? Infinity)))) ? holding : bottom
+    , null as typeof displayHoldings[0] | null),
+    [displayHoldings]
+  );
 
   return (
     <main>
@@ -732,24 +765,43 @@ export default function HomePage() {
           <div className="summary-card">
             <div className="stat-title">Invested capital</div>
             <div className="stat-value">{formatCurrency(totalCapital || null, 'SGD')}</div>
-            <div className="stat-sub">Across {allocations.byCurrency.length} currencies</div>
+            <div className="stat-sub">{displayHoldings.length} holdings · {allocations.byCurrency.length} currencies</div>
           </div>
           <div className="summary-card">
             <div className="stat-title">Current value</div>
             <div className="stat-value">{formatCurrency(totalCurrentValue || null, 'SGD')}</div>
-            <div className="stat-sub">Live prices for {Object.keys(quotes).length} symbols</div>
+            <div className="stat-sub">{Object.keys(quotes).length} live prices</div>
           </div>
           <div className={`summary-card ${totalPl > 0 ? 'profit' : totalPl < 0 ? 'loss' : ''}`}>
             <div className="stat-title">Total P/L</div>
             <div className="stat-value">{formatCurrency(totalPl, 'SGD')}</div>
-            <div className="stat-sub">{totalPlPct !== null && totalPlPct !== 0 ? `${totalPlPct.toFixed(2)}% ${totalPl >= 0 ? 'gain' : 'loss'}` : 'Unrealised basis'}</div>
+            <div className="stat-sub">{totalPlPct !== null && totalPlPct !== 0 ? `${totalPlPct > 0 ? '+' : ''}${totalPlPct.toFixed(2)}%` : '—'}</div>
           </div>
           <div className="summary-card">
-            <div className="stat-title">Dividends received</div>
-            <div className="stat-value">{formatCurrency(totalDividends || null, 'SGD')}</div>
-            <div className="stat-sub">All currencies included</div>
+            <div className="stat-title">Dividends ({currentYear})</div>
+            <div className="stat-value">{formatCurrency(ytdDividends || null, 'SGD')}</div>
+            <div className="stat-sub">{ytdYield > 0 ? `${ytdYield.toFixed(2)}% yield` : 'Total: ' + formatCurrency(totalDividends, 'SGD')}</div>
           </div>
         </div>
+        
+        {(topGainer || topLoser) && (
+          <div className="insights-grid">
+            {topGainer && topGainer.plPct !== null && topGainer.plPct > 0 && (
+              <div className="insight-card positive">
+                <div className="insight-label">Top Performer</div>
+                <div className="insight-symbol">{topGainer.symbol}</div>
+                <div className="insight-value">+{topGainer.plPct.toFixed(2)}%</div>
+              </div>
+            )}
+            {topLoser && topLoser.plPct !== null && topLoser.plPct < 0 && (
+              <div className="insight-card negative">
+                <div className="insight-label">Worst Performer</div>
+                <div className="insight-symbol">{topLoser.symbol}</div>
+                <div className="insight-value">{topLoser.plPct.toFixed(2)}%</div>
+              </div>
+            )}
+          </div>
+        )}
         <div className="chart-grid">
           <PieChart title="Allocation by category" data={allocations.byCategory} />
           <PieChart title="Allocation by holding" data={allocations.byHolding} />
@@ -762,7 +814,6 @@ export default function HomePage() {
           <div>
             <p className="eyebrow">Journal</p>
             <h2 id="add-transaction">Add transaction</h2>
-            <p className="muted">Keep the form lean—no manual current price entry needed.</p>
           </div>
         </div>
         <form onSubmit={(event) => void handleSubmit(event)} className="form-grid">
@@ -902,7 +953,7 @@ export default function HomePage() {
                       </span>
                     </td>
                     <td>{row.currency}</td>
-                    <td>{formatNumber(row.quantity, 4)}</td>
+                    <td>{formatQuantity(row.quantity)}</td>
                     <td>{row.averagePrice !== null ? row.averagePrice.toFixed(4) : '-'}</td>
                     <td>{row.currentPrice !== null ? row.currentPrice.toFixed(4) : '-'}</td>
                     <td>{formatCurrency(row.totalCost, row.currency)}</td>
