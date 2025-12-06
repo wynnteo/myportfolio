@@ -85,6 +85,15 @@ function getCurrencySymbol(currency: string) {
   return symbols[currency.toUpperCase()] || currency;
 }
 
+function formatPrice(value: number | null, currency: string, decimals: number = 2): string {
+  if (value === null || Number.isNaN(value)) return '-';
+  const formatted = value.toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+  return `${getCurrencySymbol(currency)}${formatted}`;
+}
+
 function formatQuantity(value: number | null) {
   if (value === null || Number.isNaN(value)) return '-';
   if (value === Math.floor(value)) {
@@ -231,7 +240,7 @@ function PieChart({
                   <div className="legend-subtext">{entry.pct.toFixed(1)}%</div>
                   {isSelected && (
                     <div className="legend-value">
-                      {getCurrencySymbol(currency)}{entry.value.toFixed(2)}
+                      {formatPrice(entry.value, currency, 2)}
                     </div>
                   )}
                 </div>
@@ -859,23 +868,23 @@ export default function HomePage() {
         <div className="overview-grid">
           <div className="summary-card">
             <div className="stat-title">Invested capital</div>
-            <div className="stat-value">{getCurrencySymbol('SGD')}{totalCapital.toFixed(2)}</div>
+            <div className="stat-value">{formatPrice(totalCapital, 'SGD', 2)}</div>
             <div className="stat-sub">{displayHoldings.length} holdings · {allocations.byCurrency.length} currencies</div>
           </div>
           <div className="summary-card">
             <div className="stat-title">Current value</div>
-            <div className="stat-value">{getCurrencySymbol('SGD')}{totalCurrentValue.toFixed(2)}</div>
+            <div className="stat-value">{formatPrice(totalCurrentValue, 'SGD', 2)}</div>
             <div className="stat-sub">{Object.keys(quotes).length} live prices</div>
           </div>
           <div className={`summary-card ${totalPl > 0 ? 'profit' : totalPl < 0 ? 'loss' : ''}`}>
             <div className="stat-title">Total P/L</div>
-            <div className="stat-value">{getCurrencySymbol('SGD')}{totalPl.toFixed(2)}</div>
+            <div className="stat-value">{formatPrice(totalPl, 'SGD', 2)}</div>
             <div className="stat-sub">{totalPlPct !== null && totalPlPct !== 0 ? `${totalPlPct > 0 ? '+' : ''}${totalPlPct.toFixed(2)}%` : '—'}</div>
           </div>
           <div className="summary-card">
             <div className="stat-title">Dividends ({currentYear})</div>
-            <div className="stat-value">{getCurrencySymbol('SGD')}{ytdDividends.toFixed(2)}</div>
-            <div className="stat-sub">{ytdYield > 0 ? `${ytdYield.toFixed(2)}% yield` : 'Total: ' + getCurrencySymbol('SGD') + totalDividends.toFixed(2)}</div>
+            <div className="stat-value">{formatPrice(ytdDividends, 'SGD', 2)}</div>
+            <div className="stat-sub">{ytdYield > 0 ? `${ytdYield.toFixed(2)}% yield` : 'Total: ' + formatPrice(totalDividends, 'SGD', 2)}</div>
           </div>
         </div>
         
@@ -1067,15 +1076,15 @@ export default function HomePage() {
                     </td>
                     <td>{row.currency}</td>
                     <td>{formatQuantity(row.quantity)}</td>
-                    <td>{row.averagePrice !== null ? `${getCurrencySymbol(row.currency)}${row.averagePrice.toFixed(4)}` : '-'}</td>
-                    <td>{row.currentPrice !== null ? `${getCurrencySymbol(row.currency)}${row.currentPrice.toFixed(4)}` : '-'}</td>
-                    <td>{row.totalCost !== null ? `${getCurrencySymbol(row.currency)}${row.totalCost.toFixed(2)}` : '-'}</td>
-                    <td>{row.currentValue !== null ? `${getCurrencySymbol(row.currency)}${row.currentValue.toFixed(2)}` : '-'}</td>
-                    <td>{row.dividends !== null ? `${getCurrencySymbol(row.currency)}${row.dividends.toFixed(2)}` : '-'}</td>
+                    <td>{row.averagePrice !== null ? formatPrice(row.averagePrice, row.currency, 4) : '-'}</td>
+                    <td>{row.currentPrice !== null ? formatPrice(row.currentPrice, row.currency, 4) : '-'}</td>
+                    <td>{row.totalCost !== null ? formatPrice(row.totalCost, row.currency, 2) : '-'}</td>
+                    <td>{row.currentValue !== null ? formatPrice(row.currentValue, row.currency, 2) : '-'}</td>
+                    <td>{row.dividends !== null ? formatPrice(row.dividends, row.currency, 2) : '-'}</td>
                     
                     <td>
                       <div className="pl-stack">
-                        <span className={plClass}>{row.pl !== null ? `${getCurrencySymbol(row.currency)}${row.pl.toFixed(2)}` : '-'}</span>
+                        <span className={plClass}>{row.pl !== null ? formatPrice(row.pl, row.currency, 2) : '-'}</span>
                         <span className={`pl-percent ${plClass}`}>
                           {row.plPct !== null ? `${row.plPct.toFixed(2)}%` : '-'}
                         </span>
@@ -1106,7 +1115,7 @@ export default function HomePage() {
                   <span>Broker: {selectedHolding.broker}</span>
                   <span>Currency: {selectedHolding.currency}</span>
                   <span>Qty: {formatQuantity(selectedHolding.quantity)}</span>
-                  <span>Commission: {getCurrencySymbol(selectedHolding.currency)}{selectedHolding.totalCommission.toFixed(2)}</span>
+                  <span>Commission: {formatPrice(selectedHolding.totalCommission, selectedHolding.currency, 2)}</span>
                 </div>
               </div>
               <button type="button" className="ghost" onClick={() => setSelectedHoldingKey(null)}>
@@ -1118,16 +1127,16 @@ export default function HomePage() {
                 <div className="stat-row">
                   <div className="stat-group">
                     <div className="stat-label-inline">Capital</div>
-                    <div className="stat-value-inline">{getCurrencySymbol(selectedHolding.currency)}{selectedHolding.totalCost.toFixed(2)}</div>
+                    <div className="stat-value-inline">{formatPrice(selectedHolding.totalCost, selectedHolding.currency, 2)}</div>
                   </div>
                   <div className="stat-divider">→</div>
                   <div className="stat-group">
                     <div className="stat-label-inline">Current</div>
-                    <div className="stat-value-inline">{getCurrencySymbol(selectedHolding.currency)}{(selectedHolding.currentValue ?? 0).toFixed(2)}</div>
+                    <div className="stat-value-inline">{formatPrice(selectedHolding.currentValue ?? 0, selectedHolding.currency, 2)}</div>
                   </div>
                 </div>
                 <div className={`stat-pl ${selectedHolding.pl && selectedHolding.pl > 0 ? 'positive' : selectedHolding.pl && selectedHolding.pl < 0 ? 'negative' : ''}`}>
-                  <span className="pl-amount">{getCurrencySymbol(selectedHolding.currency)}{(selectedHolding.pl ?? 0).toFixed(2)}</span>
+                  <span className="pl-amount">{formatPrice(selectedHolding.pl ?? 0, selectedHolding.currency, 2)}</span>
                   {selectedHolding.plPct !== null && (
                     <span className="pl-badge">{selectedHolding.plPct > 0 ? '+' : ''}{selectedHolding.plPct.toFixed(2)}%</span>
                   )}
@@ -1142,12 +1151,12 @@ export default function HomePage() {
                 <div className="stat-dual">
                   <div className="stat-item-small">
                     <div className="stat-label-small">Total Collected</div>
-                    <div className="stat-value-small">{getCurrencySymbol(selectedHolding.currency)}{selectedHolding.dividends.toFixed(2)}</div>
+                    <div className="stat-value-small">{formatPrice(selectedHolding.dividends, selectedHolding.currency, 2)}</div>
                   </div>
                   <div className="stat-divider-vertical"></div>
                   <div className="stat-item-small">
                     <div className="stat-label-small">YTD {new Date().getFullYear()}</div>
-                    <div className="stat-value-small">{getCurrencySymbol(selectedHolding.currency)}{selectedHolding.thisYearDividends.toFixed(2)}</div>
+                    <div className="stat-value-small">{formatPrice(selectedHolding.thisYearDividends, selectedHolding.currency, 2)}</div>
                     {selectedHolding.dividendYield !== null && (
                       <div className="stat-yield-badge">{selectedHolding.dividendYield.toFixed(2)}% yield</div>
                     )}
@@ -1253,7 +1262,7 @@ export default function HomePage() {
                                   onChange={(e) => setEditForm((prev) => ({ ...prev, price: e.target.value }))}
                                 />
                               ) : tx.price !== null ? (
-                                `${getCurrencySymbol(selectedHolding.currency)}${tx.price.toFixed(4)}`
+                                formatPrice(tx.price, selectedHolding.currency, 4)
                               ) : (
                                 '-'
                               )}
@@ -1267,7 +1276,7 @@ export default function HomePage() {
                                   onChange={(e) => setEditForm((prev) => ({ ...prev, commission: e.target.value }))}
                                 />
                               ) : tx.commission !== null ? (
-                                `${getCurrencySymbol(selectedHolding.currency)}${tx.commission.toFixed(2)}`
+                                formatPrice(tx.commission, selectedHolding.currency, 2)
                               ) : (
                                 '-'
                               )}
@@ -1400,7 +1409,7 @@ export default function HomePage() {
                                   onChange={(e) => setEditForm((prev) => ({ ...prev, dividendAmount: e.target.value }))}
                                 />
                               ) : tx.dividend_amount !== null ? (
-                                `${getCurrencySymbol(selectedHolding.currency)}${tx.dividend_amount.toFixed(2)}`
+                                formatPrice(tx.dividend_amount, selectedHolding.currency, 2)
                               ) : (
                                 '-'
                               )}
