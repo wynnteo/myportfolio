@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart as RechartsPieChart, Pie } from 'recharts';
 
 interface Transaction {
   id: string;
@@ -135,119 +136,182 @@ function parseInputNumber(value?: string) {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
-function PieChart({
+function AssetAllocationChart({
   data,
-  title,
 }: {
   data: Array<{ name: string; pct: number; value: number; currency?: string }>;
-  title: string;
 }) {
-  const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
-  const radius = 52;
-  const circumference = 2 * Math.PI * radius;
-  let offset = 0;
+  const COLORS = {
+    'Unit Trusts': '#64acdb',
+    'Stocks': '#f8c268',
+    'REITs': '#b57edc',
+    'ETF': '#6fd2df',
+    'Bond': '#f4609f',
+    'Cash': '#fa9228',
+    'Other': '#d38278',
+  };
+
+  const EXTENDED_COLORS = ['#64acdb', '#f8c268', '#b57edc', '#6fd2df', '#f4609f', '#fa9228', '#d38278', '#51c9b2', '#48b14c', '#fc8eac', '#009aad', '#8567ff'];
 
   if (data.length === 0 || data.every((entry) => entry.value === 0)) {
     return (
-      <div className="pie-chart empty">
-        <div className="empty-pie">No data</div>
+      <div className="chart-card">
+        <div className="chart-header">Allocation by Asset</div>
+        <div className="pie-chart empty">
+          <div className="empty-pie">No data</div>
+        </div>
       </div>
     );
   }
 
-  const getColor = (name: string, index: number) => {
-    const categoryColors: Record<string, string> = {
-      'Unit Trusts': '#1e40af',
-      Stocks: '#2563eb',
-      REITs: '#3b82f6',
-      ETF: '#10b981',
-      Bond: '#f59e0b',
-      Cash: '#64748b',
-      Other: '#94a3b8',
-    };
-    
-    if (categoryColors[name]) {
-      return categoryColors[name];
-    }
-    
-    return getGradientColor(index, data.length);
-  };
+  const chartData = data.map(item => ({
+    name: item.name,
+    value: item.value,
+    pct: item.pct,
+  }));
 
   return (
     <div className="chart-card">
-      <div className="chart-header">{title}</div>
-      <div className="chart-body">
-        <svg viewBox="0 0 120 120" role="img" aria-label={title}>
-          <g transform="rotate(-90 60 60)">
-            {data.map((entry, index) => {
-              const dash = (entry.pct / 100) * circumference;
-              const isSelected = selectedIndex === index;
-              const isOtherSelected = selectedIndex !== null && selectedIndex !== index;
-              
-              const circle = (
-                <circle
-                  key={entry.name}
-                  r={radius}
-                  cx="60"
-                  cy="60"
-                  fill="transparent"
-                  stroke={getColor(entry.name, index)}
-                  strokeWidth={isSelected ? "22" : "18"}
-                  strokeDasharray={`${dash} ${circumference}`}
-                  strokeDashoffset={offset}
-                  style={{
-                    cursor: 'pointer',
-                    opacity: isOtherSelected ? 0.3 : 1,
-                    transition: 'all 0.2s ease',
-                  }}
-                  onClick={() => setSelectedIndex(selectedIndex === index ? null : index)}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.filter = 'brightness(1.2)';
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.filter = 'brightness(1)';
-                  }}
-                />
-              );
-              offset -= dash;
-              return circle;
-            })}
-          </g>
-        </svg>
-        <div className="chart-legend">
-          {data.map((entry, index) => {
-            const isSelected = selectedIndex === index;
-            const isOtherSelected = selectedIndex !== null && selectedIndex !== index;
-            const currency = entry.currency || 'SGD';
-            
-            return (
-              <div 
-                key={entry.name} 
-                className={`legend-row ${isSelected ? 'legend-selected' : ''}`}
-                style={{
-                  cursor: 'pointer',
-                  opacity: isOtherSelected ? 0.4 : 1,
-                  transition: 'all 0.2s ease',
-                }}
-                onClick={() => setSelectedIndex(selectedIndex === index ? null : index)}
-              >
-                <span
-                  className="legend-swatch"
-                  style={{ background: getColor(entry.name, index) }}
-                />
-                <div className="legend-content">
-                  <div className="legend-name">{entry.name}</div>
-                  <div className="legend-subtext">{entry.pct.toFixed(1)}%</div>
-                  {isSelected && (
-                    <div className="legend-value">
-                      {formatPrice(entry.value, currency, 2)}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+      <div className="chart-header">Allocation by Asset</div>
+      <ResponsiveContainer width="100%" height={200}>
+        <RechartsPieChart>
+          <Pie
+            data={chartData}
+            cx="50%"
+            cy="50%"
+            labelLine={false}
+            outerRadius={80}
+            fill="#8884d8"
+            dataKey="value"
+          >
+            {chartData.map((entry, index) => (
+              <Cell key={`cell-${index}`} fill={COLORS[entry.name as keyof typeof COLORS] || EXTENDED_COLORS[index % EXTENDED_COLORS.length]} />
+            ))}
+          </Pie>
+          <Tooltip formatter={(value: number) => formatPrice(value, 'SGD', 2)} />
+        </RechartsPieChart>
+      </ResponsiveContainer>
+      <div className="stacked-legend">
+        {data.map((entry, index) => (
+          <div key={entry.name} className="legend-item">
+            <span
+              className="legend-swatch"
+              style={{ background: COLORS[entry.name as keyof typeof COLORS] || EXTENDED_COLORS[index % EXTENDED_COLORS.length] }}
+            />
+            <div className="legend-text">
+              <span className="legend-name">{entry.name}</span>
+              <span className="legend-value">{entry.pct.toFixed(1)}%</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function MonthlyDividendsChart({ transactions }: { transactions: Transaction[] }) {
+  const currentYear = new Date().getFullYear();
+  
+  const monthlyData = useMemo(() => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const data = months.map((name, index) => ({ month: name, value: 0, index }));
+    
+    transactions
+      .filter(tx => tx.type === 'DIVIDEND' && tx.trade_date && new Date(tx.trade_date).getFullYear() === currentYear)
+      .forEach(tx => {
+        const month = new Date(tx.trade_date!).getMonth();
+        data[month].value += tx.dividend_amount ?? 0;
+      });
+    
+    return data;
+  }, [transactions, currentYear]);
+  
+  return (
+    <div className="chart-card">
+      <div className="chart-header">Monthly Dividends ({currentYear})</div>
+      <ResponsiveContainer width="100%" height={250}>
+        <BarChart data={monthlyData}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+          <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#64748b" />
+          <YAxis tick={{ fontSize: 12 }} stroke="#64748b" />
+          <Tooltip 
+            formatter={(value: number) => formatPrice(value, 'SGD', 2)}
+            contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+          />
+          <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function TopHoldingsChart({ holdings }: { holdings: HoldingRow[] }) {
+  const EXTENDED_COLORS = ['#64acdb', '#f8c268', '#b57edc', '#6fd2df', '#f4609f', '#fa9228', '#d38278', '#51c9b2', '#48b14c', '#fc8eac', '#009aad', '#8567ff'];
+  
+  const topHoldings = useMemo(() => {
+    return [...holdings]
+      .sort((a, b) => b.totalCost - a.totalCost)
+      .slice(0, 10);
+  }, [holdings]);
+  
+  if (topHoldings.length === 0) {
+    return (
+      <div className="chart-card">
+        <div className="chart-header">Top Holdings</div>
+        <div className="pie-chart empty">
+          <div className="empty-pie">No data</div>
         </div>
+      </div>
+    );
+  }
+  
+  const totalValue = topHoldings.reduce((sum, h) => sum + h.totalCost, 0);
+  
+  // Transform data for stacked bar chart - single horizontal bar with dummy category
+  const chartData = [
+    {
+      name: 'Holdings',
+      ...topHoldings.reduce((acc, holding) => {
+        acc[holding.symbol] = holding.totalCost;
+        return acc;
+      }, {} as Record<string, number>)
+    }
+  ];
+  
+  return (
+    <div className="chart-card stacked-chart-card">
+      <div className="chart-header">Top Holdings</div>
+      <ResponsiveContainer width="100%" height={60}>
+        <BarChart data={chartData} layout="vertical" margin={{ top: 10, right: 0, bottom: 0, left: 0 }}>
+          <XAxis type="number" hide />
+          <YAxis type="category" dataKey="name" hide />
+          {topHoldings.map((holding, index) => (
+            <Bar 
+              key={holding.symbol} 
+              dataKey={holding.symbol} 
+              stackId="a" 
+              fill={EXTENDED_COLORS[index % EXTENDED_COLORS.length]}
+              radius={index === 0 ? [4, 0, 0, 4] : index === topHoldings.length - 1 ? [0, 4, 4, 0] : [0, 0, 0, 0]}
+            />
+          ))}
+        </BarChart>
+      </ResponsiveContainer>
+      <div className="holdings-legend">
+        {topHoldings.map((holding, index) => {
+          const pct = (holding.totalCost / totalValue) * 100;
+          return (
+            <div key={holding.symbol} className="legend-item">
+              <span
+                className="legend-swatch"
+                style={{ background: EXTENDED_COLORS[index % EXTENDED_COLORS.length] }}
+              />
+              <div className="legend-text">
+                <span className="legend-name">{holding.symbol}</span>
+                <span className="legend-value">{pct.toFixed(1)}%</span>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -907,9 +971,9 @@ export default function HomePage() {
           </div>
         )}
         <div className="chart-grid">
-          <PieChart title="Allocation by category" data={allocations.byCategory} />
-          <PieChart title="Allocation by holding" data={allocations.byHolding} />
-          <PieChart title="Allocation by currency" data={allocations.byCurrency} />
+          <AssetAllocationChart data={allocations.byCategory} />
+          <TopHoldingsChart holdings={displayHoldings} />
+          <MonthlyDividendsChart transactions={transactions} />
         </div>
       </section>
 
@@ -1029,25 +1093,25 @@ export default function HomePage() {
                 </th>
                 <th>Currency</th>
                 <th onClick={() => handleSort('quantity')} className="sortable">
-                  Quantity {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  Units {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th onClick={() => handleSort('averagePrice')} className="sortable">
-                  Avg Price {sortField === 'averagePrice' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  Net Avg Price {sortField === 'averagePrice' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th onClick={() => handleSort('currentPrice')} className="sortable">
                   Current Price {sortField === 'currentPrice' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th onClick={() => handleSort('totalCost')} className="sortable">
-                  Capital {sortField === 'totalCost' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  Cost {sortField === 'totalCost' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th onClick={() => handleSort('currentValue')} className="sortable">
-                  Current Value {sortField === 'currentValue' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  Market Value {sortField === 'currentValue' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th onClick={() => handleSort('dividends')} className="sortable">
                   Total Dividends {sortField === 'dividends' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th onClick={() => handleSort('plPct')} className="sortable">
-                  P/L {sortField === 'plPct' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  P&L {sortField === 'plPct' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th>Actions</th>
               </tr>
