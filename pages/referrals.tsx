@@ -25,8 +25,8 @@ const brokerPromos: BrokerPromo[] = [
       'Real-time market data',
     ],
     requirements: 'Deposit S$3,000-S$100,000, complete trades, maintain 30-90 days',
-    referralCode: 'YOUR_CODE',
-    referralLink: 'https://j.moomoo.com/YOUR_LINK',
+    referralCode: 'ABCD1234',
+    referralLink: 'https://j.moomoo.com/00AbCd',
     category: 'stocks',
     featured: true,
   },
@@ -41,8 +41,8 @@ const brokerPromos: BrokerPromo[] = [
       'Fractional shares from US$5',
     ],
     requirements: 'Deposit USD 2,000-10,000, maintain 30-90 days',
-    referralCode: 'YOUR_CODE',
-    referralLink: 'https://www.webull.com.sg/YOUR_LINK',
+    referralCode: 'WEBULL123',
+    referralLink: 'https://www.webull.com.sg/activity?code=WEBULL123',
     category: 'stocks',
     featured: true,
   },
@@ -57,8 +57,8 @@ const brokerPromos: BrokerPromo[] = [
       'Commission-free SG stocks (1 year)',
     ],
     requirements: 'Deposit and maintain funds for 60 days',
-    referralCode: 'YOUR_CODE',
-    referralLink: 'https://www.tigerbrokers.com.sg/YOUR_LINK',
+    referralCode: 'TIGER2024',
+    referralLink: 'https://www.tigerbrokers.com.sg/activity/market/signup/?invite=TIGER2024',
     category: 'stocks',
   },
   {
@@ -72,8 +72,8 @@ const brokerPromos: BrokerPromo[] = [
       'Real-time SG & HK market data',
     ],
     requirements: 'Deposit S$2,000-10,000, complete 3-5 trades, maintain 30-90 days',
-    referralCode: 'YOUR_CODE',
-    referralLink: 'https://longbridge.sg/YOUR_LINK',
+    referralCode: 'LB123456',
+    referralLink: 'https://longbridge.sg/download?channel=LB123456',
     category: 'stocks',
   },
   {
@@ -87,8 +87,8 @@ const brokerPromos: BrokerPromo[] = [
       'S$50 Shopee voucher pack',
     ],
     requirements: 'Sign up with referral code, apply for Credit Card Bundle or Instant Loan',
-    referralCode: 'YOUR_CODE',
-    referralLink: 'https://www.maribank.sg/YOUR_LINK',
+    referralCode: 'MARI15SG',
+    referralLink: 'https://www.maribank.sg/referral?code=MARI15SG',
     category: 'savings',
     featured: true,
   },
@@ -103,8 +103,8 @@ const brokerPromos: BrokerPromo[] = [
       'Access 40K+ products, 26 exchanges',
     ],
     requirements: 'Deposit S$3,000-10,000, complete trades, maintain 30-50 days',
-    referralCode: 'YOUR_CODE',
-    referralLink: 'https://www.poems.com.sg/YOUR_LINK',
+    referralCode: 'POEMS2024',
+    referralLink: 'https://www.poems.com.sg/refer-friend/?code=POEMS2024',
     category: 'stocks',
   },
   {
@@ -118,32 +118,31 @@ const brokerPromos: BrokerPromo[] = [
       'Free OPRA options live quotes',
     ],
     requirements: 'Deposit USD 1,500, complete 3 trades within 30 days',
-    referralCode: 'YOUR_CODE',
-    referralLink: 'https://www.usmart.sg/YOUR_LINK',
+    referralCode: 'USMART98',
+    referralLink: 'https://www.usmart.sg/activity/referral?code=USMART98',
     category: 'stocks',
   },
 ];
 
 export default function ReferralHub() {
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'stocks' | 'savings'>('all');
-  const [editingBroker, setEditingBroker] = useState<string | null>(null);
-  const [tempCode, setTempCode] = useState('');
-  const [tempLink, setTempLink] = useState('');
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
   const filteredPromos = brokerPromos.filter(
     (promo) => selectedCategory === 'all' || promo.category === selectedCategory
   );
 
-  const handleEdit = (broker: BrokerPromo) => {
-    setEditingBroker(broker.name);
-    setTempCode(broker.referralCode || '');
-    setTempLink(broker.referralLink);
+  const handleCopyCode = (code: string, brokerName: string) => {
+    navigator.clipboard.writeText(code);
+    setCopiedCode(brokerName);
+    setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  const handleCancel = () => {
-    setEditingBroker(null);
-    setTempCode('');
-    setTempLink('');
+  const handleCopyAll = (promo: BrokerPromo) => {
+    const text = `🎁 ${promo.name} Referral\n\n${promo.highlight}\n\nReferral Code: ${promo.referralCode}\nLink: ${promo.referralLink}\n\nRequirements: ${promo.requirements}`;
+    navigator.clipboard.writeText(text);
+    setCopiedCode(promo.name + '-all');
+    setTimeout(() => setCopiedCode(null), 2000);
   };
 
   return (
@@ -165,7 +164,7 @@ export default function ReferralHub() {
             <p className="eyebrow">Spotlight</p>
             <h2 id="promo-list">Latest broker promotions</h2>
             <p className="muted">
-              Click "Edit Link" to add your personal referral codes and share with friends
+              Click to copy referral codes or open sign-up links
             </p>
           </div>
           <div className="chip-group">
@@ -219,76 +218,41 @@ export default function ReferralHub() {
                 <div className="requirements-text">{promo.requirements}</div>
               </div>
 
-              {editingBroker === promo.name ? (
-                <div className="edit-form">
-                  <label>
-                    Referral Code
-                    <input
-                      type="text"
-                      value={tempCode}
-                      onChange={(e) => setTempCode(e.target.value)}
-                      placeholder="Enter your code"
-                    />
-                  </label>
-                  <label>
-                    Referral Link
-                    <input
-                      type="text"
-                      value={tempLink}
-                      onChange={(e) => setTempLink(e.target.value)}
-                      placeholder="Enter your link"
-                    />
-                  </label>
-                  <div className="action-row">
-                    <button type="button" onClick={() => alert('Saved! (Demo only)')}>
-                      Save
-                    </button>
-                    <button type="button" className="ghost" onClick={handleCancel}>
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="referral-actions">
-                  {promo.referralCode && promo.referralCode !== 'YOUR_CODE' ? (
-                    <>
-                      <div className="referral-info">
-                        <div className="info-row">
-                          <span className="info-label">Code:</span>
-                          <code className="info-value">{promo.referralCode}</code>
-                        </div>
-                        <div className="info-row">
-                          <span className="info-label">Link:</span>
-                          <a
-                            href={promo.referralLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="info-link"
-                          >
-                            Open link →
-                          </a>
-                        </div>
-                      </div>
+              <div className="referral-actions">
+                <div className="referral-info">
+                  {promo.referralCode && (
+                    <div className="info-row">
+                      <span className="info-label">Code:</span>
+                      <code className="info-value">{promo.referralCode}</code>
                       <button
                         type="button"
-                        className="ghost"
-                        onClick={() => {
-                          navigator.clipboard.writeText(
-                            `${promo.name} Referral Code: ${promo.referralCode}\nLink: ${promo.referralLink}`
-                          );
-                          alert('Copied to clipboard!');
-                        }}
+                        className="copy-btn"
+                        onClick={() => handleCopyCode(promo.referralCode!, promo.name)}
+                        title="Copy code"
                       >
-                        Copy Details
+                        {copiedCode === promo.name ? '✓' : '📋'}
                       </button>
-                    </>
-                  ) : (
-                    <button type="button" onClick={() => handleEdit(promo)}>
-                      Add My Link
-                    </button>
+                    </div>
                   )}
                 </div>
-              )}
+                <div className="button-group">
+                  <a
+                    href={promo.referralLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="primary-btn"
+                  >
+                    Sign up now →
+                  </a>
+                  <button
+                    type="button"
+                    className="secondary-btn"
+                    onClick={() => handleCopyAll(promo)}
+                  >
+                    {copiedCode === promo.name + '-all' ? '✓ Copied!' : 'Copy details'}
+                  </button>
+                </div>
+              </div>
             </article>
           ))}
         </div>
