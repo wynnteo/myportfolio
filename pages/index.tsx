@@ -332,6 +332,8 @@ export default function HomePage() {
   const [dividendForm, setDividendForm] = useState({ amount: '', date: '', notes: '' });
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [lastPriceUpdate, setLastPriceUpdate] = useState<Date | null>(null);
+  const [isRefreshingPrices, setIsRefreshingPrices] = useState(false);
 
   async function loadTransactions() {
     try {
@@ -462,9 +464,11 @@ export default function HomePage() {
       const symbols = Array.from(new Set(holdings.map((h) => h.symbol))).filter(Boolean);
       if (symbols.length === 0) {
         setQuotes({});
+        setLastPriceUpdate(null);
         return;
       }
 
+      setIsRefreshingPrices(true);
       const nextQuotes: Record<string, QuoteResponse> = {};
 
       await Promise.all(
@@ -483,9 +487,19 @@ export default function HomePage() {
       );
 
       setQuotes(nextQuotes);
+      setLastPriceUpdate(new Date());
+      setIsRefreshingPrices(false);
     }
 
     void fetchQuotesForHoldings();
+
+    // Set up interval to refresh every 15 minutes (900000 ms)
+    const intervalId = setInterval(() => {
+      void fetchQuotesForHoldings();
+    }, 900000);
+
+    // Clean up interval on unmount
+    return () => clearInterval(intervalId);
   }, [holdings]);
 
   const displayHoldings = useMemo(() => {
@@ -854,6 +868,51 @@ export default function HomePage() {
     await loadTransactions();
   }
 
+  async function handleRefreshPrices() {
+  const symbols = Array.from(new Set(holdings.map((h) => h.symbol))).filter(Boolean);
+  if (symbols.length === 0) return;
+
+  setIsRefreshingPrices(true);
+  const nextQuotes: Record<string, QuoteResponse> = {};
+
+  await Promise.all(
+    symbols.map(async (symbol) => {
+      try {
+        const resp = await fetch(`/api/quote?symbol=${encodeURIComponent(symbol)}`);
+        if (!resp.ok) return;
+        const data: QuoteResponse = await resp.json();
+        nextQuotes[symbol] = data;
+      } catch {}
+    })
+  );
+
+  setQuotes(nextQuotes);
+  setLastPriceUpdate(new Date());
+  setIsRefreshingPrices(false);
+}
+
+function formatLastUpdate(date: Date | null) {
+  if (!date) return 'Never';
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  
+  if (diffMins < 1) return 'Just now';
+  if (diffMins === 1) return '1 min ago';
+  if (diffMins < 60) return `${diffMins} mins ago`;
+  
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours === 1) return '1 hour ago';
+  if (diffHours < 24) return `${diffHours} hours ago`;
+  
+  return date.toLocaleString('en-SG', { 
+    month: 'short', 
+    day: 'numeric', 
+    hour: '2-digit', 
+    minute: '2-digit' 
+  });
+}
+
   const totalCapital = useMemo(
     () => Array.from(totals.capitalByCurrency.values()).reduce((sum, val) => sum + val, 0),
     [totals.capitalByCurrency]
@@ -913,9 +972,25 @@ export default function HomePage() {
           <Link href="/">Dashboard</Link>
           <Link href="/referrals">Referral hub</Link>
         </nav>
-        <span id="sync-status" className="badge" data-tone={statusTone}>
-          {statusText}
-        </span>
+        <div className="status-group">
+          <span id="sync-status" className="badge" data-tone={statusTone}>
+            {statusText}
+          </span>
+          {lastPriceUpdate && (
+            <div className="price-update-info">
+              <span className="update-time">Live prices: {formatLastUpdate(lastPriceUpdate)}</span>
+              <button 
+                type="button" 
+                className="refresh-btn"
+                onClick={() => void handleRefreshPrices()}
+                disabled={isRefreshingPrices}
+                title="Refresh live prices"
+              >
+                <span className={`refresh-icon ${isRefreshingPrices ? 'spinning' : ''}`}>↻</span>
+              </button>
+            </div>
+          )}
+        </div>
       </header>
 
       <section aria-labelledby="summary">
