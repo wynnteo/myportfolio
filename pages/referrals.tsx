@@ -25,8 +25,8 @@ const brokerPromos: BrokerPromo[] = [
       'Real-time market data',
     ],
     requirements: 'Deposit S$3,000-S$100,000, complete trades, maintain 30-90 days',
-    referralCode: 'ABCD1234',
-    referralLink: 'https://j.moomoo.com/00AbCd',
+    referralCode: '743XWRTM',
+    referralLink: 'https://j.moomoo.com/0yj083',
     category: 'stocks',
     featured: true,
   },
@@ -41,8 +41,8 @@ const brokerPromos: BrokerPromo[] = [
       'Fractional shares from US$5',
     ],
     requirements: 'Deposit USD 2,000-10,000, maintain 30-90 days',
-    referralCode: 'WEBULL123',
-    referralLink: 'https://www.webull.com.sg/activity?code=WEBULL123',
+    referralCode: 'sg6BTi5pdv5A',
+    referralLink: 'https://www.webull.com.sg/s/uIYsg6BTi5pdv5A60V',
     category: 'stocks',
     featured: true,
   },
@@ -57,8 +57,8 @@ const brokerPromos: BrokerPromo[] = [
       'Commission-free SG stocks (1 year)',
     ],
     requirements: 'Deposit and maintain funds for 60 days',
-    referralCode: 'TIGER2024',
-    referralLink: 'https://www.tigerbrokers.com.sg/activity/market/signup/?invite=TIGER2024',
+    referralCode: 'CSV0PX',
+    referralLink: 'https://tigr.link/s/80D2V0g',
     category: 'stocks',
   },
   {
@@ -70,10 +70,11 @@ const brokerPromos: BrokerPromo[] = [
       '1 NVIDIA share (deposit S$2K)',
       '1 Apple share (deposit S$10K)',
       'Real-time SG & HK market data',
+      'Additional $18 Cash Coupon'
     ],
-    requirements: 'Deposit S$2,000-10,000, complete 3-5 trades, maintain 30-90 days',
-    referralCode: 'LB123456',
-    referralLink: 'https://longbridge.sg/download?channel=LB123456',
+    requirements: 'Deposit S$2,000-10,000, complete 3-5 trades, maintain 30-90 days, earn rewards $800',
+    referralCode: 'UI312291',
+    referralLink: 'https://activity.longbridge.sg/pages/longbridge_sg/8650/index.html?app_id=longbridge_sg&org_id=1&account_channel=lb_sg&invite-code=UI312291',
     category: 'stocks',
   },
   {
@@ -87,8 +88,8 @@ const brokerPromos: BrokerPromo[] = [
       'S$50 Shopee voucher pack',
     ],
     requirements: 'Sign up with referral code, apply for Credit Card Bundle or Instant Loan',
-    referralCode: 'MARI15SG',
-    referralLink: 'https://www.maribank.sg/referral?code=MARI15SG',
+    referralCode: '743XWRTM',
+    referralLink: 'https://www.maribank.sg/promo',
     category: 'savings',
     featured: true,
   },
@@ -118,8 +119,8 @@ const brokerPromos: BrokerPromo[] = [
       'Free OPRA options live quotes',
     ],
     requirements: 'Deposit USD 1,500, complete 3 trades within 30 days',
-    referralCode: 'USMART98',
-    referralLink: 'https://www.usmart.sg/activity/referral?code=USMART98',
+    referralCode: 'cb68',
+    referralLink: 'https://m.usmartsg66.com/promo/overseas/bonus-dec.html?ICode=cb68&langType=3&Id=',
     category: 'stocks',
   },
 ];
@@ -135,14 +136,7 @@ export default function ReferralHub() {
   const handleCopyCode = (code: string, brokerName: string) => {
     navigator.clipboard.writeText(code);
     setCopiedCode(brokerName);
-    setTimeout(() => setCopiedCode(null), 2000);
-  };
-
-  const handleCopyAll = (promo: BrokerPromo) => {
-    const text = `🎁 ${promo.name} Referral\n\n${promo.highlight}\n\nReferral Code: ${promo.referralCode}\nLink: ${promo.referralLink}\n\nRequirements: ${promo.requirements}`;
-    navigator.clipboard.writeText(text);
-    setCopiedCode(promo.name + '-all');
-    setTimeout(() => setCopiedCode(null), 2000);
+    setTimeout(() => setCopiedCode(null), 1500);
   };
 
   return (
@@ -164,7 +158,7 @@ export default function ReferralHub() {
             <p className="eyebrow">Spotlight</p>
             <h2 id="promo-list">Latest broker promotions</h2>
             <p className="muted">
-              Click to copy referral codes or open sign-up links
+              Click referral code to copy • Click button to sign up
             </p>
           </div>
           <div className="chip-group">
@@ -219,23 +213,25 @@ export default function ReferralHub() {
               </div>
 
               <div className="referral-actions">
-                <div className="referral-info">
-                  {promo.referralCode && (
-                    <div className="info-row">
-                      <span className="info-label">Code:</span>
-                      <code className="info-value">{promo.referralCode}</code>
-                      <button
-                        type="button"
-                        className="copy-btn"
-                        onClick={() => handleCopyCode(promo.referralCode!, promo.name)}
-                        title="Copy code"
-                      >
-                        {copiedCode === promo.name ? '✓' : '📋'}
-                      </button>
-                    </div>
-                  )}
-                </div>
                 <div className="button-group">
+                  {promo.referralCode && (
+                    <button
+                      type="button"
+                      className="code-btn"
+                      onClick={() => handleCopyCode(promo.referralCode!, promo.name)}
+                      title="Click to copy code"
+                    >
+                      {copiedCode === promo.name ? (
+                        <>
+                          <span className="code-check">✓</span> Copied!
+                        </>
+                      ) : (
+                        <>
+                          <span className="code-label">Code:</span> {promo.referralCode}
+                        </>
+                      )}
+                    </button>
+                  )}
                   <a
                     href={promo.referralLink}
                     target="_blank"
@@ -244,13 +240,6 @@ export default function ReferralHub() {
                   >
                     Sign up now →
                   </a>
-                  <button
-                    type="button"
-                    className="secondary-btn"
-                    onClick={() => handleCopyAll(promo)}
-                  >
-                    {copiedCode === promo.name + '-all' ? '✓ Copied!' : 'Copy details'}
-                  </button>
                 </div>
               </div>
             </article>

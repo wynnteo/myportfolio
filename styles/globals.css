@@ -1436,25 +1436,49 @@ th.sortable:hover {
   text-decoration: underline;
 }
 
-.copy-btn {
-  background: #f8fafc;
-  border: 1px solid #cbd5e1;
-  padding: 4px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 14px;
-  min-width: 32px;
-}
-
-.copy-btn:hover {
-  background: #e2e8f0;
-  transform: scale(1.05);
-}
-
 .button-group {
   display: flex;
   gap: 8px;
+}
+
+.code-btn {
+  flex: 1;
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  color: #0f172a;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 700;
+  border: 1px solid #cbd5e1;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  font-family: 'Courier New', monospace;
+  text-align: center;
+}
+
+.code-btn:hover {
+  background: linear-gradient(135deg, #e2e8f0, #cbd5e1);
+  border-color: #94a3b8;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.1);
+}
+
+.code-btn:active {
+  transform: translateY(0);
+}
+
+.code-label {
+  color: #64748b;
+  font-weight: 600;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.code-check {
+  color: #10b981;
+  font-size: 16px;
+  margin-right: 4px;
 }
 
 .primary-btn {
@@ -1470,30 +1494,15 @@ th.sortable:hover {
   border: none;
   cursor: pointer;
   font-size: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .primary-btn:hover {
   background: linear-gradient(135deg, #1e293b, #334155);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
-}
-
-.secondary-btn {
-  flex: 1;
-  background: #ffffff;
-  color: #0f172a;
-  padding: 10px 16px;
-  border-radius: 8px;
-  font-weight: 600;
-  border: 1px solid #cbd5e1;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 14px;
-}
-
-.secondary-btn:hover {
-  background: #f8fafc;
-  border-color: #94a3b8;
 }
 
 .tips-section {
