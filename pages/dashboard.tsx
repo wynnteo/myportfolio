@@ -1179,81 +1179,84 @@ function formatLastUpdate(date: Date | null) {
             </select>
           </div>
         </div>
-        <div className="table-wrapper">
-          <table>
+        
+        <div className="holdings-table-wrapper">
+          <table className="holdings-table">
             <thead>
               <tr>
+                <th onClick={() => handleSort('symbol')} className="sortable">
+                  Symbol {sortField === 'symbol' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
                 <th onClick={() => handleSort('category')} className="sortable">
                   Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
-                <th onClick={() => handleSort('symbol')} className="sortable">
-                  Instrument {sortField === 'symbol' && (sortDirection === 'asc' ? '↑' : '↓')}
+                <th onClick={() => handleSort('quantity')} className="sortable" style={{textAlign: 'right'}}>
+                  Quantity {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
-                <th>Currency</th>
-                <th onClick={() => handleSort('quantity')} className="sortable">
-                  Units {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
+                <th onClick={() => handleSort('totalCost')} className="sortable" style={{textAlign: 'right'}}>
+                  Capital {sortField === 'totalCost' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
-                <th onClick={() => handleSort('averagePrice')} className="sortable">
-                  Net Avg Price {sortField === 'averagePrice' && (sortDirection === 'asc' ? '↑' : '↓')}
+                <th onClick={() => handleSort('currentValue')} className="sortable" style={{textAlign: 'right'}}>
+                  Value {sortField === 'currentValue' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
-                <th onClick={() => handleSort('currentPrice')} className="sortable">
-                  Current Price {sortField === 'currentPrice' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th onClick={() => handleSort('totalCost')} className="sortable">
-                  Cost {sortField === 'totalCost' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th onClick={() => handleSort('currentValue')} className="sortable">
-                  Market Value {sortField === 'currentValue' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th onClick={() => handleSort('dividends')} className="sortable">
-                  Total Dividends {sortField === 'dividends' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th onClick={() => handleSort('plPct')} className="sortable">
+                <th onClick={() => handleSort('plPct')} className="sortable" style={{textAlign: 'right'}}>
                   P&L {sortField === 'plPct' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
-                <th>Actions</th>
+                <th style={{textAlign: 'right'}}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {sortedHoldings.map((row) => {
-                const plClass = row.pl && row.pl !== 0 ? (row.pl > 0 ? 'pl-positive' : 'pl-negative') : 'pl-neutral';
+                const plClass = row.pl && row.pl !== 0 ? (row.pl > 0 ? 'positive' : 'negative') : 'neutral';
 
                 return (
                   <tr key={row.key}>
                     <td>
-                      <span className="category-pill">
+                      <div className="symbol-cell">
+                        <div className="symbol-main">{row.symbol}</div>
+                        {row.productName && (
+                          <div className="symbol-product" title={row.productName}>
+                            {row.productName}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="category-badge">
                         <span
-                          className="category-dot"
+                          className="category-dot-small"
                           style={{ backgroundColor: getCategoryColor(row.category) }}
-                          aria-hidden
                         />
                         {row.category}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="instrument-cell">
-                        <div className="cell-main">{row.symbol}</div>
-                        {row.productName && <div className="muted small">{row.productName}</div>}
                       </div>
                     </td>
-                    <td>{row.currency}</td>
-                    <td>{formatQuantity(row.quantity)}</td>
-                    <td>{row.averagePrice !== null ? formatPrice(row.averagePrice, row.currency, 4) : '-'}</td>
-                    <td>{row.currentPrice !== null ? formatPrice(row.currentPrice, row.currency, 4) : '-'}</td>
-                    <td>{row.totalCost !== null ? formatPrice(row.totalCost, row.currency, 2) : '-'}</td>
-                    <td>{row.currentValue !== null ? formatPrice(row.currentValue, row.currency, 2) : '-'}</td>
-                    <td>{row.dividends !== null ? formatPrice(row.dividends, row.currency, 2) : '-'}</td>
-                    
-                    <td>
-                      <div className="pl-stack">
-                        <span className={plClass}>{row.pl !== null ? formatPrice(row.pl, row.currency, 2) : '-'}</span>
-                        <span className={`pl-percent ${plClass}`}>
-                          {row.plPct !== null ? `${row.plPct.toFixed(2)}%` : '-'}
+                    <td className="value-cell">
+                      {formatQuantity(row.quantity)}
+                    </td>
+                    <td className="value-cell">
+                      {formatPrice(row.totalCost, row.currency, 2)}
+                    </td>
+                    <td className="value-cell">
+                      {row.currentValue !== null ? formatPrice(row.currentValue, row.currency, 2) : '-'}
+                    </td>
+                    <td className="pl-cell">
+                      <div className={`pl-value ${plClass}`}>
+                        <span className="pl-amount">
+                          {row.pl !== null ? formatPrice(row.pl, row.currency, 2) : '-'}
                         </span>
+                        {row.plPct !== null && (
+                          <span className="pl-percentage">
+                            {row.plPct > 0 ? '+' : ''}{row.plPct.toFixed(2)}%
+                          </span>
+                        )}
                       </div>
                     </td>
-                    <td>
-                      <button type="button" onClick={() => setSelectedHoldingKey(row.key)}>
+                    <td className="action-cell">
+                      <button 
+                        type="button" 
+                        className="view-btn"
+                        onClick={() => setSelectedHoldingKey(row.key)}
+                      >
                         View
                       </button>
                     </td>
@@ -1277,13 +1280,13 @@ function formatLastUpdate(date: Date | null) {
                   <span>Broker: {selectedHolding.broker}</span>
                   <span>Currency: {selectedHolding.currency}</span>
                   <span>Qty: {formatQuantity(selectedHolding.quantity)}</span>
-                  <span>Commission: {formatPrice(selectedHolding.totalCommission, selectedHolding.currency, 2)}</span>
                 </div>
               </div>
               <button type="button" className="ghost" onClick={() => setSelectedHoldingKey(null)}>
                 Close
               </button>
             </div>
+            
             <div className="modal-stats-grid">
               <div className="modal-stat-card highlight">
                 <div className="stat-row">
@@ -1326,26 +1329,32 @@ function formatLastUpdate(date: Date | null) {
                 </div>
               </div>
             </div>
+            
             {actionMessage && <div className="helper-text info">{actionMessage}</div>}
             
-            <div className="modal-section">
-              <h3 className="modal-section-title">Buy/Sell Transactions</h3>
+            {/* Buy/Sell Transactions Section */}
+            <div className="modal-transactions-section">
+              <div className="modal-section-header">
+                <h3 className="modal-section-title">Buy/Sell Transactions</h3>
+              </div>
+              
               {selectedHoldingTransactions.length === 0 ? (
-                <p className="muted">No transactions for this holding yet.</p>
+                <div className="dividend-empty-state">
+                  <div className="dividend-empty-icon">📊</div>
+                  <p className="dividend-empty-text">No transactions yet</p>
+                </div>
               ) : (
-                <div className="table-wrapper modal-table">
-                  <table>
+                <div className="table-wrapper">
+                  <table className="modal-transaction-table">
                     <thead>
                       <tr>
                         <th>Date</th>
                         <th>Type</th>
-                        <th>Category</th>
-                        <th>Product</th>
                         <th>Quantity</th>
                         <th>Price</th>
                         <th>Commission</th>
                         <th>Notes</th>
-                        <th>Actions</th>
+                        <th className="actions-header">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1376,29 +1385,9 @@ function formatLastUpdate(date: Date | null) {
                                   <option value="SELL">SELL</option>
                                 </select>
                               ) : (
-                                tx.type
-                              )}
-                            </td>
-                            <td>
-                              {isEditing ? (
-                                <input
-                                  type="text"
-                                  value={editForm.category ?? tx.category}
-                                  onChange={(e) => setEditForm((prev) => ({ ...prev, category: e.target.value }))}
-                                />
-                              ) : (
-                                tx.category
-                              )}
-                            </td>
-                            <td>
-                              {isEditing ? (
-                                <input
-                                  type="text"
-                                  value={editForm.productName ?? tx.product_name}
-                                  onChange={(e) => setEditForm((prev) => ({ ...prev, productName: e.target.value }))}
-                                />
-                              ) : (
-                                tx.product_name
+                                <span style={{fontWeight: 700, color: tx.type === 'BUY' ? '#059669' : '#dc2626'}}>
+                                  {tx.type}
+                                </span>
                               )}
                             </td>
                             <td>
@@ -1449,29 +1438,32 @@ function formatLastUpdate(date: Date | null) {
                                   type="text"
                                   value={editForm.notes ?? (tx.notes ?? '')}
                                   onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
+                                  placeholder="Optional"
                                 />
                               ) : (
-                                tx.notes
+                                <span style={{color: '#64748b', fontSize: '12px'}}>
+                                  {tx.notes || '-'}
+                                </span>
                               )}
                             </td>
-                            <td>
+                            <td className="actions-cell">
                               {isEditing ? (
-                                <div className="action-row">
-                                  <button type="button" onClick={() => void saveEdit()}>
+                                <div className="modal-action-buttons">
+                                  <button type="button" className="save-btn" onClick={() => void saveEdit()}>
                                     Save
                                   </button>
-                                  <button type="button" className="ghost" onClick={() => cancelEditing()}>
+                                  <button type="button" className="cancel-btn" onClick={() => cancelEditing()}>
                                     Cancel
                                   </button>
                                 </div>
                               ) : (
-                                <div className="action-row">
-                                  <button type="button" onClick={() => startEditing(tx)}>
+                                <div className="modal-action-buttons">
+                                  <button type="button" className="edit-btn" onClick={() => startEditing(tx)}>
                                     Edit
                                   </button>
                                   <button
                                     type="button"
-                                    className="ghost danger"
+                                    className="delete-btn"
                                     onClick={() => void deleteTransaction(tx.id)}
                                   >
                                     Delete
@@ -1488,16 +1480,21 @@ function formatLastUpdate(date: Date | null) {
               )}
             </div>
 
-            <div className="modal-section">
-              <div className="section-header">
+            {/* Dividend History Section */}
+            <div className="dividend-history-section">
+              <div className="modal-section-header">
                 <h3 className="modal-section-title">Dividend History</h3>
-                <button type="button" onClick={() => setShowAddDividend(!showAddDividend)}>
+                <button 
+                  type="button" 
+                  className="add-dividend-btn"
+                  onClick={() => setShowAddDividend(!showAddDividend)}
+                >
                   {showAddDividend ? 'Cancel' : '+ Add Dividend'}
                 </button>
               </div>
               
               {showAddDividend && (
-                <div className="add-dividend-form">
+                <div className="dividend-form-inline">
                   <label>
                     Amount ({selectedHolding.currency})
                     <input
@@ -1507,7 +1504,6 @@ function formatLastUpdate(date: Date | null) {
                       value={dividendForm.amount}
                       onChange={(e) => setDividendForm({ ...dividendForm, amount: e.target.value })}
                       placeholder="0.00"
-                      required
                     />
                   </label>
                   <label>
@@ -1524,26 +1520,34 @@ function formatLastUpdate(date: Date | null) {
                       type="text"
                       value={dividendForm.notes}
                       onChange={(e) => setDividendForm({ ...dividendForm, notes: e.target.value })}
-                      placeholder="Optional notes"
+                      placeholder="Optional"
                     />
                   </label>
-                  <button type="button" onClick={() => void handleAddDividend()}>
-                    Save Dividend
+                  <button 
+                    type="button" 
+                    className="save-btn"
+                    onClick={() => void handleAddDividend()}
+                    style={{height: '38px', marginTop: 'auto'}}
+                  >
+                    Save
                   </button>
                 </div>
               )}
               
               {selectedHoldingDividends.length === 0 ? (
-                <p className="muted">No dividends received yet.</p>
+                <div className="dividend-empty-state">
+                  <div className="dividend-empty-icon">💵</div>
+                  <p className="dividend-empty-text">No dividends recorded yet</p>
+                </div>
               ) : (
-                <div className="table-wrapper modal-table">
-                  <table>
+                <div className="table-wrapper">
+                  <table className="modal-transaction-table">
                     <thead>
                       <tr>
                         <th>Date</th>
                         <th>Amount</th>
                         <th>Notes</th>
-                        <th>Actions</th>
+                        <th className="actions-header">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1571,7 +1575,9 @@ function formatLastUpdate(date: Date | null) {
                                   onChange={(e) => setEditForm((prev) => ({ ...prev, dividendAmount: e.target.value }))}
                                 />
                               ) : tx.dividend_amount !== null ? (
-                                formatPrice(tx.dividend_amount, selectedHolding.currency, 2)
+                                <span style={{fontWeight: 700, color: '#059669'}}>
+                                  {formatPrice(tx.dividend_amount, selectedHolding.currency, 2)}
+                                </span>
                               ) : (
                                 '-'
                               )}
@@ -1582,29 +1588,32 @@ function formatLastUpdate(date: Date | null) {
                                   type="text"
                                   value={editForm.notes ?? (tx.notes ?? '')}
                                   onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
+                                  placeholder="Optional"
                                 />
                               ) : (
-                                tx.notes
+                                <span style={{color: '#64748b', fontSize: '12px'}}>
+                                  {tx.notes || '-'}
+                                </span>
                               )}
                             </td>
-                            <td>
+                            <td className="actions-cell">
                               {isEditing ? (
-                                <div className="action-row">
-                                  <button type="button" onClick={() => void saveEdit()}>
+                                <div className="modal-action-buttons">
+                                  <button type="button" className="save-btn" onClick={() => void saveEdit()}>
                                     Save
                                   </button>
-                                  <button type="button" className="ghost" onClick={() => cancelEditing()}>
+                                  <button type="button" className="cancel-btn" onClick={() => cancelEditing()}>
                                     Cancel
                                   </button>
                                 </div>
                               ) : (
-                                <div className="action-row">
-                                  <button type="button" onClick={() => startEditing(tx)}>
+                                <div className="modal-action-buttons">
+                                  <button type="button" className="edit-btn" onClick={() => startEditing(tx)}>
                                     Edit
                                   </button>
                                   <button
                                     type="button"
-                                    className="ghost danger"
+                                    className="delete-btn"
                                     onClick={() => void deleteTransaction(tx.id)}
                                   >
                                     Delete

@@ -1737,3 +1737,438 @@ th.sortable:hover {
     padding: 24px;
   }
 }
+
+/* Add these new styles to your existing globals.css */
+
+/* ==================== ENHANCED HOLDINGS TABLE ==================== */
+.holdings-table-wrapper {
+  overflow-x: auto;
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.holdings-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.holdings-table thead {
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.holdings-table th {
+  padding: 14px 12px;
+  text-align: left;
+  font-weight: 700;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #475569;
+  white-space: nowrap;
+}
+
+.holdings-table tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.15s ease;
+}
+
+.holdings-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.holdings-table tbody tr:last-child {
+  border-bottom: none;
+}
+
+.holdings-table td {
+  padding: 16px 12px;
+  vertical-align: middle;
+}
+
+/* Symbol cell - make it stand out */
+.symbol-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.symbol-main {
+  font-weight: 800;
+  font-size: 15px;
+  color: #0f172a;
+}
+
+.symbol-product {
+  font-size: 12px;
+  color: #64748b;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Compact category badge */
+.category-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+
+.category-dot-small {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* Value cells - right aligned numbers */
+.value-cell {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.value-cell.subdued {
+  color: #64748b;
+  font-weight: 500;
+}
+
+/* P&L cell - prominent display */
+.pl-cell {
+  text-align: right;
+}
+
+.pl-value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.pl-amount {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.pl-percentage {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.pl-value.positive .pl-amount,
+.pl-value.positive .pl-percentage {
+  color: #059669;
+}
+
+.pl-value.negative .pl-amount,
+.pl-value.negative .pl-percentage {
+  color: #dc2626;
+}
+
+.pl-value.positive .pl-percentage {
+  background: #d1fae5;
+}
+
+.pl-value.negative .pl-percentage {
+  background: #fee2e2;
+}
+
+.pl-value.neutral .pl-amount,
+.pl-value.neutral .pl-percentage {
+  color: #64748b;
+}
+
+/* Action cell - always right aligned */
+.action-cell {
+  text-align: right;
+  padding-right: 16px !important;
+}
+
+.view-btn {
+  padding: 8px 16px;
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.view-btn:hover {
+  background: #1e293b;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.15);
+}
+
+/* ==================== ENHANCED MODAL TABLES ==================== */
+.modal-transactions-section {
+  margin-bottom: 24px;
+}
+
+.modal-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.modal-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.modal-transaction-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.modal-transaction-table thead {
+  background: #f8fafc;
+}
+
+.modal-transaction-table th {
+  padding: 10px 8px;
+  text-align: left;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-transaction-table th.actions-header {
+  text-align: right;
+}
+
+.modal-transaction-table tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.modal-transaction-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.modal-transaction-table td {
+  padding: 12px 8px;
+  vertical-align: middle;
+}
+
+.modal-transaction-table td.actions-cell {
+  text-align: right;
+  padding-right: 12px;
+}
+
+.modal-transaction-table input,
+.modal-transaction-table select {
+  width: 100%;
+  padding: 6px 8px;
+  font-size: 13px;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+}
+
+.modal-action-buttons {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.modal-action-buttons button {
+  padding: 6px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.edit-btn {
+  background: #f8fafc;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.edit-btn:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.save-btn {
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.save-btn:hover {
+  background: #1e293b;
+}
+
+.cancel-btn {
+  background: #ffffff;
+  color: #64748b;
+  border: 1px solid #cbd5e1;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cancel-btn:hover {
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.delete-btn {
+  background: #ffffff;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.delete-btn:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+
+/* ==================== DIVIDEND HISTORY IMPROVEMENTS ==================== */
+.dividend-history-section {
+  margin-top: 24px;
+}
+
+.dividend-add-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.add-dividend-btn {
+  background: #0f172a;
+  color: #ffffff;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.add-dividend-btn:hover {
+  background: #1e293b;
+}
+
+.dividend-form-inline {
+  display: grid;
+  grid-template-columns: 2fr 1.5fr 2fr auto;
+  gap: 10px;
+  padding: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  align-items: end;
+}
+
+.dividend-form-inline label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.dividend-form-inline input {
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.dividend-empty-state {
+  text-align: center;
+  padding: 32px 16px;
+  color: #94a3b8;
+}
+
+.dividend-empty-icon {
+  font-size: 48px;
+  margin-bottom: 8px;
+  opacity: 0.5;
+}
+
+.dividend-empty-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  margin: 0;
+}
+
+/* ==================== TABLE RESPONSIVE ==================== */
+@media (max-width: 1024px) {
+  .holdings-table {
+    min-width: 900px;
+  }
+  
+  .modal-transaction-table {
+    min-width: 800px;
+  }
+}
+
+@media (max-width: 768px) {
+  .holdings-table th,
+  .holdings-table td {
+    padding: 12px 8px;
+    font-size: 13px;
+  }
+  
+  .symbol-main {
+    font-size: 14px;
+  }
+  
+  .modal-action-buttons {
+    flex-direction: column;
+  }
+  
+  .modal-action-buttons button {
+    width: 100%;
+  }
+  
+  .dividend-form-inline {
+    grid-template-columns: 1fr;
+  }
+}
