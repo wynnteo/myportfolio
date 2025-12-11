@@ -82,7 +82,7 @@ export default function LoginPage() {
           </form>
 
           <div className="auth-divider">
-            <span>Don't have an account?</span>
+            <span>Don&apos;t have an account?</span>
           </div>
 
           <Link href="/register" className="auth-link-button">

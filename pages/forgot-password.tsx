@@ -1,3 +1,4 @@
+// pages/forgot-password.tsx
 import Link from 'next/link';
 import { FormEvent, useState } from 'react';
 import { useAuth } from '../lib/AuthContext';
@@ -43,7 +44,7 @@ export default function ForgotPasswordPage() {
         <div className="auth-card">
           <div className="auth-card-header">
             <h1>Reset your password</h1>
-            <p>Enter your email and we'll send you a reset link</p>
+            <p>Enter your email and we&apos;ll send you a reset link</p>
           </div>
 
           {error && (
