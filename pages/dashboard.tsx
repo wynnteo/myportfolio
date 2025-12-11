@@ -98,6 +98,15 @@ function formatPrice(value: number | null, currency: string, decimals: number = 
   return `${getCurrencySymbol(currency)}${formatted}`;
 }
 
+function formatPriceWithoutCurrency(value: number | null, currency: string, decimals: number = 2): string {
+  if (value === null || Number.isNaN(value)) return '-';
+  const formatted = value.toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+  return `${formatted}`;
+}
+
 function formatQuantity(value: number | null) {
   if (value === null || Number.isNaN(value)) return '-';
   if (value === Math.floor(value)) {
@@ -1240,10 +1249,10 @@ function formatLastUpdate(date: Date | null) {
                       {formatQuantity(row.quantity)}
                     </td>
                     <td className="value-cell">
-                      {formatPrice(row.currentPrice, row.currency, 4)}
+                      {formatPriceWithoutCurrency(row.averagePrice, row.currency, 4)}
                     </td>
                     <td className="value-cell">
-                      {formatPrice(row.averagePrice, row.currency, 4)}
+                      {formatPriceWithoutCurrency(row.currentPrice, row.currency, 4)}
                     </td>
                     <td className="value-cell">
                       {formatPrice(row.totalCost, row.currency, 2)}
