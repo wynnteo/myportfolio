@@ -983,7 +983,8 @@ function formatLastUpdate(date: Date | null) {
           <p className="muted">Stay on top of holdings, performance, and income at a glance.</p>
         </div>
         <nav className="nav-links" aria-label="Primary navigation">
-          <Link href="/">Dashboard</Link>
+          <Link href="/">Home</Link>
+          <Link href="/dashboard">Dashboard</Link>
           <Link href="/referrals">Referral hub</Link>
           <button onClick={() => void logout()} className="ghost">Logout</button>
         </nav>

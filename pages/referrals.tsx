@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { useState } from 'react';
+import { useAuth } from '../lib/AuthContext';
 
 interface BrokerPromo {
   name: string;
@@ -126,6 +127,7 @@ const brokerPromos: BrokerPromo[] = [
 ];
 
 export default function ReferralHub() {
+  const { user, logout, loading } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'stocks' | 'savings'>('all');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
@@ -147,9 +149,19 @@ export default function ReferralHub() {
           <h1>Share broker sign-up promos</h1>
           <p className="muted">Your one-stop referral center with the latest promotions (Dec 2024)</p>
         </div>
-        <Link className="ghost" href="/">
-          Back to dashboard
-        </Link>
+        {user ? (
+          <>
+            <Link href="/">Home</Link>
+            <Link href="/dashboard" className="nav-link">Dashboard</Link>
+            <button onClick={() => void logout()} className="nav-btn">Logout</button>
+          </>
+        ) : (
+          <>
+            <Link href="/">Home</Link>
+            <Link href="/login" className="nav-link">Login</Link>
+            <Link href="/register" className="nav-btn">Get Started</Link>
+          </>
+        )}
       </header>
 
       <section className="panel" aria-labelledby="promo-list">

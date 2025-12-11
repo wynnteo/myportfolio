@@ -3,9 +3,6 @@ import { useAuth } from '../lib/AuthContext';
 
 export default function LandingPage() {
   const { user, logout, loading } = useAuth();
-  
-  console.log('Landing page - user:', user);
-  console.log('Landing page - loading:', loading);
 
   return (
     <main className="landing-page">
