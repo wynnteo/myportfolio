@@ -75,28 +75,71 @@ function parsePriceAndTime(html: string) {
   return { price, priceText, lastUpdated, disclaimer };
 }
 
+// ---------------- OCBC fallback ----------------
+async function fetchOcbcPrice(fundName: string) {
+  try {
+    const url = 'https://www.ocbc.com/rates/daily_price_unit_trust.html';
+    const resp = await axios.get(url, { timeout: 15_000 });
+    const $ = cheerio.load(resp.data);
+
+    let foundPrice: number | null = null;
+    let lastUpdated: string | null = null;
+
+    $('.funds-table tr').each((_, tr) => {
+      const nameTd = $(tr).find('td').first();
+      const nameText = nameTd.text().trim();
+      if (nameText.toLowerCase() === fundName.toLowerCase()) {
+        const priceTd = nameTd.next('td');
+        const dateTd = priceTd.next('td');
+        const priceNum = Number(priceTd.text().trim().replace(/[,$\s]/g, ''));
+        if (!Number.isNaN(priceNum)) foundPrice = priceNum;
+        lastUpdated = dateTd.text().trim();
+      }
+    });
+
+    if (!foundPrice) return null;
+
+    return {
+      price: foundPrice,
+      lastUpdated,
+      source: 'ocbc',
+      cached: false,
+    };
+  } catch (err) {
+    console.error('OCBC fallback error', err?.message || err);
+    return null;
+  }
+}
+
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
     const s = (req.query.s as string) ?? req.body?.s;
-    if (!s) return res.status(400).json({ error: 'missing s parameter (e.g. LU0320765646:SGD)' });
+    if (!s) return res.status(400).json({ error: 'missing s parameter (e.g. LU0320765646:SGD or fund name)' });
 
     const cacheKey = `ft:${s}`;
     const cached = cache.get(cacheKey);
     if (cached) return res.status(200).json({ ...cached, cached: true });
 
     const url = ftUrlFromS(s);
-
-    // Optional robots check could be added here (fetch /robots.txt and inspect)
     const html = await fetchFtPage(url);
     const parsed = parsePriceAndTime(html);
 
+    let result;
     if (!parsed.price) {
-      // fallback: return found text and raw HTML snippet for debugging
-      cache.set(cacheKey, { ...parsed }, 60 * 5);
-      return res.status(200).json({ ...parsed, note: 'price not parsed to number; see priceText', url });
+      // fallback to OCBC
+      const ocbcResult = await fetchOcbcPrice(s);
+      if (ocbcResult) {
+        result = { s, price: ocbcResult.price, lastUpdated: ocbcResult.lastUpdated, source: 'ocbc', cached: false };
+        cache.set(cacheKey, result, 60 * 15);
+        return res.status(200).json(result);
+      } else {
+        // still not found
+        cache.set(cacheKey, { ...parsed }, 60 * 5);
+        return res.status(200).json({ ...parsed, note: 'price not found on FT or OCBC', url });
+      }
     }
 
-    const result = {
+    result = {
       s,
       url,
       price: parsed.price,
