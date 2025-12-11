@@ -1193,6 +1193,12 @@ function formatLastUpdate(date: Date | null) {
                 <th onClick={() => handleSort('quantity')} className="sortable" style={{textAlign: 'right'}}>
                   Quantity {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
+                <th onClick={() => handleSort('averagePrice')} className="sortable">
+                  Net Avg Price {sortField === 'averagePrice' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
+                <th onClick={() => handleSort('currentPrice')} className="sortable">
+                  Market Price {sortField === 'currentPrice' && (sortDirection === 'asc' ? '↑' : '↓')}
+                </th>
                 <th onClick={() => handleSort('totalCost')} className="sortable" style={{textAlign: 'right'}}>
                   Capital {sortField === 'totalCost' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
@@ -1232,6 +1238,12 @@ function formatLastUpdate(date: Date | null) {
                     </td>
                     <td className="value-cell">
                       {formatQuantity(row.quantity)}
+                    </td>
+                    <td className="value-cell">
+                      {formatPrice(row.currentPrice, row.currency, 4)}
+                    </td>
+                    <td className="value-cell">
+                      {formatPrice(row.averagePrice, row.currency, 4)}
                     </td>
                     <td className="value-cell">
                       {formatPrice(row.totalCost, row.currency, 2)}
