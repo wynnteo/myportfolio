@@ -562,7 +562,7 @@ export default function HomePage() {
     return () => clearInterval(intervalId);
   }, [holdings]);
 
-
+  const currentYear = new Date().getFullYear();
   const displayHoldings = useMemo(() => {
     return holdings.map((row) => {
       const quote = quotes[row.symbol];
@@ -670,6 +670,70 @@ export default function HomePage() {
       dividendsByCurrency,
     };
   }, [displayHoldings]);
+
+  const categoryBreakdowns = useMemo(() => {
+    const breakdowns = new Map<string, {
+      capital: number;
+      currentValue: number;
+      pl: number;
+      plPct: number;
+      ytdDividends: number;
+      totalDividends: number;
+      dividendYield: number;
+      topGainer: typeof displayHoldings[0] | null;
+      topLoser: typeof displayHoldings[0] | null;
+      holdingsCount: number;
+    }>();
+
+    categories.forEach(category => {
+      const categoryHoldings = displayHoldings.filter(h => h.category === category);
+      
+      if (categoryHoldings.length === 0) {
+        return;
+      }
+
+      const capital = categoryHoldings.reduce((sum, h) => sum + h.totalCost, 0);
+      const currentValue = categoryHoldings.reduce((sum, h) => sum + (h.currentValue ?? 0), 0);
+      const pl = currentValue - capital;
+      const plPct = capital !== 0 ? (pl / capital) * 100 : 0;
+      
+      const totalDividends = categoryHoldings.reduce((sum, h) => sum + h.dividends, 0);
+      
+      const ytdDividends = transactions
+        .filter(tx => 
+          tx.type === 'DIVIDEND' && 
+          tx.category === category &&
+          tx.trade_date && 
+          new Date(tx.trade_date).getFullYear() === currentYear
+        )
+        .reduce((sum, tx) => sum + (tx.dividend_amount ?? 0), 0);
+      
+      const dividendYield = capital !== 0 ? (ytdDividends / capital) * 100 : 0;
+
+      const topGainer = categoryHoldings.reduce((top, holding) => 
+        (holding.plPct !== null && (top === null || (holding.plPct > (top.plPct ?? -Infinity)))) ? holding : top
+      , null as typeof displayHoldings[0] | null);
+      
+      const topLoser = categoryHoldings.reduce((bottom, holding) => 
+        (holding.plPct !== null && (bottom === null || (holding.plPct < (bottom.plPct ?? Infinity)))) ? holding : bottom
+      , null as typeof displayHoldings[0] | null);
+
+      breakdowns.set(category, {
+        capital,
+        currentValue,
+        pl,
+        plPct,
+        ytdDividends,
+        totalDividends,
+        dividendYield,
+        topGainer,
+        topLoser,
+        holdingsCount: categoryHoldings.length,
+      });
+    });
+
+    return breakdowns;
+  }, [displayHoldings, transactions, currentYear]);
 
   const symbols = useMemo(() => new Set(displayHoldings.map((h) => h.symbol)), [displayHoldings]);
 
@@ -995,7 +1059,7 @@ function formatLastUpdate(date: Date | null) {
     [totals.dividendsByCurrency]
   );
   
-  const currentYear = new Date().getFullYear();
+ 
   const ytdDividends = useMemo(
     () => transactions
       .filter(tx => tx.type === 'DIVIDEND' && tx.trade_date && new Date(tx.trade_date).getFullYear() === currentYear)
@@ -1096,31 +1160,75 @@ function formatLastUpdate(date: Date | null) {
             <div className="stat-sub">{ytdYield > 0 ? `${ytdYield.toFixed(2)}% yield` : 'Total: ' + formatPrice(totalDividends, 'SGD', 2)}</div>
           </div>
         </div>
-        
-        {(topGainer || topLoser) && (
-          <div className="insights-grid">
-            {topGainer && topGainer.plPct !== null && topGainer.plPct > 0 && (
-              <div className="insight-card positive">
-                <div className="insight-label">Top Performer</div>
-                <div className="insight-symbol">{topGainer.symbol}</div>
-                <div className="insight-value">+{topGainer.plPct.toFixed(2)}%</div>
-              </div>
-            )}
-            {topLoser && topLoser.plPct !== null && topLoser.plPct < 0 && (
-              <div className="insight-card negative">
-                <div className="insight-label">Worst Performer</div>
-                <div className="insight-symbol">{topLoser.symbol}</div>
-                <div className="insight-value">{topLoser.plPct.toFixed(2)}%</div>
-              </div>
-            )}
-          </div>
-        )}
         <div className="chart-grid">
           <AssetAllocationChart data={allocations.byCategory} />
           <TopHoldingsChart holdings={displayHoldings} />
           <MonthlyDividendsChart transactions={transactions} />
         </div>
       </section>
+
+      {/* Category Breakdowns */}
+      {Array.from(categoryBreakdowns.entries()).map(([category, breakdown]) => (
+        <section key={category} className="category-performance-section" aria-labelledby={`category-${category}`}>
+          <div className="section-title">
+            <div>
+              <p className="eyebrow">Category Breakdown</p>
+              <h2 id={`category-${category}`} className="category-section-title">
+                <span
+                  className="category-dot-inline"
+                  style={{ backgroundColor: getCategoryColor(category) }}
+                />
+                {category} Performance
+              </h2>
+            </div>
+            <div className="chip-group">
+              <span className="chip">{breakdown.holdingsCount} holdings</span>
+            </div>
+          </div>
+          
+          <div className="overview-grid">
+            <div className="summary-card">
+              <div className="stat-title">Invested capital</div>
+              <div className="stat-value">{formatPrice(breakdown.capital, 'SGD', 2)}</div>
+              <div className="stat-sub">{((breakdown.capital / totalCapital) * 100).toFixed(1)}% of portfolio</div>
+            </div>
+            <div className="summary-card">
+              <div className="stat-title">Current value</div>
+              <div className="stat-value">{formatPrice(breakdown.currentValue, 'SGD', 2)}</div>
+              <div className="stat-sub">{breakdown.holdingsCount} positions</div>
+            </div>
+            <div className={`summary-card ${breakdown.pl > 0 ? 'profit' : breakdown.pl < 0 ? 'loss' : ''}`}>
+              <div className="stat-title">P/L</div>
+              <div className="stat-value">{formatPrice(breakdown.pl, 'SGD', 2)}</div>
+              <div className="stat-sub">{breakdown.plPct > 0 ? '+' : ''}{breakdown.plPct.toFixed(2)}%</div>
+            </div>
+            <div className="summary-card">
+              <div className="stat-title">Dividends ({currentYear})</div>
+              <div className="stat-value">{formatPrice(breakdown.ytdDividends, 'SGD', 2)}</div>
+              <div className="stat-sub">{breakdown.dividendYield > 0 ? `${breakdown.dividendYield.toFixed(2)}% yield` : 'Total: ' + formatPrice(breakdown.totalDividends, 'SGD', 2)}</div>
+            </div>
+          </div>
+
+          {(breakdown.topGainer || breakdown.topLoser) && (
+            <div className="insights-grid">
+              {breakdown.topGainer && breakdown.topGainer.plPct !== null && breakdown.topGainer.plPct > 0 && (
+                <div className="insight-card positive">
+                  <div className="insight-label">Top Performer</div>
+                  <div className="insight-symbol">{breakdown.topGainer.symbol}</div>
+                  <div className="insight-value">+{breakdown.topGainer.plPct.toFixed(2)}%</div>
+                </div>
+              )}
+              {breakdown.topLoser && breakdown.topLoser.plPct !== null && breakdown.topLoser.plPct < 0 && (
+                <div className="insight-card negative">
+                  <div className="insight-label">Worst Performer</div>
+                  <div className="insight-symbol">{breakdown.topLoser.symbol}</div>
+                  <div className="insight-value">{breakdown.topLoser.plPct.toFixed(2)}%</div>
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      ))}
 
       <section aria-labelledby="add-transaction" className="panel">
         <div className="section-title">

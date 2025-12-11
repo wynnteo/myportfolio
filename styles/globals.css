@@ -221,6 +221,29 @@ section {
   color: #64748b;
 }
 
+/* ==================== CATEGORY BREAKDOWN SECTIONS ==================== */
+.category-performance-section {
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  border: 2px solid #e2e8f0;
+  margin-top: 24px;
+}
+
+.category-section-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 22px;
+  margin: 0;
+}
+
+.category-dot-inline {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
 /* ==================== INSIGHTS CARDS ==================== */
 .insights-grid {
   display: grid;

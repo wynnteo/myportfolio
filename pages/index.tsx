@@ -35,7 +35,7 @@ export default function LandingPage() {
             Track Your Investments With Confidence
           </h1>
           <p className="hero-subtitle">
-            A simple portfolio tracker for stocks, REITs, ETFs, and more. Monitor your holdings, 
+            A simple portfolio tracker for stocks, Unit Trusts, ETFs, and more. Monitor your holdings, 
             track dividends, and see your investment performance—all in one place.
           </p>
           <div className="hero-actions">
