@@ -506,7 +506,7 @@ export default function HomePage() {
       const ftFetchPromises = unitTrustSymbols.map(async (sym) => {
         const holding = holdings.find(h => h.symbol === sym);
         const sParam = ftSFromSymbol(sym, 'SGD');
-        const fundName = holding?.name ?? ''; 
+        const fundName = holding?.productName ?? ''; 
 
         try {
           const resp = await fetch(`/api/fund-quote?s=${encodeURIComponent(sParam)}&name=${encodeURIComponent(fundName)}`);

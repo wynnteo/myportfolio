@@ -106,7 +106,7 @@ async function fetchOcbcPrice(fundName: string) {
       cached: false,
     };
   } catch (err) {
-    console.error('OCBC fallback error', err?.message || err);
+    console.error('OCBC fallback error', err);
     return null;
   }
 }
