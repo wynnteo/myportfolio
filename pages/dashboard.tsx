@@ -65,8 +65,8 @@ interface TransactionFormState {
   notes?: string;
 }
 
-const brokers = ['Moo Moo', 'CMC Invest', 'DBS', 'HSBC', 'POEMS', 'FSMOne', 'IBKR', 'Other'];
-const categories = ['Unit Trusts', 'Stocks', 'REITs', 'ETF', 'Bond', 'Cash', 'Other'];
+const brokers = ['Moo Moo', 'CMC Invest', 'OCBC', 'DBS', 'HSBC', 'POEMS', 'FSMOne', 'IBKR', 'Other'];
+const categories = ['Unit Trusts', 'Stocks', 'ETF', 'Bond', 'Cash', 'Crypto', 'Other'];
 const currencies = ['SGD', 'USD', 'MYR'];
 
 function formatCurrency(value: number | null, currency: string) {
@@ -130,12 +130,12 @@ function getGradientColor(index: number, total: number) {
 
 function getCategoryColor(category: string) {
   const palette: Record<string, string> = {
-    'Unit Trusts': '#1e40af',
-    Stocks: '#2563eb',
-    REITs: '#3b82f6',
-    ETF: '#10b981',
-    Bond: '#f59e0b',
-    Cash: '#64748b',
+    'Unit Trusts': '#64acdb',
+    Stocks: '#f8c268',
+    ETF: '#6fd2df',
+    Bond: '#f4609f',
+    Cash: '#fa9228',
+    Crypto: '#8b5cf6',
     Other: '#94a3b8',
   };
   return palette[category] || '#64748b';
@@ -156,10 +156,10 @@ function AssetAllocationChart({
   const COLORS = {
     'Unit Trusts': '#64acdb',
     'Stocks': '#f8c268',
-    'REITs': '#b57edc',
     'ETF': '#6fd2df',
     'Bond': '#f4609f',
     'Cash': '#fa9228',
+    'Crypto': '#8b5cf6',
     'Other': '#d38278',
   };
 
@@ -484,46 +484,104 @@ export default function HomePage() {
 
   useEffect(() => {
     async function fetchQuotesForHoldings() {
-      const symbols = Array.from(new Set(holdings.map((h) => h.symbol))).filter(Boolean);
-      if (symbols.length === 0) {
+      const allSymbols = Array.from(new Set(holdings.map((h) => h.symbol))).filter(Boolean) as string[];
+      if (allSymbols.length === 0) {
         setQuotes({});
         setLastPriceUpdate(null);
         return;
       }
 
       setIsRefreshingPrices(true);
-      const nextQuotes: Record<string, QuoteResponse> = {};
+      const nextQuotes: Record<string, QuoteResponse | { price: number | null; asOf?: string; source?: string; cached?: boolean }> = {};
 
-      await Promise.all(
-        symbols.map(async (symbol) => {
+      const unitTrustSymbols = Array.from(new Set(
+        holdings.filter(h => h.category === 'Unit Trusts' && h.symbol).map(h => String(h.symbol))
+      ));
+      const otherSymbols = Array.from(new Set(
+        holdings.filter(h => h.category !== 'Unit Trusts' && h.symbol).map(h => String(h.symbol))
+      ));
+
+      const ftSFromSymbol = (sym: string, currency = 'SGD') => sym.includes(':') ? sym : `${sym}:${currency}`;
+      const ftFetchPromises = unitTrustSymbols.map(async (sym) => {
+        const sParam = ftSFromSymbol(sym, 'SGD');
+        try {
+          const resp = await fetch(`/api/fund-quote?s=${encodeURIComponent(sParam)}`);
+          if (!resp.ok) {
+            nextQuotes[sym] = { price: null, source: 'ft', cached: false };
+            return;
+          }
+          const j = await resp.json();
+          nextQuotes[sym] = { price: typeof j.price === 'number' ? j.price : null, asOf: j.lastUpdated ?? j.asOf ?? null, source: 'ft', cached: !!j.cached };
+        } catch (e) {
+          nextQuotes[sym] = { price: null, source: 'ft', cached: false };
+        }
+      });
+
+      const CHUNK = 5;
+      for (let i = 0; i < ftFetchPromises.length; i += CHUNK) {
+        await Promise.all(ftFetchPromises.slice(i, i + CHUNK));
+      }
+
+
+      const ftNeedsFallback = unitTrustSymbols.filter(sym => {
+        const r = nextQuotes[sym];
+        return !r || r.price === null;
+      });
+
+      const fallbackPromises: Promise<void>[] = [];
+      for (const sym of ftNeedsFallback) {
+        fallbackPromises.push((async () => {
           try {
-            const resp = await fetch(`/api/quote?symbol=${encodeURIComponent(symbol)}`);
+            const resp = await fetch(`/api/quote?symbol=${encodeURIComponent(sym)}`);
             if (!resp.ok) {
+              nextQuotes[sym] = { price: null, source: 'ft+yahoo', cached: false };
               return;
             }
-            const data: QuoteResponse = await resp.json();
-            nextQuotes[symbol] = data;
-          } catch {
-            // Ignore individual failures
+            const j = await resp.json();
+            nextQuotes[sym] = { price: typeof j.price === 'number' ? j.price : null, asOf: j.asOf ?? null, source: 'yahoo-fallback', cached: false };
+          } catch (e) {
+            nextQuotes[sym] = { price: null, source: 'ft+yahoo', cached: false };
           }
-        })
-      );
+        })());
+      }
+      await Promise.all(fallbackPromises);
 
-      setQuotes(nextQuotes);
+      await Promise.all(otherSymbols.map(async (symbol) => {
+        try {
+          const resp = await fetch(`/api/quote?symbol=${encodeURIComponent(symbol)}`);
+          if (!resp.ok) {
+            // keep undefined (no quote) or set null
+            return;
+          }
+          const data: QuoteResponse = await resp.json();
+          nextQuotes[symbol] = data;
+        } catch (err) {
+          // ignore individual failures
+        }
+      }));
+
+      setQuotes(prev => {
+        const merged: Record<string, any> = { ...prev };
+        for (const k of Object.keys(nextQuotes)) {
+          merged[k] = nextQuotes[k];
+        }
+        return merged;
+      });
+
       setLastPriceUpdate(new Date());
       setIsRefreshingPrices(false);
     }
 
     void fetchQuotesForHoldings();
 
-    // Set up interval to refresh every 15 minutes (900000 ms)
+    // Keep your 15-min interval behaviour
     const intervalId = setInterval(() => {
       void fetchQuotesForHoldings();
     }, 900000);
 
-    // Clean up interval on unmount
     return () => clearInterval(intervalId);
   }, [holdings]);
+
 
   const displayHoldings = useMemo(() => {
     return holdings.map((row) => {
@@ -1139,11 +1197,11 @@ function formatLastUpdate(date: Date | null) {
           </label>
           <label>
             Quantity
-            <input name="quantity" type="number" step="0.0001" min="0" required />
+            <input name="quantity" type="number" step="0.00001" min="0" required />
           </label>
           <label>
             Price
-            <input name="price" type="number" step="0.0001" min="0" required />
+            <input name="price" type="number" step="0.00001" min="0" required />
           </label>
           <label>
             Commission
@@ -1249,10 +1307,10 @@ function formatLastUpdate(date: Date | null) {
                       {formatQuantity(row.quantity)}
                     </td>
                     <td className="value-cell">
-                      {formatPriceWithoutCurrency(row.averagePrice, row.currency, 4)}
+                      {formatPriceWithoutCurrency(row.averagePrice, row.currency, 5)}
                     </td>
                     <td className="value-cell">
-                      {formatPriceWithoutCurrency(row.currentPrice, row.currency, 4)}
+                      {formatPriceWithoutCurrency(row.currentPrice, row.currency, 5)}
                     </td>
                     <td className="value-cell">
                       {formatPrice(row.totalCost, row.currency, 2)}
@@ -1429,12 +1487,12 @@ function formatLastUpdate(date: Date | null) {
                               {isEditing ? (
                                 <input
                                   type="number"
-                                  step="0.0001"
+                                  step="0.00001"
                                   value={editForm.price ?? (tx.price ?? '')}
                                   onChange={(e) => setEditForm((prev) => ({ ...prev, price: e.target.value }))}
                                 />
                               ) : tx.price !== null ? (
-                                formatPrice(tx.price, selectedHolding.currency, 4)
+                                formatPrice(tx.price, selectedHolding.currency, 5)
                               ) : (
                                 '-'
                               )}
