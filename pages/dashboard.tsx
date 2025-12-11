@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart as RechartsPieChart, Pie } from 'recharts';
-import { fetchWithAuth, getAuthHeaders } from '../lib/api';
+import { fetchWithAuth } from '../lib/api';
 
 interface Transaction {
   id: string;
