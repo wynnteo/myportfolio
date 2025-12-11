@@ -177,6 +177,8 @@ export default async function handler(
 
     // Get user ID from token
     const token = req.headers.authorization?.replace('Bearer ', '');
+    console.log(req);
+    console.log(token);
     if (!token) {
       res.status(401).json({ error: 'Authentication required' });
       return;
