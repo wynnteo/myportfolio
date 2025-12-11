@@ -975,19 +975,26 @@ function formatLastUpdate(date: Date | null) {
   );
 
   return (
-    <main>
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Dashboard</p>
-          <h1>Personal Portfolio Tracker</h1>
-          <p className="muted">Stay on top of holdings, performance, and income at a glance.</p>
-        </div>
-        <nav className="nav-links" aria-label="Primary navigation">
+    <>
+    <header className="site-header">
+      <nav className="site-nav">
+        <Link href="/" className="site-logo">
+          📊 Portfolio Tracker
+        </Link>
+        <div className="nav-menu">
           <Link href="/">Home</Link>
           <Link href="/dashboard">Dashboard</Link>
-          <Link href="/referrals">Referral hub</Link>
-          <button onClick={() => void logout()} className="ghost">Logout</button>
-        </nav>
+          <Link href="/referrals">Referrals</Link>
+          <button onClick={() => void logout()}>Logout</button>
+        </div>
+      </nav>
+    </header>
+    <main>
+      <div className="topbar">
+        <div>
+          <h1>Portfolio Dashboard</h1>
+          <p className="muted">Track your holdings, performance, and income at a glance</p>
+        </div>
         <div className="status-group">
           <span id="sync-status" className="badge" data-tone={statusTone}>
             {statusText}
@@ -1007,7 +1014,7 @@ function formatLastUpdate(date: Date | null) {
             </div>
           )}
         </div>
-      </header>
+      </div>
 
       <section aria-labelledby="summary">
         <div className="section-title">
@@ -1617,5 +1624,6 @@ function formatLastUpdate(date: Date | null) {
         </div>
       )}
     </main>
+    </>
   );
 }

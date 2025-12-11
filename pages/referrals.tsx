@@ -73,7 +73,7 @@ const brokerPromos: BrokerPromo[] = [
       'Real-time SG & HK market data',
       'Additional $18 Cash Coupon'
     ],
-    requirements: 'Deposit S$2,000-10,000, complete 3-5 trades, maintain 30-90 days, earn rewards $800',
+    requirements: 'Deposit S$2,000-10,000, complete 3-5 trades, maintain 30-90 days',
     referralCode: 'UI312291',
     referralLink: 'https://activity.longbridge.sg/pages/longbridge_sg/8650/index.html?app_id=longbridge_sg&org_id=1&account_channel=lb_sg&invite-code=UI312291',
     category: 'stocks',
@@ -127,7 +127,7 @@ const brokerPromos: BrokerPromo[] = [
 ];
 
 export default function ReferralHub() {
-  const { user, logout, loading } = useAuth();
+  const { user, logout } = useAuth();
   const [selectedCategory, setSelectedCategory] = useState<'all' | 'stocks' | 'savings'>('all');
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
 
@@ -142,38 +142,35 @@ export default function ReferralHub() {
   };
 
   return (
-    <main>
-      <header className="topbar">
-        <div>
-          <p className="eyebrow">Referral hub</p>
-          <h1>Share broker sign-up promos</h1>
-          <p className="muted">Your one-stop referral center with the latest promotions (Dec 2024)</p>
-        </div>
-        {user ? (
-          <>
+    <>
+      <header className="site-header">
+        <nav className="site-nav">
+          <Link href="/" className="site-logo">
+            📊 Portfolio Tracker
+          </Link>
+          <div className="nav-menu">
             <Link href="/">Home</Link>
-            <Link href="/dashboard" className="nav-link">Dashboard</Link>
-            <button onClick={() => void logout()} className="nav-btn">Logout</button>
-          </>
-        ) : (
-          <>
-            <Link href="/">Home</Link>
-            <Link href="/login" className="nav-link">Login</Link>
-            <Link href="/register" className="nav-btn">Get Started</Link>
-          </>
-        )}
+            {user ? (
+              <>
+                <Link href="/dashboard">Dashboard</Link>
+                <Link href="/referrals">Referrals</Link>
+                <button onClick={() => void logout()}>Logout</button>
+              </>
+            ) : (
+              <>
+                <Link href="/login">Login</Link>
+                <Link href="/register" className="nav-primary">Get Started</Link>
+              </>
+            )}
+          </div>
+        </nav>
       </header>
 
-      <section className="panel" aria-labelledby="promo-list">
-        <div className="section-title">
-          <div>
-            <p className="eyebrow">Spotlight</p>
-            <h2 id="promo-list">Latest broker promotions</h2>
-            <p className="muted">
-              Click referral code to copy • Click button to sign up
-            </p>
-          </div>
-          <div className="chip-group">
+      <main>
+        <div className="page-header">
+          <h1>Broker Referral Hub</h1>
+          <p>Latest sign-up promotions and referral codes (December 2024)</p>
+          <div className="chip-group" style={{ marginTop: '16px' }}>
             <button
               className={`chip ${selectedCategory === 'all' ? 'success' : ''}`}
               onClick={() => setSelectedCategory('all')}
@@ -194,6 +191,7 @@ export default function ReferralHub() {
             </button>
           </div>
         </div>
+
         <div className="referral-grid">
           {filteredPromos.map((promo) => (
             <article
@@ -224,75 +222,70 @@ export default function ReferralHub() {
                 <div className="requirements-text">{promo.requirements}</div>
               </div>
 
-              <div className="referral-actions">
-                <div className="button-group">
-                  {promo.referralCode && (
-                    <button
-                      type="button"
-                      className="code-btn"
-                      onClick={() => handleCopyCode(promo.referralCode!, promo.name)}
-                      title="Click to copy code"
-                    >
-                      {copiedCode === promo.name ? (
-                        <>
-                          <span className="code-check">✓</span> Copied!
-                        </>
-                      ) : (
-                        <>
-                          <span className="code-label">Code:</span> {promo.referralCode}
-                        </>
-                      )}
-                    </button>
-                  )}
-                  <a
-                    href={promo.referralLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="primary-btn"
+              <div className="button-group">
+                {promo.referralCode && (
+                  <button
+                    type="button"
+                    className="code-btn"
+                    onClick={() => handleCopyCode(promo.referralCode!, promo.name)}
+                    title="Click to copy code"
                   >
-                    Sign up now →
-                  </a>
-                </div>
+                    {copiedCode === promo.name ? (
+                      <>
+                        <span className="code-check">✓</span> Copied!
+                      </>
+                    ) : (
+                      <>
+                        <span className="code-label">Code:</span> {promo.referralCode}
+                      </>
+                    )}
+                  </button>
+                )}
+                <a
+                  href={promo.referralLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="primary-btn"
+                >
+                  Sign up now →
+                </a>
               </div>
             </article>
           ))}
         </div>
-      </section>
 
-      <section className="tips-section">
-        <div className="section-title">
-          <div>
-            <p className="eyebrow">Tips</p>
-            <h2>Maximize your referrals</h2>
+        <section style={{ marginTop: '48px' }}>
+          <div className="section-header">
+            <h2>Tips for Maximizing Referrals</h2>
           </div>
-        </div>
-        <div className="tips-grid">
-          <div className="tip-card">
-            <div className="tip-icon">💡</div>
-            <h3>Read the fine print</h3>
-            <p>
-              Always check deposit requirements, holding periods, and trading minimums to ensure
-              both you and your referral qualify for rewards.
-            </p>
+          <div className="features-grid">
+            <div className="feature-card">
+              <div className="feature-icon">💡</div>
+              <h3>Read the Fine Print</h3>
+              <p>
+                Always check deposit requirements, holding periods, and trading minimums to ensure
+                both you and your referral qualify for rewards.
+              </p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-icon">🎯</div>
+              <h3>Target the Right Audience</h3>
+              <p>
+                Share stock trading promos with investment-minded friends and banking offers with
+                those looking for better savings rates.
+              </p>
+            </div>
+            <div className="feature-card">
+              <div className="feature-icon">📅</div>
+              <h3>Stay Updated</h3>
+              <p>
+                Promotions change monthly. Check broker websites regularly and update your links to
+                take advantage of the best offers.
+              </p>
+            </div>
           </div>
-          <div className="tip-card">
-            <div className="tip-icon">🎯</div>
-            <h3>Target the right audience</h3>
-            <p>
-              Share stock trading promos with investment-minded friends and banking offers with
-              those looking for better savings rates.
-            </p>
-          </div>
-          <div className="tip-card">
-            <div className="tip-icon">📅</div>
-            <h3>Stay updated</h3>
-            <p>
-              Promotions change monthly. Check broker websites regularly and update your links to
-              take advantage of the best offers.
-            </p>
-          </div>
-        </div>
-      </section>
-    </main>
+        </section>
+      </main>
+    </>
   );
 }
