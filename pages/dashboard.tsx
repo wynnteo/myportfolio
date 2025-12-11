@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart as RechartsPieChart, Pie } from 'recharts';
+import { fetchWithAuth, getAuthHeaders } from '../lib/api';
 
 interface Transaction {
   id: string;
@@ -338,7 +339,7 @@ export default function HomePage() {
   async function loadTransactions() {
     try {
       setStatusText('Loading transactions from database...');
-      const response = await fetch('/api/transactions');
+      const response = await fetchWithAuth('/api/transactions');
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -706,7 +707,7 @@ export default function HomePage() {
       notes: formData.get('notes')?.toString(),
     };
 
-    const response = await fetch('/api/transactions', {
+    const response = await fetchWithAuth('/api/transactions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -739,7 +740,7 @@ export default function HomePage() {
       notes: dividendForm.notes,
     };
 
-    const response = await fetch('/api/transactions', {
+    const response = await fetchWithAuth('/api/transactions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -826,7 +827,7 @@ export default function HomePage() {
       payload.dividendAmount = undefined;
     }
 
-    const response = await fetch('/api/transactions', {
+    const response = await fetchWithAuth('/api/transactions', {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -850,7 +851,7 @@ export default function HomePage() {
     const confirmed = window.confirm('Delete this transaction?');
     if (!confirmed) return;
 
-    const response = await fetch(`/api/transactions?id=${encodeURIComponent(id)}`, {
+    const response = await fetchWithAuth(`/api/transactions?id=${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
 
