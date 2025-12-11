@@ -1,7 +1,9 @@
 import Link from 'next/link';
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/router';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, PieChart as RechartsPieChart, Pie } from 'recharts';
-import { fetchWithAuth } from '../lib/api';
+import { fetchWithAuth, getAuthHeaders } from '../lib/api';
+import { useAuth } from '../lib/AuthContext';
 
 interface Transaction {
   id: string;
@@ -319,6 +321,9 @@ function TopHoldingsChart({ holdings }: { holdings: HoldingRow[] }) {
 }
 
 export default function HomePage() {
+  const router = useRouter();
+  const { user, loading: authLoading, logout } = useAuth();
+
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [statusText, setStatusText] = useState('Connecting to database...');
   const [statusTone, setStatusTone] = useState<'info' | 'success' | 'error'>('info');
@@ -335,7 +340,7 @@ export default function HomePage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [lastPriceUpdate, setLastPriceUpdate] = useState<Date | null>(null);
   const [isRefreshingPrices, setIsRefreshingPrices] = useState(false);
-
+  
   async function loadTransactions() {
     try {
       setStatusText('Loading transactions from database...');
@@ -386,8 +391,16 @@ export default function HomePage() {
   }
 
   useEffect(() => {
-    void loadTransactions();
-  }, []);
+    if (!authLoading && !user) {
+      router.push('/login');
+    }
+  }, [authLoading, user, router]);
+
+  useEffect(() => {
+    if (user) {
+      void loadTransactions();
+    }
+  }, [user]);
 
   const holdings = useMemo(() => {
     const map = new Map<string, HoldingRow>();
@@ -972,6 +985,7 @@ function formatLastUpdate(date: Date | null) {
         <nav className="nav-links" aria-label="Primary navigation">
           <Link href="/">Dashboard</Link>
           <Link href="/referrals">Referral hub</Link>
+          <button onClick={() => void logout()} className="ghost">Logout</button>
         </nav>
         <div className="status-group">
           <span id="sync-status" className="badge" data-tone={statusTone}>
