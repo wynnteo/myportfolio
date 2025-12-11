@@ -1,20 +1,15 @@
-export function getAuthHeaders(): HeadersInit {
+export async function fetchWithAuth(url: string, options: RequestInit = {}) {
   const token = localStorage.getItem('auth_token');
-  return {
+  
+  const headers: HeadersInit = {
     'Content-Type': 'application/json',
     ...(token && { 'Authorization': `Bearer ${token}` }),
+    ...options.headers,
   };
-}
-
-export async function fetchWithAuth(url: string, options: RequestInit = {}) {
-  const headers = getAuthHeaders();
   
   const response = await fetch(url, {
     ...options,
-    headers: {
-      ...headers,
-      ...options.headers,
-    },
+    headers,
   });
 
   // If unauthorized, redirect to login

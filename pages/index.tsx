@@ -1,7 +1,9 @@
-
 import Link from 'next/link';
+import { useAuth } from '../lib/AuthContext';
 
 export default function LandingPage() {
+  const { user, logout } = useAuth();
+
   return (
     <main className="landing-page">
       <header className="landing-header">
@@ -11,8 +13,17 @@ export default function LandingPage() {
             <span className="logo-text">Portfolio Tracker</span>
           </div>
           <div className="nav-actions">
-            <Link href="/login" className="nav-link">Login</Link>
-            <Link href="/register" className="nav-btn">Get Started</Link>
+            {user ? (
+              <>
+                <Link href="/dashboard" className="nav-link">Dashboard</Link>
+                <button onClick={() => void logout()} className="nav-btn">Logout</button>
+              </>
+            ) : (
+              <>
+                <Link href="/login" className="nav-link">Login</Link>
+                <Link href="/register" className="nav-btn">Get Started</Link>
+              </>
+            )}
           </div>
         </div>
       </header>
