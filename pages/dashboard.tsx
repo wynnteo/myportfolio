@@ -262,6 +262,7 @@ function TopHoldingsChart({ holdings }: { holdings: HoldingRow[] }) {
   
   const topHoldings = useMemo(() => {
     return [...holdings]
+      .filter((h) => h.category === "Stocks") 
       .sort((a, b) => b.totalCost - a.totalCost)
       .slice(0, 10);
   }, [holdings]);
@@ -269,7 +270,7 @@ function TopHoldingsChart({ holdings }: { holdings: HoldingRow[] }) {
   if (topHoldings.length === 0) {
     return (
       <div className="chart-card">
-        <div className="chart-header">Top Holdings</div>
+        <div className="chart-header">Top Stocks Holdings</div>
         <div className="pie-chart empty">
           <div className="empty-pie">No data</div>
         </div>
