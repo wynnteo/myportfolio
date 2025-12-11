@@ -293,7 +293,7 @@ function TopHoldingsChart({ holdings }: { holdings: HoldingRow[] }) {
   
   return (
     <div className="chart-card stacked-chart-card">
-      <div className="chart-header">Top Holdings</div>
+      <div className="chart-header">Top Stocks Holdings</div>
       <ResponsiveContainer width="100%" height={60}>
         <BarChart data={chartData} layout="vertical" margin={{ top: 10, right: 0, bottom: 0, left: 0 }}>
           <XAxis type="number" hide />
@@ -504,9 +504,12 @@ export default function HomePage() {
 
       const ftSFromSymbol = (sym: string, currency = 'SGD') => sym.includes(':') ? sym : `${sym}:${currency}`;
       const ftFetchPromises = unitTrustSymbols.map(async (sym) => {
+        const holding = holdings.find(h => h.symbol === sym);
         const sParam = ftSFromSymbol(sym, 'SGD');
+        const fundName = holding?.name ?? ''; 
+
         try {
-          const resp = await fetch(`/api/fund-quote?s=${encodeURIComponent(sParam)}`);
+          const resp = await fetch(`/api/fund-quote?s=${encodeURIComponent(sParam)}&name=${encodeURIComponent(fundName)}`);
           if (!resp.ok) {
             nextQuotes[sym] = { price: null, source: 'ft', cached: false };
             return;
@@ -522,30 +525,6 @@ export default function HomePage() {
       for (let i = 0; i < ftFetchPromises.length; i += CHUNK) {
         await Promise.all(ftFetchPromises.slice(i, i + CHUNK));
       }
-
-
-      const ftNeedsFallback = unitTrustSymbols.filter(sym => {
-        const r = nextQuotes[sym];
-        return !r || r.price === null;
-      });
-
-      const fallbackPromises: Promise<void>[] = [];
-      for (const sym of ftNeedsFallback) {
-        fallbackPromises.push((async () => {
-          try {
-            const resp = await fetch(`/api/quote?symbol=${encodeURIComponent(sym)}`);
-            if (!resp.ok) {
-              nextQuotes[sym] = { price: null, source: 'ft+yahoo', cached: false };
-              return;
-            }
-            const j = await resp.json();
-            nextQuotes[sym] = { price: typeof j.price === 'number' ? j.price : null, asOf: j.asOf ?? null, source: 'yahoo-fallback', cached: false };
-          } catch (e) {
-            nextQuotes[sym] = { price: null, source: 'ft+yahoo', cached: false };
-          }
-        })());
-      }
-      await Promise.all(fallbackPromises);
 
       await Promise.all(otherSymbols.map(async (symbol) => {
         try {
