@@ -2243,3 +2243,225 @@ th.sortable:hover {
   font-weight: 600;
   color: #475569;
 }
+
+/* ==================== CATEGORY BREAKDOWN SECTIONS ==================== */
+.category-grid-section {
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+}
+
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.category-compact-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+  transition: all 0.2s ease;
+}
+
+.category-compact-card:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+  transform: translateY(-2px);
+}
+
+.category-compact-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.category-dot-inline {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.category-compact-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  flex: 1;
+}
+
+.category-compact-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.category-mini-chart {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 0;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.category-compact-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.category-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.category-stat-row.highlight {
+  padding: 8px;
+  background: #f8fafc;
+  border-radius: 6px;
+  margin: 4px 0;
+}
+
+.category-stat-row.highlight.positive {
+  background: linear-gradient(90deg, #ecfdf5 0%, #f0fdf4 100%);
+}
+
+.category-stat-row.highlight.negative {
+  background: linear-gradient(90deg, #fef2f2 0%, #fef2f2 100%);
+}
+
+.category-stat-label {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.category-stat-value {
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.category-stat-value-large {
+  font-weight: 800;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.category-stat-row.highlight.positive .category-stat-value-large {
+  color: #059669;
+}
+
+.category-stat-row.highlight.negative .category-stat-value-large {
+  color: #dc2626;
+}
+
+.category-stat-pct {
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #f1f5f9;
+}
+
+.category-stat-row.highlight.positive .category-stat-pct {
+  background: #d1fae5;
+  color: #059669;
+}
+
+.category-stat-row.highlight.negative .category-stat-pct {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.category-performers {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.category-performer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+}
+
+.category-performer.positive {
+  background: linear-gradient(90deg, #ecfdf5 0%, #f0fdf4 100%);
+}
+
+.category-performer.negative {
+  background: linear-gradient(90deg, #fef2f2 0%, #fef2f2 100%);
+}
+
+.performer-icon {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.category-performer.positive .performer-icon {
+  color: #10b981;
+}
+
+.category-performer.negative .performer-icon {
+  color: #ef4444;
+}
+
+.performer-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.performer-symbol {
+  font-weight: 700;
+  font-size: 12px;
+  color: #0f172a;
+}
+
+.performer-product {
+  font-size: 10px;
+  color: #64748b;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.performer-value {
+  font-weight: 800;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.category-performer.positive .performer-value {
+  color: #059669;
+}
+
+.category-performer.negative .performer-value {
+  color: #dc2626;
+}
+
+/* Mobile responsive for category grid */
+@media (max-width: 768px) {
+  .category-grid {
+    grid-template-columns: 1fr;
+  }
+}

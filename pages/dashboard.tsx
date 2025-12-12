@@ -1192,69 +1192,113 @@ function formatLastUpdate(date: Date | null) {
         </div>
         
         <div className="category-grid">
-          {Array.from(categoryBreakdowns.entries()).map(([category, breakdown]) => (
-            <div key={category} className="category-compact-card">
-              <div className="category-compact-header">
-                <span
-                  className="category-dot-inline"
-                  style={{ backgroundColor: getCategoryColor(category) }}
-                />
-                <span className="category-compact-title">{category}</span>
-                <span className="category-compact-count">{breakdown.holdingsCount}</span>
-              </div>
-              
-              <div className="category-compact-stats">
-                <div className="category-stat-row">
-                  <span className="category-stat-label">Capital</span>
-                  <span className="category-stat-value">{formatPrice(breakdown.capital, 'SGD', 2)}</span>
+          {Array.from(categoryBreakdowns.entries()).map(([category, breakdown]) => {
+            // Get holdings for this category and prepare chart data
+            const categoryHoldings = displayHoldings.filter(h => h.category === category);
+            const categoryChartData = categoryHoldings
+              .map(h => ({
+                name: h.symbol,
+                value: h.totalCost,
+              }))
+              .sort((a, b) => b.value - a.value)
+              .slice(0, 5); // Top 5 holdings
+            
+            const EXTENDED_COLORS = ['#64acdb', '#f8c268', '#b57edc', '#6fd2df', '#f4609f', '#fa9228', '#d38278', '#51c9b2', '#48b14c', '#fc8eac'];
+            
+            return (
+              <div key={category} className="category-compact-card">
+                {/* Header with category name */}
+                <div className="category-compact-header">
+                  <span
+                    className="category-dot-inline"
+                    style={{ backgroundColor: getCategoryColor(category) }}
+                  />
+                  <span className="category-compact-title">{category}</span>
+                  <span className="category-compact-count">{breakdown.holdingsCount}</span>
                 </div>
-                <div className="category-stat-row">
-                  <span className="category-stat-label">Current</span>
-                  <span className="category-stat-value">{formatPrice(breakdown.currentValue, 'SGD', 2)}</span>
+                
+                {/* Mini donut chart showing top 5 holdings */}
+                {categoryChartData.length > 0 && (
+                  <div className="category-mini-chart">
+                    <ResponsiveContainer width="100%" height={120}>
+                      <RechartsPieChart>
+                        <Pie
+                          data={categoryChartData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={25}
+                          outerRadius={45}
+                          paddingAngle={2}
+                          dataKey="value"
+                        >
+                          {categoryChartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={EXTENDED_COLORS[index % EXTENDED_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip 
+                          formatter={(value: number) => formatPrice(value, 'SGD', 2)}
+                          contentStyle={{ fontSize: '11px', padding: '4px 8px' }}
+                        />
+                      </RechartsPieChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+                
+                {/* Statistics */}
+                <div className="category-compact-stats">
+                  <div className="category-stat-row">
+                    <span className="category-stat-label">Capital</span>
+                    <span className="category-stat-value">{formatPrice(breakdown.capital, 'SGD', 2)}</span>
+                  </div>
+                  <div className="category-stat-row">
+                    <span className="category-stat-label">Current</span>
+                    <span className="category-stat-value">{formatPrice(breakdown.currentValue, 'SGD', 2)}</span>
+                  </div>
+                  <div className={`category-stat-row highlight ${breakdown.pl > 0 ? 'positive' : breakdown.pl < 0 ? 'negative' : ''}`}>
+                    <span className="category-stat-label">P/L</span>
+                    <span className="category-stat-value-large">
+                      {formatPrice(breakdown.pl, 'SGD', 2)}
+                      <span className="category-stat-pct">{breakdown.plPct > 0 ? '+' : ''}{breakdown.plPct.toFixed(2)}%</span>
+                    </span>
+                  </div>
+                  <div className="category-stat-row">
+                    <span className="category-stat-label">Dividends {currentYear}</span>
+                    <span className="category-stat-value">{formatPrice(breakdown.ytdDividends, 'SGD', 2)}</span>
+                  </div>
                 </div>
-                <div className={`category-stat-row highlight ${breakdown.pl > 0 ? 'positive' : breakdown.pl < 0 ? 'negative' : ''}`}>
-                  <span className="category-stat-label">P/L</span>
-                  <span className="category-stat-value-large">
-                    {formatPrice(breakdown.pl, 'SGD', 2)}
-                    <span className="category-stat-pct">{breakdown.plPct > 0 ? '+' : ''}{breakdown.plPct.toFixed(2)}%</span>
-                  </span>
-                </div>
-                <div className="category-stat-row">
-                  <span className="category-stat-label">Dividends {currentYear}</span>
-                  <span className="category-stat-value">{formatPrice(breakdown.ytdDividends, 'SGD', 2)}</span>
-                </div>
-              </div>
-              
-              {(breakdown.topGainer || breakdown.topLoser) && (
-                <div className="category-performers">
-                  {breakdown.topGainer && breakdown.topGainer.plPct !== null && breakdown.topGainer.plPct > 0 && (
-                    <div className="category-performer positive">
-                      <span className="performer-icon">↑</span>
-                      <div className="performer-info">
-                        <div className="performer-symbol">{breakdown.topGainer.symbol}</div>
-                        {breakdown.topGainer.productName && (
-                          <div className="performer-product">{breakdown.topGainer.productName}</div>
-                        )}
+                
+                {/* Top/Worst performers */}
+                {(breakdown.topGainer || breakdown.topLoser) && (
+                  <div className="category-performers">
+                    {breakdown.topGainer && breakdown.topGainer.plPct !== null && breakdown.topGainer.plPct > 0 && (
+                      <div className="category-performer positive">
+                        <span className="performer-icon">↑</span>
+                        <div className="performer-info">
+                          <div className="performer-symbol">{breakdown.topGainer.symbol}</div>
+                          {breakdown.topGainer.productName && (
+                            <div className="performer-product">{breakdown.topGainer.productName}</div>
+                          )}
+                        </div>
+                        <span className="performer-value">+{breakdown.topGainer.plPct.toFixed(1)}%</span>
                       </div>
-                      <span className="performer-value">+{breakdown.topGainer.plPct.toFixed(1)}%</span>
-                    </div>
-                  )}
-                  {breakdown.topLoser && breakdown.topLoser.plPct !== null && breakdown.topLoser.plPct < 0 && (
-                    <div className="category-performer negative">
-                      <span className="performer-icon">↓</span>
-                      <div className="performer-info">
-                        <div className="performer-symbol">{breakdown.topLoser.symbol}</div>
-                        {breakdown.topLoser.productName && (
-                          <div className="performer-product">{breakdown.topLoser.productName}</div>
-                        )}
+                    )}
+                    {breakdown.topLoser && breakdown.topLoser.plPct !== null && breakdown.topLoser.plPct < 0 && (
+                      <div className="category-performer negative">
+                        <span className="performer-icon">↓</span>
+                        <div className="performer-info">
+                          <div className="performer-symbol">{breakdown.topLoser.symbol}</div>
+                          {breakdown.topLoser.productName && (
+                            <div className="performer-product">{breakdown.topLoser.productName}</div>
+                          )}
+                        </div>
+                        <span className="performer-value">{breakdown.topLoser.plPct.toFixed(1)}%</span>
                       </div>
-                      <span className="performer-value">{breakdown.topLoser.plPct.toFixed(1)}%</span>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          ))}
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </section>
       <section aria-labelledby="add-transaction" className="panel">
