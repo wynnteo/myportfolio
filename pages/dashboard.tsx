@@ -1444,6 +1444,14 @@ function formatLastUpdate(date: Date | null) {
               </button>
             </div>
             <div className="filters">
+              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+                <option value="All">All categories</option>
+                {categories.map((cat) => (
+                  <option key={cat} value={cat}>
+                    {cat}
+                  </option>
+                ))}
+              </select>
               <select value={brokerFilter} onChange={(e) => setBrokerFilter(e.target.value)}>
                 <option value="All">All brokers</option>
                 {brokers.map((br) => (
