@@ -221,38 +221,55 @@ function AssetAllocationChart({
   );
 }
 
-function MonthlyDividendsChart({ transactions }: { transactions: Transaction[] }) {
-  const currentYear = new Date().getFullYear();
-  
-  const monthlyData = useMemo(() => {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const data = months.map((name, index) => ({ month: name, value: 0, index }));
-    
-    transactions
-      .filter(tx => tx.type === 'DIVIDEND' && tx.trade_date && new Date(tx.trade_date).getFullYear() === currentYear)
-      .forEach(tx => {
-        const month = new Date(tx.trade_date!).getMonth();
-        data[month].value += tx.dividend_amount ?? 0;
-      });
-    
-    return data;
-  }, [transactions, currentYear]);
-  
+function PerformanceInsightsCard({ topGainer, topLoser }: { topGainer: HoldingRow | null; topLoser: HoldingRow | null }) {
   return (
-    <div className="chart-card">
-      <div className="chart-header">Monthly Dividends ({currentYear})</div>
-      <ResponsiveContainer width="100%" height={250}>
-        <BarChart data={monthlyData}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-          <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#64748b" />
-          <YAxis tick={{ fontSize: 12 }} stroke="#64748b" />
-          <Tooltip 
-            formatter={(value: number) => formatPrice(value, 'SGD', 2)}
-            contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
-          />
-          <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
+    <div className="chart-card performance-insights-card">
+      <div className="chart-header">Portfolio Performance</div>
+      
+      {!topGainer && !topLoser ? (
+        <div className="pie-chart empty">
+          <div className="empty-pie">No data</div>
+        </div>
+      ) : (
+        <div className="insights-compact">
+          {topGainer && topGainer.plPct !== null && topGainer.plPct > 0 && (
+            <div className="insight-compact positive">
+              <div className="insight-compact-label">🔥 Top Performer</div>
+              <div className="insight-compact-main">
+                <span className="insight-compact-symbol">{topGainer.symbol}</span>
+                <span className="insight-compact-value">+{topGainer.plPct.toFixed(2)}%</span>
+              </div>
+              {topGainer.productName && (
+                <div className="insight-compact-product">{topGainer.productName}</div>
+              )}
+              <div className="insight-compact-amount">{formatPrice(topGainer.pl ?? 0, topGainer.currency, 2)} gain</div>
+            </div>
+          )}
+          
+          {topLoser && topLoser.plPct !== null && topLoser.plPct < 0 && (
+            <div className="insight-compact negative">
+              <div className="insight-compact-label">📉 Worst Performer</div>
+              <div className="insight-compact-main">
+                <span className="insight-compact-symbol">{topLoser.symbol}</span>
+                <span className="insight-compact-value">{topLoser.plPct.toFixed(2)}%</span>
+              </div>
+              {topLoser.productName && (
+                <div className="insight-compact-product">{topLoser.productName}</div>
+              )}
+              <div className="insight-compact-amount">{formatPrice(topLoser.pl ?? 0, topLoser.currency, 2)} loss</div>
+            </div>
+          )}
+          
+          {(!topGainer || topGainer.plPct === null || topGainer.plPct <= 0) && (!topLoser || topLoser.plPct === null || topLoser.plPct >= 0) && (
+            <div className="insight-compact neutral">
+              <div className="insight-compact-label">📊 Portfolio Status</div>
+              <div className="insight-compact-summary">
+                <div>No significant gains or losses to display</div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1160,76 +1177,86 @@ function formatLastUpdate(date: Date | null) {
             <div className="stat-sub">{ytdYield > 0 ? `${ytdYield.toFixed(2)}% yield` : 'Total: ' + formatPrice(totalDividends, 'SGD', 2)}</div>
           </div>
         </div>
-        <div className="chart-grid">
+        <div className="chart-grid-two-col">
           <AssetAllocationChart data={allocations.byCategory} />
-          <TopHoldingsChart holdings={displayHoldings} />
-          <MonthlyDividendsChart transactions={transactions} />
+          <PerformanceInsightsCard topGainer={topGainer} topLoser={topLoser} />
         </div>
       </section>
 
-      {/* Category Breakdowns */}
-      {Array.from(categoryBreakdowns.entries()).map(([category, breakdown]) => (
-        <section key={category} className="category-performance-section" aria-labelledby={`category-${category}`}>
-          <div className="section-title">
-            <div>
-              <p className="eyebrow">Category Breakdown</p>
-              <h2 id={`category-${category}`} className="category-section-title">
+      <section className="category-grid-section" aria-labelledby="category-breakdown">
+        <div className="section-title">
+          <div>
+            <p className="eyebrow">By Asset Class</p>
+            <h2 id="category-breakdown">Category Breakdown</h2>
+          </div>
+        </div>
+        
+        <div className="category-grid">
+          {Array.from(categoryBreakdowns.entries()).map(([category, breakdown]) => (
+            <div key={category} className="category-compact-card">
+              <div className="category-compact-header">
                 <span
                   className="category-dot-inline"
                   style={{ backgroundColor: getCategoryColor(category) }}
                 />
-                {category} Performance
-              </h2>
-            </div>
-            <div className="chip-group">
-              <span className="chip">{breakdown.holdingsCount} holdings</span>
-            </div>
-          </div>
-          
-          <div className="overview-grid">
-            <div className="summary-card">
-              <div className="stat-title">Invested capital</div>
-              <div className="stat-value">{formatPrice(breakdown.capital, 'SGD', 2)}</div>
-              <div className="stat-sub">{((breakdown.capital / totalCapital) * 100).toFixed(1)}% of portfolio</div>
-            </div>
-            <div className="summary-card">
-              <div className="stat-title">Current value</div>
-              <div className="stat-value">{formatPrice(breakdown.currentValue, 'SGD', 2)}</div>
-              <div className="stat-sub">{breakdown.holdingsCount} positions</div>
-            </div>
-            <div className={`summary-card ${breakdown.pl > 0 ? 'profit' : breakdown.pl < 0 ? 'loss' : ''}`}>
-              <div className="stat-title">P/L</div>
-              <div className="stat-value">{formatPrice(breakdown.pl, 'SGD', 2)}</div>
-              <div className="stat-sub">{breakdown.plPct > 0 ? '+' : ''}{breakdown.plPct.toFixed(2)}%</div>
-            </div>
-            <div className="summary-card">
-              <div className="stat-title">Dividends ({currentYear})</div>
-              <div className="stat-value">{formatPrice(breakdown.ytdDividends, 'SGD', 2)}</div>
-              <div className="stat-sub">{breakdown.dividendYield > 0 ? `${breakdown.dividendYield.toFixed(2)}% yield` : 'Total: ' + formatPrice(breakdown.totalDividends, 'SGD', 2)}</div>
-            </div>
-          </div>
-
-          {(breakdown.topGainer || breakdown.topLoser) && (
-            <div className="insights-grid">
-              {breakdown.topGainer && breakdown.topGainer.plPct !== null && breakdown.topGainer.plPct > 0 && (
-                <div className="insight-card positive">
-                  <div className="insight-label">Top Performer</div>
-                  <div className="insight-symbol">{breakdown.topGainer.symbol}</div>
-                  <div className="insight-value">+{breakdown.topGainer.plPct.toFixed(2)}%</div>
+                <span className="category-compact-title">{category}</span>
+                <span className="category-compact-count">{breakdown.holdingsCount}</span>
+              </div>
+              
+              <div className="category-compact-stats">
+                <div className="category-stat-row">
+                  <span className="category-stat-label">Capital</span>
+                  <span className="category-stat-value">{formatPrice(breakdown.capital, 'SGD', 2)}</span>
+                </div>
+                <div className="category-stat-row">
+                  <span className="category-stat-label">Current</span>
+                  <span className="category-stat-value">{formatPrice(breakdown.currentValue, 'SGD', 2)}</span>
+                </div>
+                <div className={`category-stat-row highlight ${breakdown.pl > 0 ? 'positive' : breakdown.pl < 0 ? 'negative' : ''}`}>
+                  <span className="category-stat-label">P/L</span>
+                  <span className="category-stat-value-large">
+                    {formatPrice(breakdown.pl, 'SGD', 2)}
+                    <span className="category-stat-pct">{breakdown.plPct > 0 ? '+' : ''}{breakdown.plPct.toFixed(2)}%</span>
+                  </span>
+                </div>
+                <div className="category-stat-row">
+                  <span className="category-stat-label">Dividends {currentYear}</span>
+                  <span className="category-stat-value">{formatPrice(breakdown.ytdDividends, 'SGD', 2)}</span>
+                </div>
+              </div>
+              
+              {(breakdown.topGainer || breakdown.topLoser) && (
+                <div className="category-performers">
+                  {breakdown.topGainer && breakdown.topGainer.plPct !== null && breakdown.topGainer.plPct > 0 && (
+                    <div className="category-performer positive">
+                      <span className="performer-icon">↑</span>
+                      <div className="performer-info">
+                        <div className="performer-symbol">{breakdown.topGainer.symbol}</div>
+                        {breakdown.topGainer.productName && (
+                          <div className="performer-product">{breakdown.topGainer.productName}</div>
+                        )}
+                      </div>
+                      <span className="performer-value">+{breakdown.topGainer.plPct.toFixed(1)}%</span>
+                    </div>
+                  )}
+                  {breakdown.topLoser && breakdown.topLoser.plPct !== null && breakdown.topLoser.plPct < 0 && (
+                    <div className="category-performer negative">
+                      <span className="performer-icon">↓</span>
+                      <div className="performer-info">
+                        <div className="performer-symbol">{breakdown.topLoser.symbol}</div>
+                        {breakdown.topLoser.productName && (
+                          <div className="performer-product">{breakdown.topLoser.productName}</div>
+                        )}
+                      </div>
+                      <span className="performer-value">{breakdown.topLoser.plPct.toFixed(1)}%</span>
+                    </div>
+                  )}
                 </div>
               )}
-              {breakdown.topLoser && breakdown.topLoser.plPct !== null && breakdown.topLoser.plPct < 0 && (
-                <div className="insight-card negative">
-                  <div className="insight-label">Worst Performer</div>
-                  <div className="insight-symbol">{breakdown.topLoser.symbol}</div>
-                  <div className="insight-value">{breakdown.topLoser.plPct.toFixed(2)}%</div>
-                </div>
-              )}
             </div>
-          )}
-        </section>
-      ))}
-
+          ))}
+        </div>
+      </section>
       <section aria-labelledby="add-transaction" className="panel">
         <div className="section-title">
           <div>
