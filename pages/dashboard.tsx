@@ -221,6 +221,42 @@ function AssetAllocationChart({
   );
 }
 
+function MonthlyDividendsChart({ transactions }: { transactions: Transaction[] }) {
+  const currentYear = new Date().getFullYear();
+  
+  const monthlyData = useMemo(() => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const data = months.map((name, index) => ({ month: name, value: 0, index }));
+    
+    transactions
+      .filter(tx => tx.type === 'DIVIDEND' && tx.trade_date && new Date(tx.trade_date).getFullYear() === currentYear)
+      .forEach(tx => {
+        const month = new Date(tx.trade_date!).getMonth();
+        data[month].value += tx.dividend_amount ?? 0;
+      });
+    
+    return data;
+  }, [transactions, currentYear]);
+  
+  return (
+    <div className="chart-card">
+      <div className="chart-header">Monthly Dividends ({currentYear})</div>
+      <ResponsiveContainer width="100%" height={250}>
+        <BarChart data={monthlyData}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+          <XAxis dataKey="month" tick={{ fontSize: 12 }} stroke="#64748b" />
+          <YAxis tick={{ fontSize: 12 }} stroke="#64748b" />
+          <Tooltip 
+            formatter={(value: number) => formatPrice(value, 'SGD', 2)}
+            contentStyle={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+          />
+          <Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 function PerformanceInsightsCard({ topGainer, topLoser }: { topGainer: HoldingRow | null; topLoser: HoldingRow | null }) {
   return (
     <div className="chart-card performance-insights-card">
@@ -1179,7 +1215,8 @@ function formatLastUpdate(date: Date | null) {
         </div>
         <div className="chart-grid-two-col">
           <AssetAllocationChart data={allocations.byCategory} />
-          <PerformanceInsightsCard topGainer={topGainer} topLoser={topLoser} />
+          <MonthlyDividendsChart transactions={transactions} />
+          {/*<PerformanceInsightsCard topGainer={topGainer} topLoser={topLoser} />*/}
         </div>
       </section>
 
@@ -1201,7 +1238,7 @@ function formatLastUpdate(date: Date | null) {
                 value: h.totalCost,
               }))
               .sort((a, b) => b.value - a.value)
-              .slice(0, 5); // Top 5 holdings
+              //.slice(0, 5); // Top 5 holdings
             
             const EXTENDED_COLORS = ['#64acdb', '#f8c268', '#b57edc', '#6fd2df', '#f4609f', '#fa9228', '#d38278', '#51c9b2', '#48b14c', '#fc8eac'];
             
