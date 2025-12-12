@@ -392,6 +392,7 @@ export default function HomePage() {
   const [statusTone, setStatusTone] = useState<'info' | 'success' | 'error'>('info');
   const [brokerFilter, setBrokerFilter] = useState<string>('All');
   const [currencyFilter, setCurrencyFilter] = useState<string>('All');
+  const [categoryFilter, setCategoryFilter] = useState<string>('All');
   const [quotes, setQuotes] = useState<Record<string, QuoteResponse>>({});
   const [selectedHoldingKey, setSelectedHoldingKey] = useState<string | null>(null);
   const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
@@ -403,6 +404,7 @@ export default function HomePage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [lastPriceUpdate, setLastPriceUpdate] = useState<Date | null>(null);
   const [isRefreshingPrices, setIsRefreshingPrices] = useState(false);
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
   
   async function loadTransactions() {
     try {
@@ -530,11 +532,12 @@ export default function HomePage() {
     const filtered = Array.from(map.values()).filter((row) => {
       const brokerOk = brokerFilter === 'All' || row.broker === brokerFilter;
       const currencyOk = currencyFilter === 'All' || row.currency === currencyFilter;
-      return brokerOk && currencyOk;
+      const categoryOk = categoryFilter === 'All' || row.category === categoryFilter;
+      return brokerOk && currencyOk && categoryOk;
     });
 
     return filtered;
-  }, [transactions, brokerFilter, currencyFilter]);
+  }, [transactions, brokerFilter, currencyFilter, categoryFilter]);
 
   useEffect(() => {
     async function fetchQuotesForHoldings() {
@@ -1423,124 +1426,218 @@ function formatLastUpdate(date: Date | null) {
             <p className="eyebrow">Positions</p>
             <h2 id="holdings">Holdings</h2>
           </div>
-          <div className="filters">
-            <select value={brokerFilter} onChange={(e) => setBrokerFilter(e.target.value)}>
-              <option value="All">All brokers</option>
-              {brokers.map((br) => (
-                <option key={br} value={br}>
-                  {br}
-                </option>
-              ))}
-            </select>
-            <select value={currencyFilter} onChange={(e) => setCurrencyFilter(e.target.value)}>
-              <option value="All">All currencies</option>
-              {currencies.map((ccy) => (
-                <option key={ccy} value={ccy}>
-                  {ccy}
-                </option>
-              ))}
-            </select>
+          <div className="holdings-controls">
+            <div className="view-toggle">
+              <button 
+                className={`view-toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
+                onClick={() => setViewMode('grid')}
+                title="Grid view"
+              >
+                <span>◫</span>
+              </button>
+              <button 
+                className={`view-toggle-btn ${viewMode === 'table' ? 'active' : ''}`}
+                onClick={() => setViewMode('table')}
+                title="Table view"
+              >
+                <span>☰</span>
+              </button>
+            </div>
+            <div className="filters">
+              <select value={brokerFilter} onChange={(e) => setBrokerFilter(e.target.value)}>
+                <option value="All">All brokers</option>
+                {brokers.map((br) => (
+                  <option key={br} value={br}>
+                    {br}
+                  </option>
+                ))}
+              </select>
+              <select value={currencyFilter} onChange={(e) => setCurrencyFilter(e.target.value)}>
+                <option value="All">All currencies</option>
+                {currencies.map((ccy) => (
+                  <option key={ccy} value={ccy}>
+                    {ccy}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </div>
         
-        <div className="holdings-table-wrapper">
-          <table className="holdings-table">
-            <thead>
-              <tr>
-                <th onClick={() => handleSort('symbol')} className="sortable">
-                  Symbol {sortField === 'symbol' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th onClick={() => handleSort('category')} className="sortable">
-                  Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th onClick={() => handleSort('quantity')} className="sortable" style={{textAlign: 'right'}}>
-                  Quantity {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th onClick={() => handleSort('averagePrice')} className="sortable">
-                  Net Avg Price {sortField === 'averagePrice' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th onClick={() => handleSort('currentPrice')} className="sortable">
-                  Market Price {sortField === 'currentPrice' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th onClick={() => handleSort('totalCost')} className="sortable" style={{textAlign: 'right'}}>
-                  Capital {sortField === 'totalCost' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th onClick={() => handleSort('currentValue')} className="sortable" style={{textAlign: 'right'}}>
-                  Value {sortField === 'currentValue' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th onClick={() => handleSort('plPct')} className="sortable" style={{textAlign: 'right'}}>
-                  P&L {sortField === 'plPct' && (sortDirection === 'asc' ? '↑' : '↓')}
-                </th>
-                <th style={{textAlign: 'right'}}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedHoldings.map((row) => {
-                const plClass = row.pl && row.pl !== 0 ? (row.pl > 0 ? 'positive' : 'negative') : 'neutral';
+        {viewMode === 'table' ? (
+          <div className="holdings-table-wrapper">
+            <table className="holdings-table">
+              <thead>
+                <tr>
+                  <th onClick={() => handleSort('symbol')} className="sortable">
+                    Symbol {sortField === 'symbol' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => handleSort('category')} className="sortable">
+                    Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => handleSort('quantity')} className="sortable" style={{textAlign: 'right'}}>
+                    Quantity {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => handleSort('averagePrice')} className="sortable">
+                    Net Avg Price {sortField === 'averagePrice' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => handleSort('currentPrice')} className="sortable">
+                    Market Price {sortField === 'currentPrice' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => handleSort('totalCost')} className="sortable" style={{textAlign: 'right'}}>
+                    Capital {sortField === 'totalCost' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => handleSort('currentValue')} className="sortable" style={{textAlign: 'right'}}>
+                    Value {sortField === 'currentValue' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => handleSort('plPct')} className="sortable" style={{textAlign: 'right'}}>
+                    P&L {sortField === 'plPct' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th style={{textAlign: 'right'}}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sortedHoldings.map((row) => {
+                  const plClass = row.pl && row.pl !== 0 ? (row.pl > 0 ? 'positive' : 'negative') : 'neutral';
 
-                return (
-                  <tr key={row.key}>
-                    <td>
-                      <div className="symbol-cell">
-                        <div className="symbol-main">{row.symbol}</div>
-                        {row.productName && (
-                          <div className="symbol-product" title={row.productName}>
-                            {row.productName}
-                          </div>
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="category-badge">
+                  return (
+                    <tr key={row.key}>
+                      <td>
+                        <div className="symbol-cell">
+                          <div className="symbol-main">{row.symbol}</div>
+                          {row.productName && (
+                            <div className="symbol-product" title={row.productName}>
+                              {row.productName}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="category-badge">
+                          <span
+                            className="category-dot-small"
+                            style={{ backgroundColor: getCategoryColor(row.category) }}
+                          />
+                          {row.category}
+                        </div>
+                      </td>
+                      <td className="value-cell">
+                        {formatQuantity(row.quantity)}
+                      </td>
+                      <td className="value-cell">
+                        {formatPriceWithoutCurrency(row.averagePrice, row.currency, 5)}
+                      </td>
+                      <td className="value-cell">
+                        {formatPriceWithoutCurrency(row.currentPrice, row.currency, 5)}
+                      </td>
+                      <td className="value-cell">
+                        {formatPrice(row.totalCost, row.currency, 2)}
+                      </td>
+                      <td className="value-cell">
+                        {row.currentValue !== null ? formatPrice(row.currentValue, row.currency, 2) : '-'}
+                      </td>
+                      <td className="pl-cell">
+                        <div className={`pl-value ${plClass}`}>
+                          <span className="pl-amount">
+                            {row.pl !== null ? formatPrice(row.pl, row.currency, 2) : '-'}
+                          </span>
+                          {row.plPct !== null && (
+                            <span className="pl-percentage">
+                              {row.plPct > 0 ? '+' : ''}{row.plPct.toFixed(2)}%
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="action-cell">
+                        <button 
+                          type="button" 
+                          className="view-btn"
+                          onClick={() => setSelectedHoldingKey(row.key)}
+                        >
+                          View
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="holdings-grid">
+            {sortedHoldings.map((row) => {
+              const plClass = row.pl && row.pl !== 0 ? (row.pl > 0 ? 'positive' : 'negative') : 'neutral';
+
+              return (
+                <div key={row.key} className="holding-card">
+                  <div className="holding-card-header">
+                    <div className="holding-card-title">
+                      <span className="holding-symbol">{row.symbol}</span>
+                      <div className="category-badge-small">
                         <span
                           className="category-dot-small"
                           style={{ backgroundColor: getCategoryColor(row.category) }}
                         />
-                        {row.category}
+                        <span>{row.category}</span>
                       </div>
-                    </td>
-                    <td className="value-cell">
-                      {formatQuantity(row.quantity)}
-                    </td>
-                    <td className="value-cell">
-                      {formatPriceWithoutCurrency(row.averagePrice, row.currency, 5)}
-                    </td>
-                    <td className="value-cell">
-                      {formatPriceWithoutCurrency(row.currentPrice, row.currency, 5)}
-                    </td>
-                    <td className="value-cell">
-                      {formatPrice(row.totalCost, row.currency, 2)}
-                    </td>
-                    <td className="value-cell">
-                      {row.currentValue !== null ? formatPrice(row.currentValue, row.currency, 2) : '-'}
-                    </td>
-                    <td className="pl-cell">
-                      <div className={`pl-value ${plClass}`}>
-                        <span className="pl-amount">
-                          {row.pl !== null ? formatPrice(row.pl, row.currency, 2) : '-'}
-                        </span>
-                        {row.plPct !== null && (
-                          <span className="pl-percentage">
-                            {row.plPct > 0 ? '+' : ''}{row.plPct.toFixed(2)}%
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="action-cell">
-                      <button 
-                        type="button" 
-                        className="view-btn"
-                        onClick={() => setSelectedHoldingKey(row.key)}
-                      >
-                        View
-                      </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                    {row.productName && (
+                      <div className="holding-product-name">{row.productName}</div>
+                    )}
+                  </div>
+
+                  <div className="holding-card-stats">
+                    <div className="holding-stat-row">
+                      <span className="holding-stat-label">Quantity</span>
+                      <span className="holding-stat-value">{formatQuantity(row.quantity)}</span>
+                    </div>
+                    <div className="holding-stat-row">
+                      <span className="holding-stat-label">Avg Price</span>
+                      <span className="holding-stat-value">{formatPriceWithoutCurrency(row.averagePrice, row.currency, 5)}</span>
+                    </div>
+                    <div className="holding-stat-row">
+                      <span className="holding-stat-label">Market Price</span>
+                      <span className="holding-stat-value">{formatPriceWithoutCurrency(row.currentPrice, row.currency, 5)}</span>
+                    </div>
+                  </div>
+
+                  <div className="holding-card-values">
+                    <div className="holding-value-item">
+                      <span className="holding-value-label">Capital</span>
+                      <span className="holding-value-amount">{formatPrice(row.totalCost, row.currency, 2)}</span>
+                    </div>
+                    <div className="holding-value-divider">→</div>
+                    <div className="holding-value-item">
+                      <span className="holding-value-label">Current</span>
+                      <span className="holding-value-amount">
+                        {row.currentValue !== null ? formatPrice(row.currentValue, row.currency, 2) : '-'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className={`holding-card-pl ${plClass}`}>
+                    <span className="holding-pl-amount">
+                      {row.pl !== null ? formatPrice(row.pl, row.currency, 2) : '-'}
+                    </span>
+                    {row.plPct !== null && (
+                      <span className="holding-pl-pct">
+                        {row.plPct > 0 ? '+' : ''}{row.plPct.toFixed(2)}%
+                      </span>
+                    )}
+                  </div>
+
+                  <button 
+                    type="button" 
+                    className="holding-card-btn"
+                    onClick={() => setSelectedHoldingKey(row.key)}
+                  >
+                    View Details
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       {selectedHolding && (
