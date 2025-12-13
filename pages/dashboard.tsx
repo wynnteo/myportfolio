@@ -1206,7 +1206,7 @@ function formatLastUpdate(date: Date | null) {
             <div className="stat-sub">{Object.keys(quotes).length} live prices</div>
           </div>
           <div className={`summary-card ${totalPl > 0 ? 'profit' : totalPl < 0 ? 'loss' : ''}`}>
-            <div className="stat-title">Total P/L</div>
+            <div className="stat-title">Total Unrealised P/L</div>
             <div className="stat-value">{formatPrice(totalPl, 'SGD', 2)}</div>
             <div className="stat-sub">{totalPlPct !== null && totalPlPct !== 0 ? `${totalPlPct > 0 ? '+' : ''}${totalPlPct.toFixed(2)}%` : '—'}</div>
           </div>
