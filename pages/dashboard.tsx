@@ -1295,7 +1295,7 @@ function formatLastUpdate(date: Date | null) {
                     <span className="category-stat-value">{formatPrice(breakdown.currentValue, 'SGD', 2)}</span>
                   </div>
                   <div className={`category-stat-row highlight ${breakdown.pl > 0 ? 'positive' : breakdown.pl < 0 ? 'negative' : ''}`}>
-                    <span className="category-stat-label">P/L</span>
+                    <span className="category-stat-label">Unrealised P/L</span>
                     <span className="category-stat-value-large">
                       {formatPrice(breakdown.pl, 'SGD', 2)}
                       <span className="category-stat-pct">{breakdown.plPct > 0 ? '+' : ''}{breakdown.plPct.toFixed(2)}%</span>

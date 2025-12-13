@@ -337,21 +337,7 @@ textarea:focus {
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-textarea {
-  min-height: 60px;
-}
 
-button {
-  background: #ffffff;
-  border: 1px solid #cbd5e1;
-  color: #0f172a;
-  font-weight: 600;
-  padding: 8px 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  font-size: 13px;
-}
 
 button:hover {
   background: #f8fafc;
@@ -1058,10 +1044,6 @@ th.sortable:hover {
   background: #fafafa;
 }
 
-.section-header {
-  text-align: center;
-  margin-bottom: 48px;
-}
 
 .section-header h2 {
   font-size: 32px;
@@ -1413,33 +1395,11 @@ th.sortable:hover {
     align-items: flex-start;
   }
 
-  .nav-menu {
-    width: 100%;
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
 
-  main {
-    padding: 24px 12px 32px;
-  }
 
-  .topbar {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
 
-  h1 {
-    font-size: 24px;
-  }
 
-  .hero-title {
-    font-size: 36px;
-  }
 
-  .hero-actions {
-    flex-direction: column;
-    width: 100%;
-  }
 
   .hero-actions a,
   .hero-actions button {
@@ -1447,9 +1407,6 @@ th.sortable:hover {
     text-align: center;
   }
 
-  .overview-grid {
-    grid-template-columns: 1fr;
-  }
 
   .insights-grid {
     grid-template-columns: 1fr;
@@ -1459,100 +1416,38 @@ th.sortable:hover {
     grid-template-columns: 1fr;
   }
 
-  .form-grid {
-    grid-template-columns: 1fr;
-  }
 
-  .referral-grid {
-    grid-template-columns: 1fr;
-  }
 
-  .features-grid {
-    grid-template-columns: 1fr;
-  }
 
-  .footer-content {
-    grid-template-columns: 1fr;
-    gap: 32px;
-  }
 
-  .modal-stats-grid {
-    grid-template-columns: 1fr;
-  }
 
-  .modal {
-    width: 95vw;
-    max-height: 85vh;
-    padding: 12px;
-  }
 
-  .modal-header {
-    flex-direction: column;
-    align-items: flex-start;
-  }
 
-  .modal-meta {
-    flex-direction: column;
-    gap: 4px;
-  }
 
-  .stat-dual {
-    flex-direction: column;
-    gap: 12px;
-  }
 
-  .stat-divider-vertical {
-    display: none;
-  }
 
-  .add-dividend-form {
-    grid-template-columns: 1fr;
-  }
 
   .modal-table table {
     min-width: 900px;
   }
 
-  .action-row {
-    flex-direction: column;
-    width: 100%;
-  }
 
   .action-row button {
     width: 100%;
   }
 
-  .table-wrapper {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
 
-  table {
-    min-width: 800px;
-    font-size: 13px;
-  }
 
   td, th {
     padding: 8px 6px;
   }
 
-  .filters {
-    flex-direction: column;
-  }
 
   .filters select {
     width: 100%;
   }
 
-  .chip-group {
-    justify-content: center;
-  }
 
-  .section-title {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
 
   .stacked-legend,
   .holdings-legend {
@@ -1565,52 +1460,19 @@ th.sortable:hover {
     font-size: 20px;
   }
 
-  .hero-title {
-    font-size: 28px;
-  }
 
-  .stat-value {
-    font-size: 18px;
-  }
 
-  .summary-card {
-    padding: 10px;
-  }
 
-  button {
-    padding: 8px 10px;
-    font-size: 12px;
-  }
 
-  .badge {
-    font-size: 11px;
-    padding: 4px 8px;
-  }
 
-  .chip {
-    padding: 6px 8px;
-    font-size: 12px;
-  }
 
   input, select, textarea {
     font-size: 16px;
   }
 
-  .modal-title {
-    font-size: 16px;
-  }
 
-  .stat-value-inline {
-    font-size: 16px;
-  }
 
-  .pl-amount {
-    font-size: 18px;
-  }
 
-  .auth-card {
-    padding: 24px;
-  }
 }
 
 /* Add these new styles to your existing globals.css */
@@ -1730,10 +1592,6 @@ th.sortable:hover {
   gap: 2px;
 }
 
-.pl-amount {
-  font-size: 15px;
-  font-weight: 700;
-}
 
 .pl-percentage {
   font-size: 12px;
@@ -1752,13 +1610,7 @@ th.sortable:hover {
   color: #dc2626;
 }
 
-.pl-value.positive .pl-percentage {
-  background: #d1fae5;
-}
 
-.pl-value.negative .pl-percentage {
-  background: #fee2e2;
-}
 
 .pl-value.neutral .pl-amount,
 .pl-value.neutral .pl-percentage {
@@ -2054,20 +1906,8 @@ th.sortable:hover {
     grid-template-columns: 1fr;
   }
   
-  .holdings-controls {
-    flex-direction: column;
-    align-items: flex-start;
-    width: 100%;
-  }
   
-  .view-toggle {
-    width: 100%;
-    justify-content: center;
-  }
   
-  .filters {
-    width: 100%;
-  }
 }
 
 @media (max-width: 480px) {
@@ -2075,21 +1915,9 @@ th.sortable:hover {
     padding: 12px;
   }
   
-  .holding-symbol {
-    font-size: 16px;
-  }
   
-  .holding-card-values {
-    padding: 10px;
-  }
   
-  .holding-value-amount {
-    font-size: 13px;
-  }
   
-  .holding-pl-amount {
-    font-size: 14px;
-  }
 }
 
 /* ==================== ENHANCED MODAL TABLES ==================== */
@@ -2106,12 +1934,6 @@ th.sortable:hover {
   border-bottom: 2px solid #e2e8f0;
 }
 
-.modal-section-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #0f172a;
-  margin: 0;
-}
 
 .modal-transaction-table {
   width: 100%;
@@ -2322,9 +2144,6 @@ th.sortable:hover {
     min-width: 900px;
   }
   
-  .modal-transaction-table {
-    min-width: 800px;
-  }
 }
 
 @media (max-width: 768px) {
@@ -2334,30 +2153,13 @@ th.sortable:hover {
     font-size: 13px;
   }
   
-  .symbol-main {
-    font-size: 14px;
-  }
   
-  .modal-action-buttons {
-    flex-direction: column;
-  }
   
-  .modal-action-buttons button {
-    width: 100%;
-  }
   
-  .dividend-form-inline {
-    grid-template-columns: 1fr;
-  }
 }
 
 
 /* ==================== CHARTS ==================== */
-.chart-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 12px;
-}
 
 .chart-grid-two-col {
   display: grid;
@@ -2408,14 +2210,6 @@ th.sortable:hover {
   border-top: 1px solid #e2e8f0;
 }
 
-.holdings-legend {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid #e2e8f0;
-}
 
 .legend-item {
   display: flex;
@@ -2583,13 +2377,6 @@ th.sortable:hover {
   border-bottom: 1px solid #f1f5f9;
 }
 
-.category-dot-inline {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  display: inline-block;
-  flex-shrink: 0;
-}
 
 .category-compact-title {
   font-size: 14px;
