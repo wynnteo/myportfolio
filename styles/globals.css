@@ -2555,3 +2555,483 @@ th.sortable:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* [Keep all your existing CSS from the root through the refresh button styles] */
+
+/* ==================== ENHANCED LOADING STATES ==================== */
+.update-time.loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #3b82f6;
+  font-weight: 700;
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid #3b82f6;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+.loading-count {
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* ==================== IMPROVED MOBILE RESPONSIVENESS ==================== */
+
+/* Mobile: Status Group Stack */
+@media (max-width: 768px) {
+  .topbar {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .status-group {
+    align-items: flex-start;
+    width: 100%;
+  }
+  
+  .price-update-info {
+    width: 100%;
+    justify-content: space-between;
+    padding: 8px 12px;
+  }
+  
+  /* Overview Grid - Single Column on Mobile */
+  .overview-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  /* Charts - Full Width Stack on Mobile */
+  .chart-grid-two-col {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .chart-card {
+    min-height: 280px;
+  }
+  
+  /* Recharts Container - Better Mobile Height */
+  .chart-card .recharts-wrapper {
+    width: 100% !important;
+  }
+  
+  /* Category Grid - Single Column */
+  .category-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  /* Holdings Controls - Stack on Mobile */
+  .holdings-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  
+  .view-toggle {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .filters {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .filters select {
+    width: 100%;
+  }
+  
+  /* Holdings Grid - Responsive */
+  .holdings-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  /* Form Grid - Stack on Mobile */
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .form-actions {
+    justify-content: stretch;
+  }
+  
+  .form-actions button {
+    width: 100%;
+  }
+}
+
+/* ==================== MODAL MOBILE IMPROVEMENTS ==================== */
+@media (max-width: 768px) {
+  .modal-backdrop {
+    align-items: flex-start;
+    padding: 0;
+  }
+  
+  .modal {
+    width: 100%;
+    max-height: 100vh;
+    border-radius: 0;
+    padding: 12px;
+    margin: 0;
+  }
+  
+  .modal-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .modal-title {
+    font-size: 16px;
+    word-break: break-word;
+  }
+  
+  .modal-meta {
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+  }
+  
+  /* Modal Stats - Stack on Mobile */
+  .modal-stats-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  
+  .stat-row {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .stat-divider {
+    transform: rotate(90deg);
+    margin: 0;
+  }
+  
+  /* Modal Tables - Horizontal Scroll */
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -12px;
+    padding: 0 12px;
+  }
+  
+  .modal-transaction-table {
+    min-width: 600px;
+    font-size: 12px;
+  }
+  
+  .modal-transaction-table th,
+  .modal-transaction-table td {
+    padding: 8px 6px;
+  }
+  
+  .modal-transaction-table input,
+  .modal-transaction-table select {
+    font-size: 12px;
+    padding: 4px 6px;
+  }
+  
+  .modal-action-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+  
+  .modal-action-buttons button {
+    width: 100%;
+    padding: 8px 12px;
+  }
+  
+  /* Dividend Form - Stack on Mobile */
+  .dividend-form-inline {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  
+  .dividend-form-inline button {
+    margin-top: 0;
+  }
+  
+  /* Modal Section Spacing */
+  .modal-transactions-section,
+  .dividend-history-section {
+    margin-bottom: 20px;
+  }
+  
+  .modal-section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .add-dividend-btn {
+    width: 100%;
+  }
+}
+
+/* ==================== SMALL MOBILE (< 480px) ==================== */
+@media (max-width: 480px) {
+  /* Typography Scale Down */
+  h1 {
+    font-size: 24px;
+  }
+  
+  h2 {
+    font-size: 20px;
+  }
+  
+  .hero-title {
+    font-size: 32px;
+  }
+  
+  /* Nav Menu - Full Width Buttons */
+  .nav-menu {
+    width: 100%;
+    flex-direction: column;
+  }
+  
+  .nav-menu a,
+  .nav-menu button {
+    width: 100%;
+    text-align: center;
+  }
+  
+  /* Summary Cards - Compact Padding */
+  .summary-card {
+    padding: 12px;
+  }
+  
+  .stat-value {
+    font-size: 20px;
+  }
+  
+  /* Chart Headers */
+  .chart-header {
+    font-size: 13px;
+  }
+  
+  /* Holdings Card - Compact */
+  .holding-card {
+    padding: 12px;
+  }
+  
+  .holding-symbol {
+    font-size: 16px;
+  }
+  
+  /* Referral Cards - Compact */
+  .referral-card {
+    padding: 16px;
+  }
+  
+  .broker-icon {
+    width: 48px;
+    height: 48px;
+    font-size: 28px;
+  }
+  
+  .broker-name {
+    font-size: 16px;
+  }
+  
+  /* Button Groups - Stack */
+  .button-group {
+    flex-direction: column;
+  }
+  
+  .code-btn,
+  .primary-btn {
+    width: 100%;
+  }
+  
+  /* Category Compact Cards */
+  .category-compact-card {
+    padding: 10px;
+  }
+  
+  .category-mini-chart {
+    height: 100px;
+  }
+  
+  /* Insights Compact */
+  .insight-compact-symbol {
+    font-size: 14px;
+  }
+  
+  .insight-compact-value {
+    font-size: 16px;
+  }
+  
+  /* Footer - Stack */
+  .footer-content {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}
+
+/* ==================== TABLET PORTRAIT (481px - 768px) ==================== */
+@media (min-width: 481px) and (max-width: 768px) {
+  /* Two columns where appropriate */
+  .overview-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .category-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .holdings-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .referral-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  /* Keep charts stacked for better readability */
+  .chart-grid-two-col {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ==================== LANDSCAPE MOBILE (< 768px height, landscape) ==================== */
+@media (max-height: 500px) and (orientation: landscape) {
+  .modal {
+    max-height: 100vh;
+    overflow-y: auto;
+  }
+  
+  .chart-card {
+    min-height: 200px;
+  }
+  
+  .modal-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ==================== TOUCH DEVICE IMPROVEMENTS ==================== */
+@media (hover: none) and (pointer: coarse) {
+  /* Larger touch targets */
+  button,
+  .view-btn,
+  .edit-btn,
+  .delete-btn,
+  .save-btn,
+  .cancel-btn {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  .refresh-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  
+  /* Easier scrolling */
+  .table-wrapper {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Remove hover effects on touch */
+  .holding-card:hover,
+  .referral-card:hover,
+  .feature-card:hover {
+    transform: none;
+  }
+}
+
+/* ==================== LOADING SKELETON STATES ==================== */
+.holding-card.loading {
+  opacity: 0.6;
+  pointer-events: none;
+  position: relative;
+}
+
+.holding-card.loading::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* ==================== ACCESSIBILITY IMPROVEMENTS ==================== */
+/* Focus visible for keyboard navigation */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  
+  .refresh-icon.spinning {
+    animation: none;
+  }
+  
+  .loading-spinner {
+    animation: none;
+    border-top-color: #3b82f6;
+  }
+}
+
+/* ==================== PRINT STYLES ==================== */
+@media print {
+  .site-header,
+  .nav-menu,
+  .refresh-btn,
+  .view-toggle,
+  .filters,
+  button,
+  .modal-backdrop {
+    display: none !important;
+  }
+  
+  .modal {
+    position: static;
+    box-shadow: none;
+    border: 1px solid #000;
+  }
+  
+  .chart-card,
+  .summary-card,
+  .holding-card {
+    break-inside: avoid;
+  }
+}

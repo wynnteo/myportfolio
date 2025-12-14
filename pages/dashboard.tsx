@@ -387,6 +387,8 @@ export default function HomePage() {
   const router = useRouter();
   const { user, loading: authLoading, logout } = useAuth();
 
+  const [loadingPrices, setLoadingPrices] = useState(false);
+  const [priceLoadingSymbols, setPriceLoadingSymbols] = useState<Set<string>>(new Set());
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [statusText, setStatusText] = useState('Connecting to database...');
   const [statusTone, setStatusTone] = useState<'info' | 'success' | 'error'>('info');
