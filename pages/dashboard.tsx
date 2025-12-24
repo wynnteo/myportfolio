@@ -407,6 +407,8 @@ export default function HomePage() {
   const [lastPriceUpdate, setLastPriceUpdate] = useState<Date | null>(null);
   const [isRefreshingPrices, setIsRefreshingPrices] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
+  const [loadingPrices, setLoadingPrices] = useState(false);
+  const [priceLoadingSymbols, setPriceLoadingSymbols] = useState<Set<string>>(new Set());
   
   async function loadTransactions() {
     try {
@@ -547,10 +549,13 @@ export default function HomePage() {
       if (allSymbols.length === 0) {
         setQuotes({});
         setLastPriceUpdate(null);
+        setPriceLoadingSymbols(new Set());
+        setLoadingPrices(false);
         return;
       }
 
-      setIsRefreshingPrices(true);
+      setLoadingPrices(true);
+      setPriceLoadingSymbols(new Set(allSymbols));
       const nextQuotes: Record<string, QuoteResponse | { price: number | null; asOf?: string; source?: string; cached?: boolean }> = {};
 
       const unitTrustSymbols = Array.from(new Set(
@@ -576,6 +581,13 @@ export default function HomePage() {
           nextQuotes[sym] = { price: typeof j.price === 'number' ? j.price : null, asOf: j.lastUpdated ?? j.asOf ?? null, source: 'ft', cached: !!j.cached };
         } catch (e) {
           nextQuotes[sym] = { price: null, source: 'ft', cached: false };
+        } finally {
+          // Remove from loading set
+          setPriceLoadingSymbols(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(sym);
+            return newSet;
+          });
         }
       });
 
@@ -588,13 +600,19 @@ export default function HomePage() {
         try {
           const resp = await fetch(`/api/quote?symbol=${encodeURIComponent(symbol)}`);
           if (!resp.ok) {
-            // keep undefined (no quote) or set null
             return;
           }
           const data: QuoteResponse = await resp.json();
           nextQuotes[symbol] = data;
         } catch (err) {
           // ignore individual failures
+        } finally {
+          // Remove from loading set
+          setPriceLoadingSymbols(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(symbol);
+            return newSet;
+          });
         }
       }));
 
@@ -607,18 +625,19 @@ export default function HomePage() {
       });
 
       setLastPriceUpdate(new Date());
-      setIsRefreshingPrices(false);
+      setLoadingPrices(false);
+      setPriceLoadingSymbols(new Set());
     }
 
     void fetchQuotesForHoldings();
 
-    // Keep your 15-min interval behaviour
     const intervalId = setInterval(() => {
       void fetchQuotesForHoldings();
     }, 900000);
 
     return () => clearInterval(intervalId);
   }, [holdings]);
+
 
   const currentYear = new Date().getFullYear();
   const displayHoldings = useMemo(() => {
@@ -1051,11 +1070,12 @@ export default function HomePage() {
     await loadTransactions();
   }
 
-  async function handleRefreshPrices() {
+async function handleRefreshPrices() {
   const symbols = Array.from(new Set(holdings.map((h) => h.symbol))).filter(Boolean);
   if (symbols.length === 0) return;
 
-  setIsRefreshingPrices(true);
+  setLoadingPrices(true);
+  setPriceLoadingSymbols(new Set(symbols));
   const nextQuotes: Record<string, QuoteResponse> = {};
 
   await Promise.all(
@@ -1066,12 +1086,20 @@ export default function HomePage() {
         const data: QuoteResponse = await resp.json();
         nextQuotes[symbol] = data;
       } catch {}
+      finally {
+        setPriceLoadingSymbols(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(symbol);
+          return newSet;
+        });
+      }
     })
   );
 
   setQuotes(nextQuotes);
   setLastPriceUpdate(new Date());
-  setIsRefreshingPrices(false);
+  setLoadingPrices(false);
+  setPriceLoadingSymbols(new Set());
 }
 
 function formatLastUpdate(date: Date | null) {
@@ -1168,17 +1196,25 @@ function formatLastUpdate(date: Date | null) {
           <span id="sync-status" className="badge" data-tone={statusTone}>
             {statusText}
           </span>
-          {lastPriceUpdate && (
+          {(loadingPrices || lastPriceUpdate) && (
             <div className="price-update-info">
-              <span className="update-time">Live prices: {formatLastUpdate(lastPriceUpdate)}</span>
+              {loadingPrices && priceLoadingSymbols.size > 0 ? (
+                <span className="update-time loading">
+                  <span className="loading-spinner"></span>
+                  Loading prices...
+                  <span className="loading-count">{priceLoadingSymbols.size} remaining</span>
+                </span>
+              ) : lastPriceUpdate ? (
+                <span className="update-time">Live prices: {formatLastUpdate(lastPriceUpdate)}</span>
+              ) : null}
               <button 
                 type="button" 
                 className="refresh-btn"
                 onClick={() => void handleRefreshPrices()}
-                disabled={isRefreshingPrices}
+                disabled={loadingPrices}
                 title="Refresh live prices"
               >
-                <span className={`refresh-icon ${isRefreshingPrices ? 'spinning' : ''}`}>↻</span>
+                <span className={`refresh-icon ${loadingPrices ? 'spinning' : ''}`}>↻</span>
               </button>
             </div>
           )}
@@ -1305,7 +1341,14 @@ function formatLastUpdate(date: Date | null) {
                   </div>
                   <div className="category-stat-row">
                     <span className="category-stat-label">Dividends {currentYear}</span>
-                    <span className="category-stat-value">{formatPrice(breakdown.ytdDividends, 'SGD', 2)}</span>
+                    <span className="category-stat-value">
+                      {formatPrice(breakdown.ytdDividends, 'SGD', 2)}
+                      {breakdown.dividendYield > 0 && (
+                        <span className="stat-yield-badge" style={{marginLeft: '6px'}}>
+                          {breakdown.dividendYield.toFixed(2)}% yield
+                        </span>
+                      )}
+                    </span>
                   </div>
                 </div>
                 

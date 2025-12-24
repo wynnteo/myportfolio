@@ -2,6 +2,13 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica', 'Arial', sans-serif;
   color: #1a1a1a;
   background: #ffffff;
+  
+  /* New color scheme - Deep blue instead of black */
+  --primary-color: #1e40af;
+  --primary-hover: #1e3a8a;
+  --primary-dark: #1e3a8a;
+  --secondary-color: #3b82f6;
+  --accent-color: #60a5fa;
 }
 
 * {
@@ -81,12 +88,12 @@ a {
 }
 
 .nav-menu .nav-primary {
-  background: #1a1a1a;
+  background: var(--primary-color);
   color: #ffffff;
 }
 
 .nav-menu .nav-primary:hover {
-  background: #404040;
+  background: var(--primary-hover);
   color: #ffffff;
 }
 
@@ -205,7 +212,7 @@ section {
   font-size: 24px;
   font-weight: 800;
   margin: 8px 0;
-  color: #0f172a;
+  color: var(--primary-dark);
 }
 
 .summary-card.profit .stat-value {
@@ -278,12 +285,19 @@ section {
   font-weight: 700;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chip:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
 }
 
 .chip.success {
-  background: #ecfeff;
-  color: #0f172a;
-  border-color: #a5f3fc;
+  background: #dbeafe;
+  color: var(--primary-dark);
+  border-color: #93c5fd;
 }
 
 .chip-group {
@@ -333,11 +347,19 @@ input:focus,
 select:focus,
 textarea:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: var(--secondary-color);
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-
+button {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+}
 
 button:hover {
   background: #f8fafc;
@@ -345,14 +367,15 @@ button:hover {
 }
 
 button[type="submit"] {
-  background: #0f172a;
+  background: var(--primary-color);
   color: #fff;
-  border-color: #0f172a;
+  border-color: var(--primary-color);
+  border-radius: 8px;
 }
 
 button[type="submit"]:hover {
-  background: #1e293b;
-  border-color: #1e293b;
+  background: var(--primary-hover);
+  border-color: var(--primary-hover);
 }
 
 .ghost {
@@ -363,7 +386,7 @@ button[type="submit"]:hover {
 
 .ghost:hover {
   background: #f8fafc;
-  color: #0f172a;
+  color: var(--primary-dark);
   border-color: #94a3b8;
 }
 
@@ -543,7 +566,7 @@ th.sortable:hover {
 .stat-value-inline {
   font-size: 18px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--primary-dark);
 }
 
 .stat-divider {
@@ -650,7 +673,7 @@ th.sortable:hover {
 .stat-value-small {
   font-size: 16px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--primary-dark);
   margin-bottom: 4px;
 }
 
@@ -677,7 +700,7 @@ th.sortable:hover {
   font-size: 15px;
   font-weight: 700;
   margin: 0;
-  color: #0f172a;
+  color: var(--primary-dark);
 }
 
 .section-header {
@@ -733,6 +756,33 @@ th.sortable:hover {
 .update-time {
   color: #64748b;
   font-weight: 600;
+}
+
+.update-time.loading {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--secondary-color);
+  font-weight: 700;
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--secondary-color);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+}
+
+.loading-count {
+  font-size: 10px;
+  font-weight: 700;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 .refresh-btn {
@@ -802,7 +852,7 @@ th.sortable:hover {
 }
 
 .referral-card.featured {
-  border: 2px solid #3b82f6;
+  border: 2px solid var(--secondary-color);
   background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
 }
 
@@ -832,7 +882,7 @@ th.sortable:hover {
   font-size: 18px;
   font-weight: 800;
   margin: 0 0 4px 0;
-  color: #0f172a;
+  color: var(--primary-dark);
 }
 
 .featured-badge {
@@ -846,7 +896,7 @@ th.sortable:hover {
 }
 
 .highlight-box {
-  background: linear-gradient(135deg, #0f172a, #1e293b);
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
   color: #ffffff;
   padding: 12px 16px;
   border-radius: 10px;
@@ -906,7 +956,7 @@ th.sortable:hover {
 .code-btn {
   flex: 1;
   background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-  color: #0f172a;
+  color: var(--primary-dark);
   padding: 10px 16px;
   border-radius: 8px;
   font-weight: 700;
@@ -941,7 +991,7 @@ th.sortable:hover {
 
 .primary-btn {
   flex: 1;
-  background: linear-gradient(135deg, #0f172a, #1e293b);
+  background: linear-gradient(135deg, var(--primary-color), var(--primary-dark));
   color: #ffffff;
   padding: 10px 16px;
   border-radius: 8px;
@@ -958,9 +1008,9 @@ th.sortable:hover {
 }
 
 .primary-btn:hover {
-  background: linear-gradient(135deg, #1e293b, #334155);
+  background: linear-gradient(135deg, var(--primary-hover), var(--primary-dark));
   transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+  box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
 }
 
 /* ==================== LANDING PAGE (UPDATED) ==================== */
@@ -1004,10 +1054,10 @@ th.sortable:hover {
 }
 
 .btn-primary {
-  background: #1a1a1a;
+  background: var(--primary-color);
   color: #ffffff;
   padding: 12px 24px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-weight: 500;
   font-size: 15px;
   text-decoration: none;
@@ -1017,14 +1067,14 @@ th.sortable:hover {
 }
 
 .btn-primary:hover {
-  background: #404040;
+  background: var(--primary-hover);
 }
 
 .btn-secondary {
   background: #ffffff;
-  color: #1a1a1a;
+  color: var(--primary-color);
   padding: 12px 24px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-weight: 500;
   font-size: 15px;
   text-decoration: none;
@@ -1102,7 +1152,7 @@ th.sortable:hover {
 }
 
 .cta-content {
-  background: #1a1a1a;
+  background: var(--primary-color);
   border-radius: 12px;
   padding: 48px 32px;
   text-align: center;
@@ -1117,7 +1167,7 @@ th.sortable:hover {
 
 .cta-content p {
   font-size: 16px;
-  color: #b3b3b3;
+  color: #dbeafe;
   margin: 0 0 24px;
 }
 
@@ -1242,10 +1292,10 @@ th.sortable:hover {
 }
 
 .auth-submit {
-  background: #1a1a1a;
+  background: var(--primary-color);
   color: #ffffff;
   padding: 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-weight: 500;
   font-size: 15px;
   border: none;
@@ -1254,7 +1304,7 @@ th.sortable:hover {
 }
 
 .auth-submit:hover:not(:disabled) {
-  background: #404040;
+  background: var(--primary-hover);
 }
 
 .auth-submit:disabled {
@@ -1292,7 +1342,7 @@ th.sortable:hover {
   padding: 12px;
   background: #ffffff;
   border: 1px solid #e5e5e5;
-  border-radius: 6px;
+  border-radius: 8px;
   font-weight: 500;
   color: #1a1a1a;
   text-decoration: none;
@@ -1317,7 +1367,7 @@ th.sortable:hover {
 }
 
 .auth-footer a {
-  color: #1a1a1a;
+  color: var(--primary-color);
   text-decoration: none;
   font-weight: 500;
 }
@@ -1327,7 +1377,7 @@ th.sortable:hover {
 }
 
 .forgot-link {
-  color: #1a1a1a;
+  color: var(--primary-color);
   font-size: 14px;
   font-weight: 500;
   text-decoration: none;
@@ -1353,7 +1403,7 @@ th.sortable:hover {
 .dev-link {
   display: block;
   word-break: break-all;
-  color: #3b82f6;
+  color: var(--secondary-color);
   font-size: 13px;
   margin-top: 4px;
 }
@@ -1386,96 +1436,6 @@ th.sortable:hover {
   font-size: 12px;
   color: #475569;
 }
-
-/* ==================== MOBILE RESPONSIVE ==================== */
-@media (max-width: 768px) {
-  .site-nav {
-    flex-direction: column;
-    gap: 12px;
-    align-items: flex-start;
-  }
-
-
-
-
-
-
-
-  .hero-actions a,
-  .hero-actions button {
-    width: 100%;
-    text-align: center;
-  }
-
-
-  .insights-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .chart-grid {
-    grid-template-columns: 1fr;
-  }
-
-
-
-
-
-
-
-
-
-
-
-
-  .modal-table table {
-    min-width: 900px;
-  }
-
-
-  .action-row button {
-    width: 100%;
-  }
-
-
-
-  td, th {
-    padding: 8px 6px;
-  }
-
-
-  .filters select {
-    width: 100%;
-  }
-
-
-
-  .stacked-legend,
-  .holdings-legend {
-    grid-template-columns: 1fr;
-  }
-}
-
-@media (max-width: 480px) {
-  h1 {
-    font-size: 20px;
-  }
-
-
-
-
-
-
-
-  input, select, textarea {
-    font-size: 16px;
-  }
-
-
-
-
-}
-
-/* Add these new styles to your existing globals.css */
 
 /* ==================== ENHANCED HOLDINGS TABLE ==================== */
 .holdings-table-wrapper {
@@ -1535,7 +1495,7 @@ th.sortable:hover {
 .symbol-main {
   font-weight: 800;
   font-size: 15px;
-  color: #0f172a;
+  color: var(--primary-dark);
 }
 
 .symbol-product {
@@ -1572,7 +1532,7 @@ th.sortable:hover {
   text-align: right;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--primary-dark);
 }
 
 .value-cell.subdued {
@@ -1625,10 +1585,10 @@ th.sortable:hover {
 
 .view-btn {
   padding: 8px 16px;
-  background: #0f172a;
+  background: var(--primary-color);
   color: #ffffff;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
@@ -1636,14 +1596,12 @@ th.sortable:hover {
 }
 
 .view-btn:hover {
-  background: #1e293b;
+  background: var(--primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.15);
+  box-shadow: 0 2px 8px rgba(30, 64, 175, 0.2);
 }
 
 /* ==================== HOLDINGS GRID/CARD VIEW CSS ==================== */
-/* Add this to your globals.css file */
-
 /* View Toggle Controls */
 .holdings-controls {
   display: flex;
@@ -1673,12 +1631,12 @@ th.sortable:hover {
 
 .view-toggle-btn:hover {
   background: #e2e8f0;
-  color: #0f172a;
+  color: var(--primary-dark);
 }
 
 .view-toggle-btn.active {
   background: #ffffff;
-  color: #0f172a;
+  color: var(--primary-dark);
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
   font-weight: 600;
 }
@@ -1727,7 +1685,7 @@ th.sortable:hover {
 .holding-symbol {
   font-size: 18px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--primary-dark);
 }
 
 .category-badge-small {
@@ -1774,7 +1732,7 @@ th.sortable:hover {
 
 .holding-stat-value {
   font-weight: 700;
-  color: #0f172a;
+  color: var(--primary-dark);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1807,7 +1765,7 @@ th.sortable:hover {
 .holding-value-amount {
   font-size: 14px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--primary-dark);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1884,7 +1842,7 @@ th.sortable:hover {
 .holding-card-btn {
   width: 100%;
   padding: 10px;
-  background: #0f172a;
+  background: var(--primary-color);
   color: #ffffff;
   border: none;
   border-radius: 8px;
@@ -1895,29 +1853,9 @@ th.sortable:hover {
 }
 
 .holding-card-btn:hover {
-  background: #1e293b;
+  background: var(--primary-hover);
   transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.15);
-}
-
-/* Mobile Responsive for Holdings Grid */
-@media (max-width: 768px) {
-  .holdings-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  
-  
-}
-
-@media (max-width: 480px) {
-  .holding-card {
-    padding: 12px;
-  }
-  
-  
-  
-  
+  box-shadow: 0 2px 8px rgba(30, 64, 175, 0.2);
 }
 
 /* ==================== ENHANCED MODAL TABLES ==================== */
@@ -1984,7 +1922,7 @@ th.sortable:hover {
   padding: 6px 8px;
   font-size: 13px;
   border: 1px solid #cbd5e1;
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 .modal-action-buttons {
@@ -1997,14 +1935,15 @@ th.sortable:hover {
   padding: 6px 12px;
   font-size: 12px;
   white-space: nowrap;
+  border-radius: 6px;
 }
 
 .edit-btn {
   background: #f8fafc;
-  color: #0f172a;
+  color: var(--primary-dark);
   border: 1px solid #cbd5e1;
   padding: 6px 12px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-weight: 600;
   font-size: 12px;
   cursor: pointer;
@@ -2017,11 +1956,11 @@ th.sortable:hover {
 }
 
 .save-btn {
-  background: #0f172a;
+  background: var(--primary-color);
   color: #ffffff;
   border: none;
   padding: 6px 12px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-weight: 600;
   font-size: 12px;
   cursor: pointer;
@@ -2029,7 +1968,7 @@ th.sortable:hover {
 }
 
 .save-btn:hover {
-  background: #1e293b;
+  background: var(--primary-hover);
 }
 
 .cancel-btn {
@@ -2037,7 +1976,7 @@ th.sortable:hover {
   color: #64748b;
   border: 1px solid #cbd5e1;
   padding: 6px 12px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-weight: 600;
   font-size: 12px;
   cursor: pointer;
@@ -2046,7 +1985,7 @@ th.sortable:hover {
 
 .cancel-btn:hover {
   background: #f8fafc;
-  color: #0f172a;
+  color: var(--primary-dark);
 }
 
 .delete-btn {
@@ -2054,7 +1993,7 @@ th.sortable:hover {
   color: #dc2626;
   border: 1px solid #fecaca;
   padding: 6px 12px;
-  border-radius: 4px;
+  border-radius: 6px;
   font-weight: 600;
   font-size: 12px;
   cursor: pointer;
@@ -2079,11 +2018,11 @@ th.sortable:hover {
 }
 
 .add-dividend-btn {
-  background: #0f172a;
+  background: var(--primary-color);
   color: #ffffff;
   border: none;
   padding: 8px 16px;
-  border-radius: 6px;
+  border-radius: 8px;
   font-weight: 600;
   font-size: 13px;
   cursor: pointer;
@@ -2091,7 +2030,7 @@ th.sortable:hover {
 }
 
 .add-dividend-btn:hover {
-  background: #1e293b;
+  background: var(--primary-hover);
 }
 
 .dividend-form-inline {
@@ -2117,6 +2056,7 @@ th.sortable:hover {
 .dividend-form-inline input {
   padding: 8px 10px;
   font-size: 13px;
+  border-radius: 6px;
 }
 
 .dividend-empty-state {
@@ -2137,27 +2077,6 @@ th.sortable:hover {
   color: #64748b;
   margin: 0;
 }
-
-/* ==================== TABLE RESPONSIVE ==================== */
-@media (max-width: 1024px) {
-  .holdings-table {
-    min-width: 900px;
-  }
-  
-}
-
-@media (max-width: 768px) {
-  .holdings-table th,
-  .holdings-table td {
-    padding: 12px 8px;
-    font-size: 13px;
-  }
-  
-  
-  
-  
-}
-
 
 /* ==================== CHARTS ==================== */
 
@@ -2180,6 +2099,7 @@ th.sortable:hover {
 .chart-header {
   font-weight: 700;
   margin-bottom: 8px;
+  color: var(--primary-dark);
 }
 
 .pie-chart.empty {
@@ -2210,6 +2130,14 @@ th.sortable:hover {
   border-top: 1px solid #e2e8f0;
 }
 
+.holdings-legend {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
 
 .legend-item {
   display: flex;
@@ -2228,7 +2156,7 @@ th.sortable:hover {
 .legend-text .legend-name {
   font-size: 13px;
   font-weight: 600;
-  color: #0f172a;
+  color: var(--primary-dark);
 }
 
 .legend-text .legend-value {
@@ -2300,7 +2228,7 @@ th.sortable:hover {
 .insight-compact-symbol {
   font-size: 16px;
   font-weight: 800;
-  color: #0f172a;
+  color: var(--primary-dark);
 }
 
 .insight-compact-value {
@@ -2381,7 +2309,7 @@ th.sortable:hover {
 .category-compact-title {
   font-size: 14px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--primary-dark);
   flex: 1;
 }
 
@@ -2438,7 +2366,7 @@ th.sortable:hover {
 
 .category-stat-value {
   font-weight: 700;
-  color: #0f172a;
+  color: var(--primary-dark);
 }
 
 .category-stat-value-large {
@@ -2524,7 +2452,7 @@ th.sortable:hover {
 .performer-symbol {
   font-weight: 700;
   font-size: 12px;
-  color: #0f172a;
+  color: var(--primary-dark);
 }
 
 .performer-product {
@@ -2549,51 +2477,7 @@ th.sortable:hover {
   color: #dc2626;
 }
 
-/* Mobile responsive for category grid */
-@media (max-width: 768px) {
-  .category-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* [Keep all your existing CSS from the root through the refresh button styles] */
-
-/* ==================== ENHANCED LOADING STATES ==================== */
-.update-time.loading {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  color: #3b82f6;
-  font-weight: 700;
-}
-
-.loading-spinner {
-  display: inline-block;
-  width: 12px;
-  height: 12px;
-  border: 2px solid #3b82f6;
-  border-top-color: transparent;
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
-}
-
-.loading-count {
-  font-size: 10px;
-  font-weight: 700;
-  color: #64748b;
-  background: #f1f5f9;
-  padding: 2px 6px;
-  border-radius: 4px;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-/* ==================== IMPROVED MOBILE RESPONSIVENESS ==================== */
-
-/* Mobile: Status Group Stack */
+/* ==================== MOBILE RESPONSIVE ==================== */
 @media (max-width: 768px) {
   .topbar {
     grid-template-columns: 1fr;
@@ -2626,11 +2510,6 @@ th.sortable:hover {
     min-height: 280px;
   }
   
-  /* Recharts Container - Better Mobile Height */
-  .chart-card .recharts-wrapper {
-    width: 100% !important;
-  }
-  
   /* Category Grid - Single Column */
   .category-grid {
     grid-template-columns: 1fr;
@@ -2657,7 +2536,7 @@ th.sortable:hover {
     width: 100%;
   }
   
-  /* Holdings Grid - Responsive */
+  /* Holdings Grid - Single column on mobile */
   .holdings-grid {
     grid-template-columns: 1fr;
   }
@@ -2673,6 +2552,41 @@ th.sortable:hover {
   
   .form-actions button {
     width: 100%;
+  }
+  
+  /* Nav Menu */
+  .site-nav {
+    flex-direction: column;
+    gap: 12px;
+    align-items: flex-start;
+  }
+  
+  .nav-menu {
+    width: 100%;
+    flex-direction: column;
+  }
+  
+  .nav-menu a,
+  .nav-menu button {
+    width: 100%;
+    text-align: center;
+  }
+  
+  /* Hero Actions */
+  .hero-actions {
+    flex-direction: column;
+  }
+  
+  .hero-actions a,
+  .hero-actions button {
+    width: 100%;
+    text-align: center;
+  }
+  
+  /* Footer */
+  .footer-content {
+    grid-template-columns: 1fr;
+    gap: 24px;
   }
 }
 
@@ -2800,18 +2714,6 @@ th.sortable:hover {
     font-size: 32px;
   }
   
-  /* Nav Menu - Full Width Buttons */
-  .nav-menu {
-    width: 100%;
-    flex-direction: column;
-  }
-  
-  .nav-menu a,
-  .nav-menu button {
-    width: 100%;
-    text-align: center;
-  }
-  
   /* Summary Cards - Compact Padding */
   .summary-card {
     padding: 12px;
@@ -2877,12 +2779,6 @@ th.sortable:hover {
   .insight-compact-value {
     font-size: 16px;
   }
-  
-  /* Footer - Stack */
-  .footer-content {
-    grid-template-columns: 1fr;
-    gap: 24px;
-  }
 }
 
 /* ==================== TABLET PORTRAIT (481px - 768px) ==================== */
@@ -2892,36 +2788,21 @@ th.sortable:hover {
     grid-template-columns: repeat(2, 1fr);
   }
   
-  .category-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .holdings-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .referral-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  /* Keep charts stacked for better readability */
+  /* Keep charts and category grid stacked for better readability on mobile */
   .chart-grid-two-col {
     grid-template-columns: 1fr;
   }
-}
-
-/* ==================== LANDSCAPE MOBILE (< 768px height, landscape) ==================== */
-@media (max-height: 500px) and (orientation: landscape) {
-  .modal {
-    max-height: 100vh;
-    overflow-y: auto;
+  
+  .category-grid {
+    grid-template-columns: 1fr;
   }
   
-  .chart-card {
-    min-height: 200px;
+  /* Holdings grid single column to prevent overflow */
+  .holdings-grid {
+    grid-template-columns: 1fr;
   }
   
-  .modal-stats-grid {
+  .referral-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -2957,29 +2838,6 @@ th.sortable:hover {
   }
 }
 
-/* ==================== LOADING SKELETON STATES ==================== */
-.holding-card.loading {
-  opacity: 0.6;
-  pointer-events: none;
-  position: relative;
-}
-
-.holding-card.loading::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
-  animation: shimmer 1.5s infinite;
-}
-
-@keyframes shimmer {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
 /* ==================== ACCESSIBILITY IMPROVEMENTS ==================== */
 /* Focus visible for keyboard navigation */
 button:focus-visible,
@@ -2987,7 +2845,7 @@ a:focus-visible,
 input:focus-visible,
 select:focus-visible,
 textarea:focus-visible {
-  outline: 2px solid #3b82f6;
+  outline: 2px solid var(--secondary-color);
   outline-offset: 2px;
 }
 
@@ -3007,7 +2865,7 @@ textarea:focus-visible {
   
   .loading-spinner {
     animation: none;
-    border-top-color: #3b82f6;
+    border-top-color: var(--secondary-color);
   }
 }
 
