@@ -407,9 +407,7 @@ export default function HomePage() {
   const [lastPriceUpdate, setLastPriceUpdate] = useState<Date | null>(null);
   const [isRefreshingPrices, setIsRefreshingPrices] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
-  const [loadingPrices, setLoadingPrices] = useState(false);
-  const [priceLoadingSymbols, setPriceLoadingSymbols] = useState<Set<string>>(new Set());
-  
+
   async function loadTransactions() {
     try {
       setStatusText('Loading transactions from database...');
