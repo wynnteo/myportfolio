@@ -222,8 +222,6 @@ function AssetAllocationChart({
 }
 
 function MonthlyDividendsChart({ transactions, year }: { transactions: Transaction[]; year: number }) {
-  const currentYear = new Date().getFullYear();
-  
   const monthlyData = useMemo(() => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const data = months.map((name, index) => ({ month: name, value: 0, index }));
@@ -236,7 +234,7 @@ function MonthlyDividendsChart({ transactions, year }: { transactions: Transacti
       });
     
     return data;
-  }, [transactions, currentYear]);
+  }, [transactions, year]);
   
   return (
     <div className="chart-card">
