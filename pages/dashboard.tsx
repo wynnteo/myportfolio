@@ -407,6 +407,9 @@ export default function HomePage() {
   const [lastPriceUpdate, setLastPriceUpdate] = useState<Date | null>(null);
   const [isRefreshingPrices, setIsRefreshingPrices] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
+  const [holdingsPage, setHoldingsPage] = useState(1);
+  const [transactionsPage, setTransactionsPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   async function loadTransactions() {
     try {
@@ -469,7 +472,7 @@ export default function HomePage() {
     }
   }, [user]);
 
-  const holdings = useMemo(() => {
+  const allHoldings = useMemo(() => {
     const map = new Map<string, HoldingRow>();
 
     for (const tx of transactions) {
@@ -531,15 +534,17 @@ export default function HomePage() {
       }
     });
 
-    const filtered = Array.from(map.values()).filter((row) => {
+    return Array.from(map.values());
+  }, [transactions]);
+
+  const holdings = useMemo(() => {
+    return allHoldings.filter((row) => {
       const brokerOk = brokerFilter === 'All' || row.broker === brokerFilter;
       const currencyOk = currencyFilter === 'All' || row.currency === currencyFilter;
       const categoryOk = categoryFilter === 'All' || row.category === categoryFilter;
       return brokerOk && currencyOk && categoryOk;
     });
-
-    return filtered;
-  }, [transactions, brokerFilter, currencyFilter, categoryFilter]);
+  }, [allHoldings, brokerFilter, currencyFilter, categoryFilter]);
 
   useEffect(() => {
     async function fetchQuotesForHoldings() {
@@ -638,6 +643,48 @@ export default function HomePage() {
 
 
   const currentYear = new Date().getFullYear();
+
+  const allDisplayHoldings = useMemo(() => {
+    return allHoldings.map((row) => {
+      const quote = quotes[row.symbol];
+
+      const currentPrice = quote ? quote.price : row.currentPrice;
+      let currentValue: number | null = null;
+      let pl: number | null = null;
+      let plPct: number | null = null;
+
+      if (currentPrice !== null && !Number.isNaN(currentPrice)) {
+        currentValue = currentPrice * row.quantity;
+        pl = currentValue - row.totalCost;
+        plPct = row.totalCost !== 0 ? (pl / row.totalCost) * 100 : null;
+      }
+
+      const currentYear = new Date().getFullYear();
+      const thisYearDividends = transactions
+        .filter(tx => 
+          tx.type === 'DIVIDEND' && 
+          tx.symbol === row.symbol && 
+          tx.broker === row.broker &&
+          tx.trade_date && 
+          new Date(tx.trade_date).getFullYear() === currentYear
+        )
+        .reduce((sum, tx) => sum + (tx.dividend_amount ?? 0), 0);
+      
+      const dividendYield = row.totalCost !== 0 ? (thisYearDividends / row.totalCost) * 100 : null;
+
+      return {
+        ...row,
+        currentPrice,
+        currentValue,
+        pl,
+        plPct,
+        thisYearDividends,
+        dividendYield,
+        lastPriceTimestamp: quote?.asOf ? Date.parse(quote.asOf) : row.lastPriceTimestamp,
+      };
+    });
+  }, [allHoldings, quotes, transactions]);
+
   const displayHoldings = useMemo(() => {
     return holdings.map((row) => {
       const quote = quotes[row.symbol];
@@ -684,7 +731,7 @@ export default function HomePage() {
     const byCurrency = new Map<string, number>();
     const byHolding = new Map<string, { value: number; currency: string }>();
 
-    for (const row of displayHoldings) {
+    for (const row of allDisplayHoldings) {
       const catData = byCategory.get(row.category) ?? { value: 0, currency: row.currency };
       catData.value += row.totalCost;
       byCategory.set(row.category, catData);
@@ -718,7 +765,7 @@ export default function HomePage() {
         pct: totalCapital ? (data.value / totalCapital) * 100 : 0,
       })).sort((a, b) => b.value - a.value),
     };
-  }, [displayHoldings]);
+  }, [allDisplayHoldings]);
 
   const totals = useMemo(() => {
     const capitalByCurrency = new Map<string, number>();
@@ -726,7 +773,7 @@ export default function HomePage() {
     const plByCurrency = new Map<string, number>();
     const dividendsByCurrency = new Map<string, number>();
 
-    for (const row of displayHoldings) {
+    for (const row of allDisplayHoldings) {
       capitalByCurrency.set(row.currency, (capitalByCurrency.get(row.currency) ?? 0) + row.totalCost);
       dividendsByCurrency.set(row.currency, (dividendsByCurrency.get(row.currency) ?? 0) + row.dividends);
       if (row.currentValue !== null) {
@@ -744,7 +791,7 @@ export default function HomePage() {
       plByCurrency,
       dividendsByCurrency,
     };
-  }, [displayHoldings]);
+  }, [allDisplayHoldings]);
 
   const categoryBreakdowns = useMemo(() => {
     const breakdowns = new Map<string, {
@@ -761,7 +808,7 @@ export default function HomePage() {
     }>();
 
     categories.forEach(category => {
-      const categoryHoldings = displayHoldings.filter(h => h.category === category);
+      const categoryHoldings = allDisplayHoldings.filter(h => h.category === category);
       
       if (categoryHoldings.length === 0) {
         return;
@@ -808,7 +855,7 @@ export default function HomePage() {
     });
 
     return breakdowns;
-  }, [displayHoldings, transactions, currentYear]);
+  }, [allDisplayHoldings, transactions, currentYear]);
 
   const symbols = useMemo(() => new Set(displayHoldings.map((h) => h.symbol)), [displayHoldings]);
 
@@ -831,6 +878,13 @@ export default function HomePage() {
       return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
     });
   }, [displayHoldings, sortField, sortDirection]);
+
+  const paginatedHoldings = useMemo(() => {
+    const start = (holdingsPage - 1) * ITEMS_PER_PAGE;
+    return sortedHoldings.slice(start, start + ITEMS_PER_PAGE);
+  }, [sortedHoldings, holdingsPage]);
+
+  const totalPages = Math.ceil(sortedHoldings.length / ITEMS_PER_PAGE);
 
   const handleSort = (field: string) => {
     if (sortField === field) {
@@ -1156,17 +1210,17 @@ function formatLastUpdate(date: Date | null) {
   );
   
   const topGainer = useMemo(
-    () => displayHoldings.reduce((top, holding) => 
+    () => allDisplayHoldings.reduce((top, holding) => 
       (holding.plPct !== null && (top === null || (holding.plPct > (top.plPct ?? -Infinity)))) ? holding : top
     , null as typeof displayHoldings[0] | null),
-    [displayHoldings]
+    [allDisplayHoldings]
   );
   
   const topLoser = useMemo(
-    () => displayHoldings.reduce((bottom, holding) => 
+    () => allDisplayHoldings.reduce((bottom, holding) => 
       (holding.plPct !== null && (bottom === null || (holding.plPct < (bottom.plPct ?? Infinity)))) ? holding : bottom
     , null as typeof displayHoldings[0] | null),
-    [displayHoldings]
+    [allDisplayHoldings]
   );
 
   return (
@@ -1548,7 +1602,7 @@ function formatLastUpdate(date: Date | null) {
                 </tr>
               </thead>
               <tbody>
-                {sortedHoldings.map((row) => {
+                {paginatedHoldings.map((row) => {
                   const plClass = row.pl && row.pl !== 0 ? (row.pl > 0 ? 'positive' : 'negative') : 'neutral';
 
                   return (
@@ -1616,7 +1670,7 @@ function formatLastUpdate(date: Date | null) {
           </div>
         ) : (
           <div className="holdings-grid">
-            {sortedHoldings.map((row) => {
+            {paginatedHoldings.map((row) => {
               const plClass = row.pl && row.pl !== 0 ? (row.pl > 0 ? 'positive' : 'negative') : 'neutral';
 
               return (
@@ -1687,6 +1741,24 @@ function formatLastUpdate(date: Date | null) {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {totalPages > 1 && (
+          <div className="pagination-controls">
+            <button 
+              onClick={() => setHoldingsPage(p => Math.max(1, p - 1))}
+              disabled={holdingsPage === 1}
+            >
+              Previous
+            </button>
+            <span>Page {holdingsPage} of {totalPages}</span>
+            <button 
+              onClick={() => setHoldingsPage(p => Math.min(totalPages, p + 1))}
+              disabled={holdingsPage === totalPages}
+            >
+              Next
+            </button>
           </div>
         )}
       </section>

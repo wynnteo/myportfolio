@@ -1579,20 +1579,21 @@ th.sortable:hover {
 
 /* Action cell - always right aligned */
 .action-cell {
-  text-align: right;
-  padding-right: 16px !important;
+  text-align: center;
+  padding: 10px 8px !important;
 }
 
 .view-btn {
-  padding: 8px 16px;
+  padding: 6px 12px;
   background: var(--primary-color);
   color: #ffffff;
   border: none;
-  border-radius: 8px;
+  border-radius: 6px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   transition: all 0.15s ease;
+  min-width: 70px;
 }
 
 .view-btn:hover {
@@ -2892,4 +2893,19 @@ textarea:focus-visible {
   .holding-card {
     break-inside: avoid;
   }
+}
+
+.pagination-controls {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  margin-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.pagination-controls button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
