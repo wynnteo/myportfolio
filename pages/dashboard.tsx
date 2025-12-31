@@ -409,7 +409,7 @@ export default function HomePage() {
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
   const [holdingsPage, setHoldingsPage] = useState(1);
   const [transactionsPage, setTransactionsPage] = useState(1);
-  const ITEMS_PER_PAGE = 10;
+  const ITEMS_PER_PAGE = 6;
 
   async function loadTransactions() {
     try {
