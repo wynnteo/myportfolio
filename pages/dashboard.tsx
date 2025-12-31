@@ -549,13 +549,6 @@ export default function HomePage() {
     });
   }, [allHoldings, brokerFilter, currencyFilter, categoryFilter]);
 
-  const ytdDividends = useMemo(
-    () => transactions
-      .filter(tx => tx.type === 'DIVIDEND' && tx.trade_date && new Date(tx.trade_date).getFullYear() === dividendYearFilter)
-      .reduce((sum, tx) => sum + (tx.dividend_amount ?? 0), 0),
-    [transactions, dividendYearFilter]
-  );
-
   useEffect(() => {
     async function fetchQuotesForHoldings() {
       const allSymbols = Array.from(new Set(holdings.map((h) => h.symbol))).filter(Boolean) as string[];
@@ -1219,6 +1212,7 @@ function formatLastUpdate(date: Date | null) {
       .reduce((sum, tx) => sum + (tx.dividend_amount ?? 0), 0),
     [transactions, currentYear]
   );
+  
   const ytdYield = useMemo(
     () => (totalCapital !== 0 ? (ytdDividends / totalCapital) * 100 : 0),
     [ytdDividends, totalCapital]
