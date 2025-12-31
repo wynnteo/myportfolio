@@ -538,6 +538,8 @@ export default function HomePage() {
     return Array.from(map.values());
   }, [transactions]);
 
+  const currentYear = new Date().getFullYear();
+
   const holdings = useMemo(() => {
     return allHoldings.filter((row) => {
       const brokerOk = brokerFilter === 'All' || row.broker === brokerFilter;
@@ -546,14 +548,6 @@ export default function HomePage() {
       return brokerOk && currencyOk && categoryOk;
     });
   }, [allHoldings, brokerFilter, currencyFilter, categoryFilter]);
-
-  const yearOptions = useMemo(() => {
-    const years = [];
-    for (let i = 0; i < 6; i++) {
-      years.push(currentYear - i);
-    }
-    return years;
-  }, [currentYear]);
 
   const ytdDividends = useMemo(
     () => transactions
@@ -657,8 +651,13 @@ export default function HomePage() {
     return () => clearInterval(intervalId);
   }, [holdings]);
 
-
-  const currentYear = new Date().getFullYear();
+  const yearOptions = useMemo(() => {
+    const years = [];
+    for (let i = 0; i < 6; i++) {
+      years.push(currentYear - i);
+    }
+    return years;
+  }, [currentYear]);
 
   const allDisplayHoldings = useMemo(() => {
     return allHoldings.map((row) => {
