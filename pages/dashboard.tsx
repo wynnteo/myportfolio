@@ -221,7 +221,7 @@ function AssetAllocationChart({
   );
 }
 
-function MonthlyDividendsChart({ transactions }: { transactions: Transaction[] }) {
+function MonthlyDividendsChart({ transactions, year }: { transactions: Transaction[]; year: number }) {
   const currentYear = new Date().getFullYear();
   
   const monthlyData = useMemo(() => {
@@ -229,7 +229,7 @@ function MonthlyDividendsChart({ transactions }: { transactions: Transaction[] }
     const data = months.map((name, index) => ({ month: name, value: 0, index }));
     
     transactions
-      .filter(tx => tx.type === 'DIVIDEND' && tx.trade_date && new Date(tx.trade_date).getFullYear() === currentYear)
+      .filter(tx => tx.type === 'DIVIDEND' && tx.trade_date && new Date(tx.trade_date).getFullYear() === year)
       .forEach(tx => {
         const month = new Date(tx.trade_date!).getMonth();
         data[month].value += tx.dividend_amount ?? 0;
@@ -240,7 +240,7 @@ function MonthlyDividendsChart({ transactions }: { transactions: Transaction[] }
   
   return (
     <div className="chart-card">
-      <div className="chart-header">Monthly Dividends ({currentYear})</div>
+      <div className="chart-header">Monthly Dividends ({year})</div>
       <ResponsiveContainer width="100%" height={250}>
         <BarChart data={monthlyData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -409,6 +409,7 @@ export default function HomePage() {
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
   const [holdingsPage, setHoldingsPage] = useState(1);
   const [transactionsPage, setTransactionsPage] = useState(1);
+  const [dividendYearFilter, setDividendYearFilter] = useState<number>(new Date().getFullYear());
   const ITEMS_PER_PAGE = 6;
 
   async function loadTransactions() {
@@ -545,6 +546,21 @@ export default function HomePage() {
       return brokerOk && currencyOk && categoryOk;
     });
   }, [allHoldings, brokerFilter, currencyFilter, categoryFilter]);
+
+  const yearOptions = useMemo(() => {
+    const years = [];
+    for (let i = 0; i < 6; i++) {
+      years.push(currentYear - i);
+    }
+    return years;
+  }, [currentYear]);
+
+  const ytdDividends = useMemo(
+    () => transactions
+      .filter(tx => tx.type === 'DIVIDEND' && tx.trade_date && new Date(tx.trade_date).getFullYear() === dividendYearFilter)
+      .reduce((sum, tx) => sum + (tx.dividend_amount ?? 0), 0),
+    [transactions, dividendYearFilter]
+  );
 
   useEffect(() => {
     async function fetchQuotesForHoldings() {
@@ -1301,14 +1317,35 @@ function formatLastUpdate(date: Date | null) {
             <div className="stat-sub">{totalPlPct !== null && totalPlPct !== 0 ? `${totalPlPct > 0 ? '+' : ''}${totalPlPct.toFixed(2)}%` : '—'}</div>
           </div>
           <div className="summary-card">
-            <div className="stat-title">Dividends ({currentYear})</div>
+            <div className="stat-title">
+              Dividends
+              <select 
+                value={dividendYearFilter} 
+                onChange={(e) => setDividendYearFilter(Number(e.target.value))}
+                style={{
+                  marginLeft: '8px',
+                  padding: '2px 6px',
+                  fontSize: '11px',
+                  border: '1px solid #cbd5e1',
+                  borderRadius: '4px',
+                  background: '#ffffff',
+                  fontWeight: 600,
+                  color: '#475569',
+                  cursor: 'pointer'
+                }}
+              >
+                {yearOptions.map(year => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+            </div>
             <div className="stat-value">{formatPrice(ytdDividends, 'SGD', 2)}</div>
             <div className="stat-sub">{ytdYield > 0 ? `${ytdYield.toFixed(2)}% yield` : 'Total: ' + formatPrice(totalDividends, 'SGD', 2)}</div>
           </div>
         </div>
         <div className="chart-grid-two-col">
           <AssetAllocationChart data={allocations.byCategory} />
-          <MonthlyDividendsChart transactions={transactions} />
+          <MonthlyDividendsChart transactions={transactions} year={dividendYearFilter} />
           {/*<PerformanceInsightsCard topGainer={topGainer} topLoser={topLoser} />*/}
         </div>
       </section>

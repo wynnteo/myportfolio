@@ -4,7 +4,7 @@
   color: #0f172a;
   background: #ffffff;
   
-  --primary-color: #0f172a;
+  --primary-color: #00257c;
   --primary-hover: #1e293b;
   --primary-dark: #020617;
   --secondary-color: #334155;
@@ -1784,17 +1784,6 @@ th.sortable:hover {
   padding: 12px;
   background: #f1f5f9;
   border-radius: 8px;
-  border-left: 4px solid #64748b;
-}
-
-.holding-card-pl.positive {
-  background: linear-gradient(90deg, #ecfdf5 0%, #f0fdf4 100%);
-  border-left-color: #10b981;
-}
-
-.holding-card-pl.negative {
-  background: linear-gradient(90deg, #fef2f2 0%, #fef2f2 100%);
-  border-left-color: #ef4444;
 }
 
 .holding-pl-amount {
