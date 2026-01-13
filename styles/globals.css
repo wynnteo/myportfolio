@@ -494,8 +494,8 @@ th.sortable:hover {
   background: #fff;
   border-radius: 12px;
   padding: 16px;
-  width: min(1100px, 95vw);
-  max-height: 90vh;
+  width: min(1000px, 85vw);
+  max-height: 80vh;
   overflow: auto;
   box-shadow: 0 10px 30px rgba(15, 23, 42, 0.25);
 }
