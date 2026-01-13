@@ -1602,26 +1602,26 @@ function formatLastUpdate(date: Date | null) {
             <table className="holdings-table">
               <thead>
                 <tr>
-                  <th onClick={() => handleSort('symbol')} className="sortable">
-                    Symbol {sortField === 'symbol' && (sortDirection === 'asc' ? '↑' : '↓')}
-                  </th>
                   <th onClick={() => handleSort('category')} className="sortable">
                     Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
+                  <th onClick={() => handleSort('symbol')} className="sortable">
+                    Symbol {sortField === 'symbol' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th onClick={() => handleSort('quantity')} className="sortable" style={{textAlign: 'right'}}>
-                    Quantity {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th onClick={() => handleSort('averagePrice')} className="sortable">
-                    Net Avg Price {sortField === 'averagePrice' && (sortDirection === 'asc' ? '↑' : '↓')}
-                  </th>
-                  <th onClick={() => handleSort('currentPrice')} className="sortable">
-                    Market Price {sortField === 'currentPrice' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    #Units {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                   <th onClick={() => handleSort('totalCost')} className="sortable" style={{textAlign: 'right'}}>
                     Capital {sortField === 'totalCost' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
+                  <th onClick={() => handleSort('averagePrice')} className="sortable">
+                    Avg Cost {sortField === 'averagePrice' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
+                  <th onClick={() => handleSort('currentPrice')} className="sortable">
+                    Market Price {sortField === 'currentPrice' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </th>
                   <th onClick={() => handleSort('currentValue')} className="sortable" style={{textAlign: 'right'}}>
-                    Value {sortField === 'currentValue' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    Market Value {sortField === 'currentValue' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </th>
                   <th onClick={() => handleSort('plPct')} className="sortable" style={{textAlign: 'right'}}>
                     P&L {sortField === 'plPct' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -1636,6 +1636,15 @@ function formatLastUpdate(date: Date | null) {
                   return (
                     <tr key={row.key}>
                       <td>
+                        <div className="category-badge">
+                          <span
+                            className="category-dot-small"
+                            style={{ backgroundColor: getCategoryColor(row.category) }}
+                          />
+                          {row.category}
+                        </div>
+                      </td>
+                      <td>
                         <div className="symbol-cell">
                           <div className="symbol-main">{row.symbol}</div>
                           {row.productName && (
@@ -1645,26 +1654,17 @@ function formatLastUpdate(date: Date | null) {
                           )}
                         </div>
                       </td>
-                      <td>
-                        <div className="category-badge">
-                          <span
-                            className="category-dot-small"
-                            style={{ backgroundColor: getCategoryColor(row.category) }}
-                          />
-                          {row.category}
-                        </div>
-                      </td>
                       <td className="value-cell">
                         {formatQuantity(row.quantity)}
+                      </td>
+                      <td className="value-cell">
+                        {formatPrice(row.totalCost, row.currency, 2)}
                       </td>
                       <td className="value-cell">
                         {formatPriceWithoutCurrency(row.averagePrice, row.currency, 5)}
                       </td>
                       <td className="value-cell">
                         {formatPriceWithoutCurrency(row.currentPrice, row.currency, 5)}
-                      </td>
-                      <td className="value-cell">
-                        {formatPrice(row.totalCost, row.currency, 2)}
                       </td>
                       <td className="value-cell">
                         {row.currentValue !== null ? formatPrice(row.currentValue, row.currency, 2) : '-'}
