@@ -597,8 +597,7 @@ th.sortable:hover {
 }
 
 .pl-amount {
-  font-size: 20px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .stat-pl.positive .pl-amount {
@@ -1531,7 +1530,6 @@ th.sortable:hover {
 .value-cell {
   text-align: right;
   font-variant-numeric: tabular-nums;
-  font-weight: 600;
   color: var(--primary-dark);
 }
 
@@ -1737,7 +1735,7 @@ th.sortable:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* Card Values Section (Capital → Current) */
+/* Card Values Section (Capital â†’ Current) */
 .holding-card-values {
   display: flex;
   align-items: center;
@@ -2093,6 +2091,36 @@ th.sortable:hover {
   margin-bottom: 8px;
   color: var(--primary-dark);
 }
+
+.chart-header-with-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  color: var(--primary-dark);
+}
+
+.chart-action-btn {
+  padding: 4px 10px;
+  background: var(--primary-color);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.chart-action-btn:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(30, 64, 175, 0.2);
+}
+
 
 .pie-chart.empty {
   display: flex;

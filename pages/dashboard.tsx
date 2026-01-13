@@ -78,10 +78,10 @@ function getCurrencySymbol(currency: string) {
   const symbols: Record<string, string> = {
     SGD: 'S$',
     USD: '$',
-    EUR: '€',
-    GBP: '£',
-    JPY: '¥',
-    CNY: '¥',
+    EUR: 'â‚¬',
+    GBP: 'Â£',
+    JPY: 'Â¥',
+    CNY: 'Â¥',
     AUD: 'A$',
     MYR: 'RM',
   };
@@ -221,7 +221,15 @@ function AssetAllocationChart({
   );
 }
 
-function MonthlyDividendsChart({ transactions, year }: { transactions: Transaction[]; year: number }) {
+function MonthlyDividendsChart({ 
+  transactions, 
+  year, 
+  onViewDetails 
+}: { 
+  transactions: Transaction[]; 
+  year: number;
+  onViewDetails: () => void;
+}) {
   const monthlyData = useMemo(() => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const data = months.map((name, index) => ({ month: name, value: 0, index }));
@@ -238,7 +246,17 @@ function MonthlyDividendsChart({ transactions, year }: { transactions: Transacti
   
   return (
     <div className="chart-card">
-      <div className="chart-header">Monthly Dividends ({year})</div>
+      <div className="chart-header-with-action">
+        <span>Monthly Dividends ({year})</span>
+        <button 
+          type="button" 
+          className="chart-action-btn"
+          onClick={onViewDetails}
+          title="View all dividend transactions"
+        >
+          View Details
+        </button>
+      </div>
       <ResponsiveContainer width="100%" height={250}>
         <BarChart data={monthlyData}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -268,7 +286,7 @@ function PerformanceInsightsCard({ topGainer, topLoser }: { topGainer: HoldingRo
         <div className="insights-compact">
           {topGainer && topGainer.plPct !== null && topGainer.plPct > 0 && (
             <div className="insight-compact positive">
-              <div className="insight-compact-label">🔥 Top Performer</div>
+              <div className="insight-compact-label">ðŸ”¥ Top Performer</div>
               <div className="insight-compact-main">
                 <span className="insight-compact-symbol">{topGainer.symbol}</span>
                 <span className="insight-compact-value">+{topGainer.plPct.toFixed(2)}%</span>
@@ -282,7 +300,7 @@ function PerformanceInsightsCard({ topGainer, topLoser }: { topGainer: HoldingRo
           
           {topLoser && topLoser.plPct !== null && topLoser.plPct < 0 && (
             <div className="insight-compact negative">
-              <div className="insight-compact-label">📉 Worst Performer</div>
+              <div className="insight-compact-label">ðŸ“‰ Worst Performer</div>
               <div className="insight-compact-main">
                 <span className="insight-compact-symbol">{topLoser.symbol}</span>
                 <span className="insight-compact-value">{topLoser.plPct.toFixed(2)}%</span>
@@ -296,7 +314,7 @@ function PerformanceInsightsCard({ topGainer, topLoser }: { topGainer: HoldingRo
           
           {(!topGainer || topGainer.plPct === null || topGainer.plPct <= 0) && (!topLoser || topLoser.plPct === null || topLoser.plPct >= 0) && (
             <div className="insight-compact neutral">
-              <div className="insight-compact-label">📊 Portfolio Status</div>
+              <div className="insight-compact-label">ðŸ“Š Portfolio Status</div>
               <div className="insight-compact-summary">
                 <div>No significant gains or losses to display</div>
               </div>
@@ -408,6 +426,7 @@ export default function HomePage() {
   const [holdingsPage, setHoldingsPage] = useState(1);
   const [transactionsPage, setTransactionsPage] = useState(1);
   const [dividendYearFilter, setDividendYearFilter] = useState<number>(new Date().getFullYear());
+  const [showDividendDetailsModal, setShowDividendDetailsModal] = useState(false);
   const ITEMS_PER_PAGE = 6;
 
   async function loadTransactions() {
@@ -1230,12 +1249,22 @@ function formatLastUpdate(date: Date | null) {
     [allDisplayHoldings]
   );
 
+  const yearDividendTransactions = useMemo(() => {
+    return transactions
+      .filter(tx => 
+        tx.type === 'DIVIDEND' && 
+        tx.trade_date && 
+        new Date(tx.trade_date).getFullYear() === dividendYearFilter
+      )
+      .sort((a, b) => new Date(b.trade_date!).getTime() - new Date(a.trade_date!).getTime());
+  }, [transactions, dividendYearFilter]);
+
   return (
     <>
     <header className="site-header">
       <nav className="site-nav">
         <Link href="/" className="site-logo">
-          📊 Portfolio Tracker
+          ðŸ“Š Portfolio Tracker
         </Link>
         <div className="nav-menu">
           <Link href="/">Home</Link>
@@ -1273,7 +1302,7 @@ function formatLastUpdate(date: Date | null) {
                 disabled={loadingPrices}
                 title="Refresh live prices"
               >
-                <span className={`refresh-icon ${loadingPrices ? 'spinning' : ''}`}>↻</span>
+                <span className={`refresh-icon ${loadingPrices ? 'spinning' : ''}`}>â†»</span>
               </button>
             </div>
           )}
@@ -1295,7 +1324,7 @@ function formatLastUpdate(date: Date | null) {
           <div className="summary-card">
             <div className="stat-title">Invested capital</div>
             <div className="stat-value">{formatPrice(totalCapital, 'SGD', 2)}</div>
-            <div className="stat-sub">{displayHoldings.length} holdings · {allocations.byCurrency.length} currencies</div>
+            <div className="stat-sub">{displayHoldings.length} holdings Â· {allocations.byCurrency.length} currencies</div>
           </div>
           <div className="summary-card">
             <div className="stat-title">Current value</div>
@@ -1305,7 +1334,7 @@ function formatLastUpdate(date: Date | null) {
           <div className={`summary-card ${totalPl > 0 ? 'profit' : totalPl < 0 ? 'loss' : ''}`}>
             <div className="stat-title">Total Unrealised P/L</div>
             <div className="stat-value">{formatPrice(totalPl, 'SGD', 2)}</div>
-            <div className="stat-sub">{totalPlPct !== null && totalPlPct !== 0 ? `${totalPlPct > 0 ? '+' : ''}${totalPlPct.toFixed(2)}%` : '—'}</div>
+            <div className="stat-sub">{totalPlPct !== null && totalPlPct !== 0 ? `${totalPlPct > 0 ? '+' : ''}${totalPlPct.toFixed(2)}%` : 'â€”'}</div>
           </div>
           <div className="summary-card">
             <div className="stat-title">
@@ -1336,7 +1365,11 @@ function formatLastUpdate(date: Date | null) {
         </div>
         <div className="chart-grid-two-col">
           <AssetAllocationChart data={allocations.byCategory} />
-          <MonthlyDividendsChart transactions={transactions} year={dividendYearFilter} />
+          <MonthlyDividendsChart 
+            transactions={transactions} 
+            year={dividendYearFilter}
+            onViewDetails={() => setShowDividendDetailsModal(true)}
+          />
           {/*<PerformanceInsightsCard topGainer={topGainer} topLoser={topLoser} />*/}
         </div>
       </section>
@@ -1437,7 +1470,7 @@ function formatLastUpdate(date: Date | null) {
                   <div className="category-performers">
                     {breakdown.topGainer && breakdown.topGainer.plPct !== null && breakdown.topGainer.plPct > 0 && (
                       <div className="category-performer positive">
-                        <span className="performer-icon">↑</span>
+                        <span className="performer-icon">â†‘</span>
                         <div className="performer-info">
                           <div className="performer-symbol">{breakdown.topGainer.symbol}</div>
                           {breakdown.topGainer.productName && (
@@ -1449,7 +1482,7 @@ function formatLastUpdate(date: Date | null) {
                     )}
                     {breakdown.topLoser && breakdown.topLoser.plPct !== null && breakdown.topLoser.plPct < 0 && (
                       <div className="category-performer negative">
-                        <span className="performer-icon">↓</span>
+                        <span className="performer-icon">â†“</span>
                         <div className="performer-info">
                           <div className="performer-symbol">{breakdown.topLoser.symbol}</div>
                           {breakdown.topLoser.productName && (
@@ -1558,14 +1591,14 @@ function formatLastUpdate(date: Date | null) {
                 onClick={() => setViewMode('grid')}
                 title="Grid view"
               >
-                <span>◫</span>
+                <span>â—«</span>
               </button>
               <button 
                 className={`view-toggle-btn ${viewMode === 'table' ? 'active' : ''}`}
                 onClick={() => setViewMode('table')}
                 title="Table view"
               >
-                <span>☰</span>
+                <span>â˜°</span>
               </button>
             </div>
             <div className="filters">
@@ -1603,28 +1636,28 @@ function formatLastUpdate(date: Date | null) {
               <thead>
                 <tr>
                   <th onClick={() => handleSort('category')} className="sortable">
-                    Category {sortField === 'category' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    Category {sortField === 'category' && (sortDirection === 'asc' ? 'â†‘' : 'â†“')}
                   </th>
                   <th onClick={() => handleSort('symbol')} className="sortable">
-                    Symbol {sortField === 'symbol' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    Symbol {sortField === 'symbol' && (sortDirection === 'asc' ? 'â†‘' : 'â†“')}
                   </th>
                   <th onClick={() => handleSort('quantity')} className="sortable" style={{textAlign: 'right'}}>
-                    #Units {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    #Units {sortField === 'quantity' && (sortDirection === 'asc' ? 'â†‘' : 'â†“')}
                   </th>
                   <th onClick={() => handleSort('totalCost')} className="sortable" style={{textAlign: 'right'}}>
-                    Capital {sortField === 'totalCost' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    Capital {sortField === 'totalCost' && (sortDirection === 'asc' ? 'â†‘' : 'â†“')}
                   </th>
                   <th onClick={() => handleSort('averagePrice')} className="sortable">
-                    Avg Cost {sortField === 'averagePrice' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    Avg Cost {sortField === 'averagePrice' && (sortDirection === 'asc' ? 'â†‘' : 'â†“')}
                   </th>
                   <th onClick={() => handleSort('currentPrice')} className="sortable">
-                    Market Price {sortField === 'currentPrice' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    Market Price {sortField === 'currentPrice' && (sortDirection === 'asc' ? 'â†‘' : 'â†“')}
                   </th>
                   <th onClick={() => handleSort('currentValue')} className="sortable" style={{textAlign: 'right'}}>
-                    Market Value {sortField === 'currentValue' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    Market Value {sortField === 'currentValue' && (sortDirection === 'asc' ? 'â†‘' : 'â†“')}
                   </th>
                   <th onClick={() => handleSort('plPct')} className="sortable" style={{textAlign: 'right'}}>
-                    P&L {sortField === 'plPct' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    P&L {sortField === 'plPct' && (sortDirection === 'asc' ? 'â†‘' : 'â†“')}
                   </th>
                   <th style={{textAlign: 'right'}}>Actions</th>
                 </tr>
@@ -1739,7 +1772,7 @@ function formatLastUpdate(date: Date | null) {
                       <span className="holding-value-label">Capital</span>
                       <span className="holding-value-amount">{formatPrice(row.totalCost, row.currency, 2)}</span>
                     </div>
-                    <div className="holding-value-divider">→</div>
+                    <div className="holding-value-divider">â†’</div>
                     <div className="holding-value-item">
                       <span className="holding-value-label">Current</span>
                       <span className="holding-value-amount">
@@ -1797,7 +1830,7 @@ function formatLastUpdate(date: Date | null) {
             <div className="modal-header">
               <div>
                 <div className="modal-title">
-                  {selectedHolding.symbol} · {selectedHolding.productName}
+                  {selectedHolding.symbol} Â· {selectedHolding.productName}
                 </div>
                 <div className="modal-meta">
                   <span>Broker: {selectedHolding.broker}</span>
@@ -1817,7 +1850,7 @@ function formatLastUpdate(date: Date | null) {
                     <div className="stat-label-inline">Capital</div>
                     <div className="stat-value-inline">{formatPrice(selectedHolding.totalCost, selectedHolding.currency, 2)}</div>
                   </div>
-                  <div className="stat-divider">→</div>
+                  <div className="stat-divider">â†’</div>
                   <div className="stat-group">
                     <div className="stat-label-inline">Current</div>
                     <div className="stat-value-inline">{formatPrice(selectedHolding.currentValue ?? 0, selectedHolding.currency, 2)}</div>
@@ -1833,7 +1866,7 @@ function formatLastUpdate(date: Date | null) {
 
               <div className="modal-stat-card">
                 <div className="stat-card-header">
-                  <span className="stat-icon">💰</span>
+                  <span className="stat-icon">ðŸ’°</span>
                   <span className="stat-card-title">Dividends</span>
                 </div>
                 <div className="stat-dual">
@@ -1863,7 +1896,7 @@ function formatLastUpdate(date: Date | null) {
               
               {selectedHoldingTransactions.length === 0 ? (
                 <div className="dividend-empty-state">
-                  <div className="dividend-empty-icon">📊</div>
+                  <div className="dividend-empty-icon">ðŸ“Š</div>
                   <p className="dividend-empty-text">No transactions yet</p>
                 </div>
               ) : (
@@ -2059,7 +2092,7 @@ function formatLastUpdate(date: Date | null) {
               
               {selectedHoldingDividends.length === 0 ? (
                 <div className="dividend-empty-state">
-                  <div className="dividend-empty-icon">💵</div>
+                  <div className="dividend-empty-icon">ðŸ’µ</div>
                   <p className="dividend-empty-text">No dividends recorded yet</p>
                 </div>
               ) : (
@@ -2152,6 +2185,86 @@ function formatLastUpdate(date: Date | null) {
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Dividend Details Modal */}
+      {showDividendDetailsModal && (
+        <div className="modal-backdrop" role="dialog" aria-modal="true">
+          <div className="modal">
+            <div className="modal-header">
+              <div>
+                <div className="modal-title">
+                  Dividend Transactions - {dividendYearFilter}
+                </div>
+                <div className="modal-meta">
+                  <span>Total: {formatPrice(
+                    yearDividendTransactions.reduce((sum, tx) => sum + (tx.dividend_amount ?? 0), 0),
+                    'SGD',
+                    2
+                  )}</span>
+                  <span>{yearDividendTransactions.length} transaction{yearDividendTransactions.length !== 1 ? 's' : ''}</span>
+                </div>
+              </div>
+              <button type="button" className="ghost" onClick={() => setShowDividendDetailsModal(false)}>
+                Close
+              </button>
+            </div>
+
+            {yearDividendTransactions.length === 0 ? (
+              <div className="dividend-empty-state">
+                <div className="dividend-empty-icon">💵</div>
+                <p className="dividend-empty-text">No dividend transactions in {dividendYearFilter}</p>
+              </div>
+            ) : (
+              <div className="table-wrapper">
+                <table className="modal-transaction-table">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Symbol</th>
+                      <th>Product Name</th>
+                      <th>Broker</th>
+                      <th>Amount</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {yearDividendTransactions.map((tx) => (
+                      <tr key={tx.id}>
+                        <td>{tx.trade_date ?? '-'}</td>
+                        <td>
+                          <span style={{fontWeight: 700, color: 'var(--primary-dark)'}}>
+                            {tx.symbol}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{fontSize: '12px', color: '#64748b'}}>
+                            {tx.product_name || '-'}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{fontSize: '12px'}}>
+                            {tx.broker}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{fontWeight: 700, color: '#059669'}}>
+                            {formatPrice(tx.dividend_amount ?? 0, tx.currency, 2)}
+                          </span>
+                        </td>
+                        <td>
+                          <span style={{color: '#64748b', fontSize: '12px'}}>
+                            {tx.notes || '-'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
