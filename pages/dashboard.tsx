@@ -670,7 +670,9 @@ export default function HomePage() {
   }, [currentYear]);
 
   const allDisplayHoldings = useMemo(() => {
-    return allHoldings.map((row) => {
+    return allHoldings
+      .filter(row => row.quantity > 0.0001)
+      .map((row) => {
       const quote = quotes[row.symbol];
 
       const currentPrice = quote ? quote.price : row.currentPrice;
@@ -711,7 +713,9 @@ export default function HomePage() {
   }, [allHoldings, quotes, transactions]);
 
   const displayHoldings = useMemo(() => {
-    return holdings.map((row) => {
+    return holdings
+      .filter(row => row.quantity > 0.0001) 
+      .map((row) => {
       const quote = quotes[row.symbol];
 
       const currentPrice = quote ? quote.price : row.currentPrice;
@@ -1675,12 +1679,10 @@ function formatLastUpdate(date: Date | null) {
                       </td>
                       <td>
                         <div className="symbol-cell">
-                          <div className="symbol-main">{row.symbol}</div>
-                          {row.productName && (
-                            <div className="symbol-product" title={row.productName}>
-                              {row.productName}
-                            </div>
-                          )}
+                          <div className="symbol-main">{row.productName}</div>
+                          <div className="symbol-product" title={row.symbol}>
+                            {row.symbol}
+                          </div>
                         </div>
                       </td>
                       <td className="value-cell">
@@ -1734,7 +1736,7 @@ function formatLastUpdate(date: Date | null) {
                 <div key={row.key} className="holding-card">
                   <div className="holding-card-header">
                     <div className="holding-card-title">
-                      <span className="holding-symbol">{row.symbol}</span>
+                      <span className="holding-symbol">{row.productName}</span>
                       <div className="category-badge-small">
                         <span
                           className="category-dot-small"
@@ -1743,9 +1745,7 @@ function formatLastUpdate(date: Date | null) {
                         <span>{row.category}</span>
                       </div>
                     </div>
-                    {row.productName && (
-                      <div className="holding-product-name">{row.productName}</div>
-                    )}
+                    <div className="holding-product-name">{row.symbol}</div>
                   </div>
 
                   <div className="holding-card-stats">

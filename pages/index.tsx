@@ -15,11 +15,14 @@ export default function LandingPage() {
             {user ? (
               <>
                 <Link href="/dashboard">Dashboard</Link>
+                <Link href="/calculator">Calculator</Link>
                 <Link href="/referrals">Referrals</Link>
+
                 <button onClick={() => void logout()}>Logout</button>
               </>
             ) : (
               <>
+                <Link href="/calculator">Calculator</Link>
                 <Link href="/referrals">Referrals</Link>
                 <Link href="/login">Login</Link>
                 <Link href="/register" className="nav-primary">Get Started</Link>

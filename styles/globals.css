@@ -1682,7 +1682,7 @@ th.sortable:hover {
 }
 
 .holding-symbol {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 800;
   color: var(--primary-dark);
 }
@@ -2929,4 +2929,1204 @@ textarea:focus-visible {
 .pagination-controls button:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+
+/* ==================== CALCULATOR PAGE STYLES ==================== */
+.calculator-tabs {
+  display: flex;
+  gap: 8px;
+  padding: 16px;
+  background: #f8fafc;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+}
+
+.calc-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 20px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 100px;
+  white-space: nowrap;
+}
+
+.calc-tab:hover {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+}
+
+.calc-tab.active {
+  background: var(--primary-color);
+  color: #ffffff;
+  border-color: var(--primary-color);
+  box-shadow: 0 2px 8px rgba(30, 64, 175, 0.2);
+}
+
+.calc-tab-icon {
+  font-size: 24px;
+}
+
+.calc-tab span:last-child {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.calculator-content {
+  min-height: 400px;
+}
+
+.calculator-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.calc-header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.calc-header h2 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  color: var(--primary-dark);
+}
+
+.calc-description {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0;
+}
+
+.calc-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.calc-section {
+  background: #f8fafc;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.calc-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #475569;
+  margin: 0 0 12px 0;
+}
+
+.calc-input-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.calc-input-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.calc-input-grid input {
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.calc-input-grid input:focus {
+  outline: none;
+  border-color: var(--secondary-color);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.calc-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  padding-top: 8px;
+}
+
+.calc-submit {
+  background: var(--primary-color);
+  color: #ffffff;
+  padding: 12px 32px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 140px;
+}
+
+.calc-submit:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+}
+
+.calc-reset {
+  background: #ffffff;
+  color: #64748b;
+  padding: 12px 32px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 140px;
+}
+
+.calc-reset:hover {
+  background: #f8fafc;
+  color: var(--primary-dark);
+  border-color: #94a3b8;
+}
+
+.calc-result {
+  margin-top: 24px;
+  padding: 20px;
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.calc-result.profit {
+  background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+  border-color: #86efac;
+}
+
+.calc-result.loss {
+  background: linear-gradient(135deg, #fef2f2 0%, #fef2f2 100%);
+  border-color: #fca5a5;
+}
+
+.result-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.result-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--primary-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.result-value.large {
+  font-size: 36px;
+}
+
+.calc-result.profit .result-value {
+  color: #059669;
+}
+
+.calc-result.loss .result-value {
+  color: #dc2626;
+}
+
+.result-note {
+  margin-top: 12px;
+  font-size: 14px;
+  color: #475569;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+}
+
+.result-item {
+  background: #ffffff;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  text-align: center;
+}
+
+.result-item.highlight {
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  border: 2px solid var(--secondary-color);
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
+.calc-result.profit .result-item.highlight {
+  background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+  border-color: #10b981;
+}
+
+.calc-result.loss .result-item.highlight {
+  background: linear-gradient(135deg, #fef2f2 0%, #fef2f2 100%);
+  border-color: #ef4444;
+}
+
+.result-pct {
+  margin-top: 8px;
+  font-size: 18px;
+  font-weight: 700;
+  padding: 6px 12px;
+  background: #f1f5f9;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.calc-result.profit .result-pct {
+  background: #059669;
+  color: #ffffff;
+}
+
+.calc-result.loss .result-pct {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+/* ==================== CALCULATOR PAGE STYLES ==================== */
+.calculator-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: #f8fafc;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  overflow-x: auto;
+  border: 1px solid #e2e8f0;
+}
+
+.calc-tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748b;
+}
+
+.calc-tab:hover {
+  background: rgba(255, 255, 255, 0.6);
+  color: #475569;
+}
+
+.calc-tab.active {
+  background: #ffffff;
+  color: var(--primary-dark);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
+}
+
+.calculator-content {
+  min-height: 400px;
+}
+
+.calculator-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.calc-header {
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.calc-header h2 {
+  font-size: 24px;
+  font-weight: 700;
+  margin: 0 0 8px 0;
+  color: var(--primary-dark);
+}
+
+.calc-description {
+  font-size: 14px;
+  color: #64748b;
+  margin: 0;
+}
+
+.calc-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.calc-section {
+  background: #f8fafc;
+  padding: 16px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.calc-section-title {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #475569;
+  margin: 0 0 12px 0;
+}
+
+.calc-input-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.calc-input-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.calc-input-grid input {
+  padding: 10px 12px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 14px;
+  background: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.calc-input-grid input:focus {
+  outline: none;
+  border-color: var(--secondary-color);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.calc-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  padding-top: 8px;
+}
+
+.calc-submit {
+  background: var(--primary-color);
+  color: #ffffff;
+  padding: 12px 32px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 140px;
+}
+
+.calc-submit:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(30, 64, 175, 0.3);
+}
+
+.calc-reset {
+  background: #ffffff;
+  color: #64748b;
+  padding: 12px 32px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-weight: 600;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 140px;
+}
+
+.calc-reset:hover {
+  background: #f8fafc;
+  color: var(--primary-dark);
+  border-color: #94a3b8;
+}
+
+.calc-result {
+  margin-top: 24px;
+  padding: 24px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.calc-result.profit {
+  border-left: 3px solid #10b981;
+  background: #ffffff;
+}
+
+.calc-result.loss {
+  border-left: 3px solid #ef4444;
+  background: #ffffff;
+}
+
+.result-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.result-value {
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--primary-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.result-value.large {
+  font-size: 40px;
+}
+
+.calc-result.profit .result-value {
+  color: #059669;
+}
+
+.calc-result.loss .result-value {
+  color: #dc2626;
+}
+
+.result-note {
+  margin-top: 12px;
+  font-size: 13px;
+  color: #64748b;
+  padding-top: 12px;
+  border-top: 1px solid #f1f5f9;
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 20px;
+}
+
+.result-item {
+  background: #fafafa;
+  padding: 16px;
+  border-radius: 6px;
+  border: 1px solid #f1f5f9;
+}
+
+.result-item.highlight {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+}
+
+.calc-result.profit .result-item.highlight {
+  background: #ffffff;
+  border-left: 3px solid #10b981;
+}
+
+.calc-result.loss .result-item.highlight {
+  background: #ffffff;
+  border-left: 3px solid #ef4444;
+}
+
+.result-pct {
+  margin-top: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.calc-result.profit .result-pct {
+  color: #059669;
+}
+
+.calc-result.loss .result-pct {
+  color: #dc2626;
+}
+
+/* ==================== CALCULATOR MOBILE RESPONSIVE ==================== */
+@media (max-width: 768px) {
+  .calculator-tabs {
+    padding: 12px;
+    gap: 6px;
+  }
+  
+  .calc-tab {
+    min-width: 80px;
+    padding: 10px 12px;
+  }
+  
+  .calc-tab-icon {
+    font-size: 20px;
+  }
+  
+  .calc-tab span:last-child {
+    font-size: 11px;
+  }
+  
+  .calculator-card {
+    padding: 16px;
+  }
+  
+  .calc-header h2 {
+    font-size: 20px;
+  }
+  
+  .calc-input-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .calc-actions {
+    flex-direction: column;
+  }
+  
+  .calc-submit,
+  .calc-reset {
+    width: 100%;
+  }
+  
+  .result-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .result-value {
+    font-size: 24px;
+  }
+  
+  .result-value.large {
+    font-size: 32px;
+  }
+}
+
+@media (max-width: 480px) {
+  .calc-tab {
+    min-width: 70px;
+    padding: 8px 10px;
+    gap: 4px;
+  }
+  
+  .calc-tab-icon {
+    font-size: 18px;
+  }
+  
+  .calc-tab span:last-child {
+    font-size: 10px;
+  }
+  
+  .calc-header h2 {
+    font-size: 18px;
+  }
+  
+  .calc-description {
+    font-size: 13px;
+  }
+}
+
+/* ==================== TRANSACTION HISTORY PAGE STYLES ==================== */
+.transaction-view-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: #f8fafc;
+  border-radius: 8px;
+  margin-bottom: 24px;
+  border: 1px solid #e2e8f0;
+  overflow-x: auto;
+}
+
+.trans-tab {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 20px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  font-size: 14px;
+  font-weight: 500;
+  color: #64748b;
+  white-space: nowrap;
+}
+
+.trans-tab:hover {
+  background: rgba(255, 255, 255, 0.6);
+  color: #475569;
+}
+
+.trans-tab.active {
+  background: #ffffff;
+  color: var(--primary-dark);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
+}
+
+.trans-tab span:first-child {
+  font-size: 14px;
+}
+
+.trans-tab-count {
+  position: static;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  min-width: 24px;
+  text-align: center;
+}
+
+.trans-tab.active .trans-tab-count {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.transaction-filters {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.transaction-filters select {
+  padding: 10px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 180px;
+}
+
+.transaction-filters select:hover {
+  border-color: #94a3b8;
+}
+
+.transaction-filters select:focus {
+  outline: none;
+  border-color: var(--secondary-color);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.loading-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #64748b;
+  font-size: 16px;
+}
+
+/* Transaction List Section */
+.transaction-list-section {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.transaction-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.transaction-table thead {
+  background: #f8fafc;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.transaction-table th {
+  padding: 12px 10px;
+  text-align: left;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #475569;
+}
+
+.transaction-table tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.15s ease;
+}
+
+.transaction-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.transaction-table td {
+  padding: 14px 10px;
+  vertical-align: middle;
+}
+
+.type-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.type-badge.buy {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.type-badge.sell {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.type-badge.dividend {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.symbol-cell {
+  font-weight: 700;
+  color: var(--primary-dark);
+}
+
+.product-cell {
+  color: #64748b;
+  font-size: 12px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notes-cell {
+  color: #64748b;
+  font-size: 12px;
+  font-style: italic;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Closed Positions Section */
+.closed-positions-section {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.total-realized {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 16px 20px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  min-width: 200px;
+}
+
+.total-realized.profit {
+  background: #ffffff;
+  border-left: 3px solid #10b981;
+}
+
+.total-realized.loss {
+  background: #ffffff;
+  border-left: 3px solid #ef4444;
+}
+
+.total-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.total-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary-dark);
+  margin-bottom: 4px;
+}
+
+.total-realized.profit .total-value {
+  color: #059669;
+}
+
+.total-realized.loss .total-value {
+  color: #dc2626;
+}
+
+.total-pct {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.total-realized.profit .total-pct {
+  color: #059669;
+}
+
+.total-realized.loss .total-pct {
+  color: #dc2626;
+}
+
+.closed-positions-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.closed-positions-table thead {
+  background: #f8fafc;
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.closed-positions-table th {
+  padding: 12px 10px;
+  text-align: left;
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #475569;
+}
+
+.closed-positions-table tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+  transition: background-color 0.15s ease;
+}
+
+.closed-positions-table tbody tr:hover {
+  background: #f8fafc;
+}
+
+.closed-positions-table td {
+  padding: 14px 10px;
+  vertical-align: middle;
+}
+
+.pl-display {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.pl-display .pl-amount {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.pl-display.profit .pl-amount {
+  color: #059669;
+}
+
+.pl-display.loss .pl-amount {
+  color: #dc2626;
+}
+
+.pl-display .pl-pct {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.pl-display.profit .pl-pct {
+  color: #059669;
+}
+
+.pl-display.loss .pl-pct {
+  color: #dc2626;
+}
+
+/* Trade Summary Section */
+.trade-summary-section {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.summary-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  transition: all 0.2s ease;
+}
+
+.summary-card:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+  transform: translateY(-2px);
+}
+
+.summary-card.closed {
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  border-color: #94a3b8;
+}
+
+.summary-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.summary-symbol {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--primary-dark);
+}
+
+.closed-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 3px 8px;
+  background: #f1f5f9;
+  color: #64748b;
+  border-radius: 4px;
+}
+
+.summary-product {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.summary-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 11px;
+  color: #64748b;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.summary-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+}
+
+.stat-row.highlight {
+  background: #f8fafc;
+  padding: 8px;
+  border-radius: 6px;
+  margin: 4px 0;
+}
+
+.stat-label {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.stat-value {
+  font-weight: 700;
+  color: var(--primary-dark);
+}
+
+.summary-pl {
+  padding: 12px;
+  border-radius: 6px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fafafa;
+  border: 1px solid #f1f5f9;
+}
+
+.summary-pl.profit {
+  background: #ffffff;
+  border-left: 3px solid #10b981;
+}
+
+.summary-pl.loss {
+  background: #ffffff;
+  border-left: 3px solid #ef4444;
+}
+
+.pl-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  font-weight: 600;
+}
+
+.summary-pl .pl-value {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.summary-pl.profit .pl-value {
+  color: #059669;
+}
+
+.summary-pl.loss .pl-value {
+  color: #dc2626;
+}
+
+.summary-pl .pl-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+}
+
+.summary-pl.profit .pl-badge {
+  color: #059669;
+}
+
+.summary-pl.loss .pl-badge {
+  color: #dc2626;
+}
+
+/* ==================== TRANSACTION HISTORY MOBILE RESPONSIVE ==================== */
+@media (max-width: 768px) {
+  .transaction-view-tabs {
+    padding: 12px;
+    gap: 8px;
+  }
+  
+  .trans-tab {
+    min-width: 120px;
+    padding: 12px 16px;
+  }
+  
+  .trans-tab-icon {
+    font-size: 24px;
+  }
+  
+  .trans-tab span:nth-child(2) {
+    font-size: 12px;
+  }
+  
+  .transaction-filters {
+    flex-direction: column;
+  }
+  
+  .transaction-filters select {
+    width: 100%;
+  }
+  
+  .section-title {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+  
+  .total-realized {
+    width: 100%;
+    align-items: flex-start;
+  }
+  
+  .table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .transaction-table,
+  .closed-positions-table {
+    min-width: 800px;
+  }
+  
+  .summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .trans-tab {
+    min-width: 100px;
+    padding: 10px 12px;
+  }
+  
+  .trans-tab-icon {
+    font-size: 20px;
+  }
+  
+  .trans-tab span:nth-child(2) {
+    font-size: 11px;
+  }
+  
+  .trans-tab-count {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+  
+  .total-value {
+    font-size: 20px;
+  }
+  
+  .total-pct {
+    font-size: 12px;
+  }
 }
