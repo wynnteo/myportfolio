@@ -42,6 +42,21 @@ interface TradeAnalysis {
   isClosed: boolean;
 }
 
+interface TransactionFormState {
+  symbol?: string;
+  productName?: string;
+  category?: string;
+  broker?: string;
+  currency?: string;
+  type?: Transaction['type'];
+  quantity?: string;
+  price?: string;
+  commission?: string;
+  dividendAmount?: string;
+  tradeDate?: string;
+  notes?: string;
+}
+
 const brokers = ['All', 'Moo Moo', 'CMC Invest', 'OCBC', 'DBS', 'HSBC', 'POEMS', 'FSMOne', 'IBKR', 'Other'];
 const categories = ['All', 'Unit Trusts', 'Stocks', 'ETF', 'Bond', 'Cash', 'Crypto', 'Other'];
 
@@ -56,6 +71,13 @@ function formatQuantity(value: number) {
   return value.toFixed(4).replace(/\.?0+$/, '');
 }
 
+function parseInputNumber(value?: string) {
+  if (value === undefined) return undefined;
+  if (value.trim() === '') return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
 export default function TransactionHistoryPage() {
   const router = useRouter();
   const { user, loading: authLoading, logout } = useAuth();
@@ -65,6 +87,9 @@ export default function TransactionHistoryPage() {
   const [brokerFilter, setBrokerFilter] = useState('All');
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'BUY' | 'SELL' | 'DIVIDEND'>('ALL');
+  const [editingTransactionId, setEditingTransactionId] = useState<string | null>(null);
+  const [editForm, setEditForm] = useState<TransactionFormState>({});
+  const [actionMessage, setActionMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -91,6 +116,122 @@ export default function TransactionHistoryPage() {
     } finally {
       setLoading(false);
     }
+  }
+
+  function startEditing(tx: Transaction) {
+    setEditingTransactionId(tx.id);
+    setActionMessage(null);
+    
+    if (tx.type === 'DIVIDEND') {
+      setEditForm({
+        symbol: tx.symbol,
+        productName: tx.product_name,
+        category: tx.category,
+        broker: tx.broker,
+        currency: tx.currency,
+        type: tx.type,
+        dividendAmount: tx.dividend_amount !== null ? tx.dividend_amount.toString() : '',
+        tradeDate: tx.trade_date ?? '',
+        notes: tx.notes ?? '',
+      });
+    } else {
+      setEditForm({
+        symbol: tx.symbol,
+        productName: tx.product_name,
+        category: tx.category,
+        broker: tx.broker,
+        currency: tx.currency,
+        type: tx.type,
+        quantity: tx.quantity !== null ? Math.abs(tx.quantity).toString() : '',
+        price: tx.price !== null ? tx.price.toString() : '',
+        commission: tx.commission !== null ? tx.commission.toString() : '',
+        tradeDate: tx.trade_date ?? '',
+        notes: tx.notes ?? '',
+      });
+    }
+  }
+
+  function cancelEditing() {
+    setEditingTransactionId(null);
+    setEditForm({});
+    setActionMessage(null);
+  }
+
+  async function saveEdit() {
+    if (!editingTransactionId) return;
+    const original = transactions.find((tx) => tx.id === editingTransactionId);
+    if (!original) return;
+
+    const payload: any = {
+      id: editingTransactionId,
+      symbol: editForm.symbol ?? original.symbol,
+      productName: editForm.productName ?? original.product_name,
+      category: editForm.category ?? original.category,
+      broker: editForm.broker ?? original.broker,
+      currency: editForm.currency ?? original.currency,
+      type: (editForm.type as Transaction['type']) ?? original.type,
+      tradeDate: editForm.tradeDate ?? original.trade_date ?? undefined,
+      notes: editForm.notes ?? original.notes ?? undefined,
+    };
+
+    if (original.type === 'DIVIDEND') {
+      payload.dividendAmount = parseInputNumber(editForm.dividendAmount) ?? original.dividend_amount ?? undefined;
+      payload.quantity = undefined;
+      payload.price = undefined;
+      payload.commission = 0;
+    } else {
+      payload.quantity = parseInputNumber(editForm.quantity) ?? Math.abs(original.quantity ?? 0);
+      payload.price = parseInputNumber(editForm.price) ?? original.price ?? undefined;
+      payload.commission = parseInputNumber(editForm.commission) ?? original.commission ?? 0;
+      payload.dividendAmount = undefined;
+    }
+
+    const response = await fetchWithAuth('/api/transactions', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      setActionMessage((error as any)?.error ?? 'Failed to update transaction');
+      return;
+    }
+
+    setActionMessage('Transaction updated successfully.');
+    setEditingTransactionId(null);
+    setEditForm({});
+    await loadTransactions();
+    
+    // Clear success message after 3 seconds
+    setTimeout(() => setActionMessage(null), 3000);
+  }
+
+  async function deleteTransaction(id: string) {
+    const confirmed = window.confirm('Are you sure you want to delete this transaction?');
+    if (!confirmed) return;
+
+    const response = await fetchWithAuth(`/api/transactions?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      setActionMessage((error as any)?.error ?? 'Failed to delete transaction');
+      return;
+    }
+
+    setActionMessage('Transaction deleted successfully.');
+    if (editingTransactionId === id) {
+      setEditingTransactionId(null);
+      setEditForm({});
+    }
+    await loadTransactions();
+    
+    // Clear success message after 3 seconds
+    setTimeout(() => setActionMessage(null), 3000);
   }
 
   // Analyze trades by symbol to calculate realized P/L
@@ -207,6 +348,19 @@ export default function TransactionHistoryPage() {
           <p>Track all your buy, sell, and dividend transactions</p>
         </div>
 
+        {actionMessage && (
+          <div className="helper-text success" style={{ 
+            padding: '12px 16px', 
+            background: '#dcfce7', 
+            color: '#166534',
+            borderRadius: '8px',
+            marginBottom: '16px',
+            fontWeight: 600
+          }}>
+            {actionMessage}
+          </div>
+        )}
+
         {/* View Mode Tabs */}
         <div className="transaction-view-tabs">
           <button
@@ -277,38 +431,181 @@ export default function TransactionHistoryPage() {
                         <th style={{textAlign: 'right'}}>Commission</th>
                         <th style={{textAlign: 'right'}}>Total Value</th>
                         <th>Notes</th>
+                        <th className="actions-header">Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredTransactions.map(tx => {
+                        const isEditing = editingTransactionId === tx.id;
                         const totalValue = tx.type === 'DIVIDEND' 
                           ? (tx.dividend_amount || 0)
                           : ((Math.abs(tx.quantity || 0) * (tx.price || 0)) + (tx.commission || 0));
                         
                         return (
                           <tr key={tx.id}>
-                            <td>{tx.trade_date || tx.created_at.split('T')[0]}</td>
                             <td>
-                              <span className={`type-badge ${tx.type.toLowerCase()}`}>
-                                {tx.type}
-                              </span>
+                              {isEditing ? (
+                                <input
+                                  type="date"
+                                  value={editForm.tradeDate ?? tx.trade_date ?? ''}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, tradeDate: e.target.value }))}
+                                  style={{ width: '100%', fontSize: '12px' }}
+                                />
+                              ) : (
+                                tx.trade_date || tx.created_at.split('T')[0]
+                              )}
                             </td>
-                            <td className="symbol-cell">{tx.symbol}</td>
-                            <td className="product-cell">{tx.product_name || '-'}</td>
-                            <td>{tx.broker}</td>
-                            <td style={{textAlign: 'right'}}>
-                              {tx.type !== 'DIVIDEND' ? formatQuantity(Math.abs(tx.quantity || 0)) : '-'}
+                            <td>
+                              {isEditing && tx.type !== 'DIVIDEND' ? (
+                                <select
+                                  value={(editForm.type as Transaction['type']) ?? tx.type}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, type: e.target.value as Transaction['type'] }))}
+                                  style={{ width: '100%', fontSize: '12px' }}
+                                >
+                                  <option value="BUY">BUY</option>
+                                  <option value="SELL">SELL</option>
+                                </select>
+                              ) : (
+                                <span className={`type-badge ${tx.type.toLowerCase()}`}>
+                                  {tx.type}
+                                </span>
+                              )}
+                            </td>
+                            <td className="symbol-cell">
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={editForm.symbol ?? tx.symbol}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, symbol: e.target.value }))}
+                                  style={{ width: '100%', fontSize: '12px' }}
+                                />
+                              ) : (
+                                tx.symbol
+                              )}
+                            </td>
+                            <td className="product-cell">
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={editForm.productName ?? tx.product_name ?? ''}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, productName: e.target.value }))}
+                                  style={{ width: '100%', fontSize: '12px' }}
+                                />
+                              ) : (
+                                tx.product_name || '-'
+                              )}
+                            </td>
+                            <td>
+                              {isEditing ? (
+                                <select
+                                  value={editForm.broker ?? tx.broker}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, broker: e.target.value }))}
+                                  style={{ width: '100%', fontSize: '12px' }}
+                                >
+                                  {brokers.filter(b => b !== 'All').map(br => (
+                                    <option key={br} value={br}>{br}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                tx.broker
+                              )}
                             </td>
                             <td style={{textAlign: 'right'}}>
-                              {tx.price !== null && tx.type !== 'DIVIDEND' ? formatCurrency(tx.price, tx.currency) : '-'}
+                              {isEditing && tx.type !== 'DIVIDEND' ? (
+                                <input
+                                  type="number"
+                                  step="0.0001"
+                                  value={editForm.quantity ?? (tx.quantity !== null ? Math.abs(tx.quantity) : '')}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, quantity: e.target.value }))}
+                                  style={{ width: '100%', fontSize: '12px', textAlign: 'right' }}
+                                />
+                              ) : tx.type !== 'DIVIDEND' ? (
+                                formatQuantity(Math.abs(tx.quantity || 0))
+                              ) : (
+                                '-'
+                              )}
                             </td>
                             <td style={{textAlign: 'right'}}>
-                              {tx.commission !== null && tx.type !== 'DIVIDEND' ? formatCurrency(tx.commission, tx.currency) : '-'}
+                              {isEditing && tx.type !== 'DIVIDEND' ? (
+                                <input
+                                  type="number"
+                                  step="0.00001"
+                                  value={editForm.price ?? (tx.price ?? '')}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, price: e.target.value }))}
+                                  style={{ width: '100%', fontSize: '12px', textAlign: 'right' }}
+                                />
+                              ) : tx.price !== null && tx.type !== 'DIVIDEND' ? (
+                                formatCurrency(tx.price, tx.currency)
+                              ) : (
+                                '-'
+                              )}
+                            </td>
+                            <td style={{textAlign: 'right'}}>
+                              {isEditing && tx.type !== 'DIVIDEND' ? (
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={editForm.commission ?? (tx.commission ?? '')}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, commission: e.target.value }))}
+                                  style={{ width: '100%', fontSize: '12px', textAlign: 'right' }}
+                                />
+                              ) : tx.commission !== null && tx.type !== 'DIVIDEND' ? (
+                                formatCurrency(tx.commission, tx.currency)
+                              ) : (
+                                '-'
+                              )}
                             </td>
                             <td style={{textAlign: 'right', fontWeight: 700}}>
-                              {formatCurrency(totalValue, tx.currency)}
+                              {isEditing && tx.type === 'DIVIDEND' ? (
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={editForm.dividendAmount ?? (tx.dividend_amount ?? '')}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, dividendAmount: e.target.value }))}
+                                  style={{ width: '100%', fontSize: '12px', textAlign: 'right' }}
+                                />
+                              ) : (
+                                formatCurrency(totalValue, tx.currency)
+                              )}
                             </td>
-                            <td className="notes-cell">{tx.notes || '-'}</td>
+                            <td className="notes-cell">
+                              {isEditing ? (
+                                <input
+                                  type="text"
+                                  value={editForm.notes ?? (tx.notes ?? '')}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, notes: e.target.value }))}
+                                  placeholder="Optional"
+                                  style={{ width: '100%', fontSize: '12px' }}
+                                />
+                              ) : (
+                                tx.notes || '-'
+                              )}
+                            </td>
+                            <td className="actions-cell">
+                              {isEditing ? (
+                                <div className="modal-action-buttons">
+                                  <button type="button" className="save-btn" onClick={() => void saveEdit()}>
+                                    Save
+                                  </button>
+                                  <button type="button" className="cancel-btn" onClick={() => cancelEditing()}>
+                                    Cancel
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="modal-action-buttons">
+                                  <button type="button" className="edit-btn" onClick={() => startEditing(tx)}>
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="delete-btn"
+                                    onClick={() => void deleteTransaction(tx.id)}
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </td>
                           </tr>
                         );
                       })}
