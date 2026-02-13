@@ -20,6 +20,7 @@ export default function CalculatorPage() {
             {user ? (
               <>
                 <Link href="/dashboard">Dashboard</Link>
+                <Link href="/transactions">Transactions</Link>
                 <Link href="/calculator">Calculator</Link>
                 <Link href="/referrals">Referrals</Link>
                 <button onClick={() => void logout()}>Logout</button>
