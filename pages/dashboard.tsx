@@ -275,7 +275,7 @@ function MonthlyDividendsChart({
 
 function CategoryPieTooltip({ active, payload }: any) {
   if (!active || !payload || !payload.length) return null;
-  const { name, value, total } = payload[0].payload;
+  const { product, value, total } = payload[0].payload;
   const pct = total > 0 ? (value / total) * 100 : 0;
   return (
     <div style={{
@@ -1413,6 +1413,7 @@ function formatLastUpdate(date: Date | null) {
             const categoryChartData = categoryHoldings
               .map(h => ({
                 name: h.symbol,
+                product: h.productName,
                 value: h.totalCost,
                 total: categoryTotal,
               }))
