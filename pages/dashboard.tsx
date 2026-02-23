@@ -287,7 +287,7 @@ function CategoryPieTooltip({ active, payload }: any) {
       boxShadow: '0 4px 12px rgba(15,23,42,0.12)',
       minWidth: '140px',
     }}>
-      <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>{name}</div>
+      <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>{product}</div>
       <div style={{ color: '#475569', marginBottom: '2px' }}>{formatPrice(value, 'SGD', 2)}</div>
       <div style={{ fontWeight: 700, color: '#64748b' }}>{pct.toFixed(1)}%</div>
     </div>
