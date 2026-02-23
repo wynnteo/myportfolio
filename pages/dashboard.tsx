@@ -273,6 +273,27 @@ function MonthlyDividendsChart({
   );
 }
 
+function CategoryPieTooltip({ active, payload }: any) {
+  if (!active || !payload || !payload.length) return null;
+  const { name, value, total } = payload[0].payload;
+  const pct = total > 0 ? (value / total) * 100 : 0;
+  return (
+    <div style={{
+      background: '#ffffff',
+      border: '1px solid #e2e8f0',
+      borderRadius: '8px',
+      padding: '8px 12px',
+      fontSize: '12px',
+      boxShadow: '0 4px 12px rgba(15,23,42,0.12)',
+      minWidth: '140px',
+    }}>
+      <div style={{ fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}>{name}</div>
+      <div style={{ color: '#475569', marginBottom: '2px' }}>{formatPrice(value, 'SGD', 2)}</div>
+      <div style={{ fontWeight: 700, color: '#64748b' }}>{pct.toFixed(1)}%</div>
+    </div>
+  );
+}
+
 function PerformanceInsightsCard({ topGainer, topLoser }: { topGainer: HoldingRow | null; topLoser: HoldingRow | null }) {
   return (
     <div className="chart-card performance-insights-card">
@@ -1388,10 +1409,12 @@ function formatLastUpdate(date: Date | null) {
           {Array.from(categoryBreakdowns.entries()).map(([category, breakdown]) => {
             // Get holdings for this category and prepare chart data
             const categoryHoldings = displayHoldings.filter(h => h.category === category);
+            const categoryTotal = categoryHoldings.reduce((s, h) => s + h.totalCost, 0);
             const categoryChartData = categoryHoldings
               .map(h => ({
                 name: h.symbol,
                 value: h.totalCost,
+                total: categoryTotal,
               }))
               .sort((a, b) => b.value - a.value)
               //.slice(0, 5); // Top 5 holdings
@@ -1409,8 +1432,7 @@ function formatLastUpdate(date: Date | null) {
                   <span className="category-compact-title">{category}</span>
                   <span className="category-compact-count">{breakdown.holdingsCount}</span>
                 </div>
-                
-                {/* Mini donut chart showing top 5 holdings */}
+
                 {categoryChartData.length > 0 && (
                   <div className="category-mini-chart">
                     <ResponsiveContainer width="100%" height={120}>
@@ -1428,10 +1450,11 @@ function formatLastUpdate(date: Date | null) {
                             <Cell key={`cell-${index}`} fill={EXTENDED_COLORS[index % EXTENDED_COLORS.length]} />
                           ))}
                         </Pie>
-                        <Tooltip 
+                        {/*<Tooltip 
                           formatter={(value: number) => formatPrice(value, 'SGD', 2)}
                           contentStyle={{ fontSize: '11px', padding: '4px 8px' }}
-                        />
+                        />*/}
+                        <Tooltip content={<CategoryPieTooltip />} />
                       </RechartsPieChart>
                     </ResponsiveContainer>
                   </div>
