@@ -4130,3 +4130,458 @@ textarea:focus-visible {
     font-size: 12px;
   }
 }
+
+
+/* ==================== INSIGHTS PAGE STYLES ==================== */
+/* Add these styles to the end of your styles/globals.css file */
+
+.insights-controls {
+  display: flex;
+  gap: 20px;
+  align-items: flex-end;
+  margin-bottom: 32px;
+  padding: 20px;
+  background: #f8fafc;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+}
+
+.year-selector-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.selector-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+}
+
+.year-selector {
+  padding: 10px 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 150px;
+}
+
+.year-selector:hover {
+  border-color: #94a3b8;
+}
+
+.year-selector:focus {
+  outline: none;
+  border-color: var(--secondary-color);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Overview Section */
+.insights-overview-section {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.insights-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.insight-overview-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  transition: all 0.2s ease;
+}
+
+.insight-overview-card:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+  transform: translateY(-2px);
+}
+
+.insight-overview-card.highlight-dividends {
+  background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+  border-left: 4px solid #10b981;
+}
+
+.insight-overview-card.highlight-return {
+  background: linear-gradient(135deg, #dbeafe 0%, #eff6ff 100%);
+  border-left: 4px solid var(--primary-color);
+}
+
+.overview-icon {
+  font-size: 32px;
+  line-height: 1;
+}
+
+.overview-label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  font-weight: 700;
+}
+
+.overview-value {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--primary-dark);
+  line-height: 1.2;
+}
+
+.overview-value.positive {
+  color: #059669;
+}
+
+.overview-value.negative {
+  color: #dc2626;
+}
+
+.overview-sub {
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.return-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  background: #f1f5f9;
+}
+
+.return-badge.positive {
+  background: #059669;
+  color: #ffffff;
+}
+
+.return-badge.negative {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+/* Category Breakdown Section */
+.insights-category-section {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.insights-category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.insight-category-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+  transition: all 0.2s ease;
+}
+
+.insight-category-card:hover {
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+  transform: translateY(-2px);
+}
+
+.category-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+.category-color-indicator {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.category-card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--primary-dark);
+}
+
+.category-metrics {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.metric-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  padding: 6px 0;
+}
+
+.metric-row.highlight-row {
+  background: linear-gradient(90deg, #ecfdf5 0%, #f0fdf4 100%);
+  padding: 8px 12px;
+  margin: 0 -12px;
+  border-radius: 6px;
+}
+
+.metric-row.total-row {
+  padding-top: 12px;
+  margin-top: 8px;
+  border-top: 1px solid #e2e8f0;
+  font-weight: 700;
+}
+
+.metric-label {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.metric-value {
+  font-weight: 700;
+  color: var(--primary-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-value.positive {
+  color: #059669;
+}
+
+.metric-value.negative {
+  color: #dc2626;
+}
+
+.return-pct-badge-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+.return-pct-badge {
+  display: inline-block;
+  padding: 6px 14px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  background: #f1f5f9;
+}
+
+.return-pct-badge.positive {
+  background: #059669;
+  color: #ffffff;
+}
+
+.return-pct-badge.negative {
+  background: #dc2626;
+  color: #ffffff;
+}
+
+/* Year Comparison Section */
+.insights-comparison-section {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
+}
+
+.comparison-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.comparison-card {
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+
+.comparison-metric {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  font-weight: 700;
+  text-align: center;
+}
+
+.comparison-values {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.comparison-value-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+}
+
+.comparison-year {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.comparison-amount {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--primary-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.comparison-amount.positive {
+  color: #059669;
+}
+
+.comparison-amount.negative {
+  color: #dc2626;
+}
+
+.comparison-divider {
+  font-size: 14px;
+  font-weight: 600;
+  color: #cbd5e1;
+}
+
+.comparison-diff {
+  text-align: center;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: #475569;
+  border: 1px solid #e2e8f0;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.empty-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+  opacity: 0.5;
+}
+
+.empty-state p {
+  font-size: 16px;
+  color: #64748b;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* ==================== INSIGHTS PAGE MOBILE RESPONSIVE ==================== */
+@media (max-width: 768px) {
+  .insights-controls {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 16px;
+  }
+
+  .year-selector-group {
+    width: 100%;
+  }
+
+  .year-selector {
+    width: 100%;
+  }
+
+  .insights-overview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .insights-category-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .comparison-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .comparison-values {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .comparison-divider {
+    transform: rotate(90deg);
+  }
+
+  .overview-value {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .insights-overview-section,
+  .insights-category-section,
+  .insights-comparison-section {
+    padding: 16px;
+  }
+
+  .insight-overview-card,
+  .insight-category-card,
+  .comparison-card {
+    padding: 16px;
+  }
+
+  .overview-icon {
+    font-size: 28px;
+  }
+
+  .overview-value {
+    font-size: 20px;
+  }
+
+  .category-card-title {
+    font-size: 14px;
+  }
+
+  .comparison-amount {
+    font-size: 16px;
+  }
+}
