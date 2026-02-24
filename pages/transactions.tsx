@@ -472,7 +472,7 @@ export default function TransactionHistoryPage() {
                                 </span>
                               )}
                             </td>
-                            <td className="symbol-cell">
+                            <td className="">
                               {isEditing ? (
                                 <input
                                   type="text"

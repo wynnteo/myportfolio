@@ -4205,7 +4205,7 @@ textarea:focus-visible {
   padding: 20px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
   transition: all 0.2s ease;
 }
@@ -4225,17 +4225,13 @@ textarea:focus-visible {
   border-left: 4px solid var(--primary-color);
 }
 
-.overview-icon {
-  font-size: 32px;
-  line-height: 1;
-}
-
 .overview-label {
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: #64748b;
   font-weight: 700;
+  order: 1;
 }
 
 .overview-value {
@@ -4243,6 +4239,7 @@ textarea:focus-visible {
   font-weight: 800;
   color: var(--primary-dark);
   line-height: 1.2;
+  order: 2;
 }
 
 .overview-value.positive {
@@ -4257,6 +4254,7 @@ textarea:focus-visible {
   font-size: 13px;
   color: #64748b;
   font-weight: 500;
+  order: 3;
 }
 
 .return-badge {
@@ -4501,12 +4499,6 @@ textarea:focus-visible {
   border-radius: 12px;
 }
 
-.empty-icon {
-  font-size: 64px;
-  margin-bottom: 16px;
-  opacity: 0.5;
-}
-
 .empty-state p {
   font-size: 16px;
   color: #64748b;
@@ -4567,10 +4559,6 @@ textarea:focus-visible {
   .insight-category-card,
   .comparison-card {
     padding: 16px;
-  }
-
-  .overview-icon {
-    font-size: 28px;
   }
 
   .overview-value {
