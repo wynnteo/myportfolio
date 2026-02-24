@@ -1295,6 +1295,7 @@ function formatLastUpdate(date: Date | null) {
           <Link href="/">Home</Link>
           <Link href="/dashboard">Dashboard</Link>
           <Link href="/transactions">Transactions</Link>
+          <Link href="/insights">Insights</Link>
           <Link href="/calculator">Calculator</Link>
           <Link href="/referrals">Referrals</Link>
           <button onClick={() => void logout()}>Logout</button>
