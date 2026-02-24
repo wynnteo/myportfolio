@@ -23,6 +23,15 @@ interface Transaction {
   created_at: string;
 }
 
+interface CategoryData {
+  invested: number;
+  dividends: number;
+  realizedPL: number;
+  dividendYield: number;
+  totalReturn: number;
+  returnPct: number;
+}
+
 interface YearInsight {
   year: number;
   totalInvested: number;
@@ -30,16 +39,7 @@ interface YearInsight {
   totalRealizedPL: number;
   totalReturn: number;
   returnPct: number;
-  categories: {
-    [category: string]: {
-      invested: number;
-      dividends: number;
-      realizedPL: number;
-      dividendYield: number;
-      totalReturn: number;
-      returnPct: number;
-    };
-  };
+  categories: Record<string, CategoryData>;
 }
 
 const categories = ['Unit Trusts', 'Stocks', 'ETF', 'Bond', 'Cash', 'Crypto', 'Other'];
@@ -98,51 +98,90 @@ export default function InsightsPage() {
 
   // Calculate insights by year
   const yearInsights = useMemo(() => {
-    const insights: { [year: number]: YearInsight } = {};
+    const insights: Record<number, YearInsight> = {};
 
-    // Group by symbol+broker to track realized P/L
-    const positionsByYear: {
-      [year: number]: {
-        [key: string]: {
-          category: string;
-          totalBought: number;
-          totalSold: number;
-          totalBuyCost: number;
-          totalSellValue: number;
-        };
-      };
-    } = {};
+    // First, build a complete view of all positions across all time
+    interface GlobalPosition {
+      category: string;
+      totalBought: number;
+      totalBuyCost: number;
+      buys: Array<{ year: number; quantity: number; cost: number }>;
+      sells: Array<{ year: number; quantity: number; value: number }>;
+    }
 
+    const globalPositions: Record<string, GlobalPosition> = {};
+
+    // Collect all buys and sells
     transactions.forEach((tx) => {
-      const year = new Date(tx.trade_date || tx.created_at).getFullYear();
+      if (tx.type !== 'BUY' && tx.type !== 'SELL') return;
+      
       const key = `${tx.symbol}__${tx.broker}`;
+      const year = new Date(tx.trade_date || tx.created_at).getFullYear();
 
-      if (!positionsByYear[year]) {
-        positionsByYear[year] = {};
-      }
-
-      if (!positionsByYear[year][key]) {
-        positionsByYear[year][key] = {
+      if (!globalPositions[key]) {
+        globalPositions[key] = {
           category: tx.category,
           totalBought: 0,
-          totalSold: 0,
           totalBuyCost: 0,
-          totalSellValue: 0,
+          buys: [],
+          sells: [],
         };
       }
 
-      const position = positionsByYear[year][key];
+      const position = globalPositions[key];
 
       if (tx.type === 'BUY' && tx.quantity && tx.price !== null) {
-        position.totalBought += tx.quantity;
-        position.totalBuyCost += tx.quantity * tx.price + (tx.commission || 0);
+        const qty = tx.quantity;
+        const cost = qty * tx.price + (tx.commission || 0);
+        position.totalBought += qty;
+        position.totalBuyCost += cost;
+        position.buys.push({ year, quantity: qty, cost });
       } else if (tx.type === 'SELL' && tx.quantity && tx.price !== null) {
-        position.totalSold += Math.abs(tx.quantity);
-        position.totalSellValue += Math.abs(tx.quantity) * tx.price - (tx.commission || 0);
+        const qty = Math.abs(tx.quantity);
+        const value = qty * tx.price - (tx.commission || 0);
+        position.sells.push({ year, quantity: qty, value });
       }
     });
 
-    // Calculate insights for each year
+    // Calculate realized P/L for each year based on sells in that year
+    Object.values(globalPositions).forEach((position) => {
+      if (position.totalBought === 0) return;
+      
+      const avgBuyPrice = position.totalBuyCost / position.totalBought;
+
+      position.sells.forEach((sell) => {
+        if (!insights[sell.year]) {
+          insights[sell.year] = {
+            year: sell.year,
+            totalInvested: 0,
+            totalDividends: 0,
+            totalRealizedPL: 0,
+            totalReturn: 0,
+            returnPct: 0,
+            categories: {} as Record<string, CategoryData>,
+          };
+        }
+
+        if (!insights[sell.year].categories[position.category]) {
+          insights[sell.year].categories[position.category] = {
+            invested: 0,
+            dividends: 0,
+            realizedPL: 0,
+            dividendYield: 0,
+            totalReturn: 0,
+            returnPct: 0,
+          };
+        }
+
+        const soldCost = sell.quantity * avgBuyPrice;
+        const realizedPL = sell.value - soldCost;
+        
+        insights[sell.year].totalRealizedPL += realizedPL;
+        insights[sell.year].categories[position.category].realizedPL += realizedPL;
+      });
+    });
+
+    // Calculate insights for investments and dividends per year
     transactions.forEach((tx) => {
       const year = new Date(tx.trade_date || tx.created_at).getFullYear();
 
@@ -154,7 +193,7 @@ export default function InsightsPage() {
           totalRealizedPL: 0,
           totalReturn: 0,
           returnPct: 0,
-          categories: {},
+          categories: {} as Record<string, CategoryData>,
         };
       }
 
@@ -186,25 +225,6 @@ export default function InsightsPage() {
         yearData.totalDividends += tx.dividend_amount;
         categoryData.dividends += tx.dividend_amount;
       }
-    });
-
-    // Calculate realized P/L for each year
-    Object.entries(positionsByYear).forEach(([yearStr, positions]) => {
-      const year = parseInt(yearStr);
-      const yearData = insights[year];
-
-      Object.values(positions).forEach((position) => {
-        if (position.totalSold > 0 && position.totalBought > 0) {
-          const avgBuyPrice = position.totalBuyCost / position.totalBought;
-          const soldCost = position.totalSold * avgBuyPrice;
-          const realizedPL = position.totalSellValue - soldCost;
-
-          yearData.totalRealizedPL += realizedPL;
-          if (yearData.categories[position.category]) {
-            yearData.categories[position.category].realizedPL += realizedPL;
-          }
-        }
-      });
     });
 
     // Calculate returns
@@ -322,14 +342,12 @@ export default function InsightsPage() {
 
               <div className="insights-overview-grid">
                 <div className="insight-overview-card">
-                  <div className="overview-icon">💰</div>
                   <div className="overview-label">Total Invested</div>
                   <div className="overview-value">{formatCurrency(selectedYearData.totalInvested)}</div>
                   <div className="overview-sub">Capital deployed in {selectedYear}</div>
                 </div>
 
                 <div className="insight-overview-card highlight-dividends">
-                  <div className="overview-icon">💵</div>
                   <div className="overview-label">Dividends Collected</div>
                   <div className="overview-value positive">
                     {formatCurrency(selectedYearData.totalDividends)}
@@ -342,7 +360,6 @@ export default function InsightsPage() {
                 </div>
 
                 <div className="insight-overview-card">
-                  <div className="overview-icon">📊</div>
                   <div className="overview-label">Realized P/L</div>
                   <div className={`overview-value ${selectedYearData.totalRealizedPL >= 0 ? 'positive' : 'negative'}`}>
                     {formatCurrency(selectedYearData.totalRealizedPL)}
@@ -351,7 +368,6 @@ export default function InsightsPage() {
                 </div>
 
                 <div className="insight-overview-card highlight-return">
-                  <div className="overview-icon">🎯</div>
                   <div className="overview-label">Total Return</div>
                   <div className={`overview-value ${selectedYearData.totalReturn >= 0 ? 'positive' : 'negative'}`}>
                     {formatCurrency(selectedYearData.totalReturn)}
@@ -538,7 +554,6 @@ export default function InsightsPage() {
 
         {!selectedYearData && (
           <div className="empty-state">
-            <div className="empty-icon">📊</div>
             <p>No transaction data available for {selectedYear}</p>
           </div>
         )}
@@ -546,6 +561,3 @@ export default function InsightsPage() {
     </>
   );
 }
-
-
-
