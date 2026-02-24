@@ -61,7 +61,7 @@ function getClient(): Client {
 async function getUserIdFromToken(token: string, client: Client): Promise<string | null> {
   try {
     const result = await client.execute(
-      'SELECT user_id FROM sessions WHERE token = ? AND datetime(expires_at) > datetime("now");',
+      'SELECT user_id FROM sessions WHERE token = ?;',
       [token]
     );
     

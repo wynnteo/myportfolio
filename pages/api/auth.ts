@@ -96,7 +96,7 @@ function generateToken(): string {
 function getExpiryDate(hours: number = 24): string {
   const date = new Date();
   date.setHours(date.getHours() + hours);
-  return date.toISOString();
+  return date.toISOString().replace('T', ' ').slice(0, 19);
 }
 
 export default async function handler(
