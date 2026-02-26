@@ -227,56 +227,59 @@ export default function InsightsPage() {
       }
     });
 
-    // Calculate accumulated capital by year for dividend yield calculation
+    // Calculate accumulated capital INCLUDING each year (for dividend yield calculation)
     const accumulatedCapitalByYear: Record<number, number> = {};
     const accumulatedCapitalByCategoryYear: Record<string, Record<number, number>> = {};
     
     // Sort years to process chronologically
     const sortedYears = Object.keys(insights).map(Number).sort((a, b) => a - b);
     
+    let runningTotal = 0;
+    const runningCategoryTotals: Record<string, number> = {};
+    
     sortedYears.forEach((year) => {
       const yearData = insights[year];
       
-      // Calculate accumulated total capital
-      const prevYearTotal = year > sortedYears[0] ? (accumulatedCapitalByYear[year - 1] || 0) : 0;
-      accumulatedCapitalByYear[year] = prevYearTotal + yearData.totalInvested;
+      // Add this year's investments to running total
+      runningTotal += yearData.totalInvested;
       
-      // Calculate accumulated capital by category
+      // Store accumulated capital INCLUDING this year
+      accumulatedCapitalByYear[year] = runningTotal;
+      
+      // Same for each category
       Object.keys(yearData.categories).forEach((category) => {
+        if (!runningCategoryTotals[category]) {
+          runningCategoryTotals[category] = 0;
+        }
+        runningCategoryTotals[category] += yearData.categories[category].invested;
+        
         if (!accumulatedCapitalByCategoryYear[category]) {
           accumulatedCapitalByCategoryYear[category] = {};
         }
-        
-        const prevYearCategoryTotal = year > sortedYears[0] 
-          ? (accumulatedCapitalByCategoryYear[category][year - 1] || 0) 
-          : 0;
-        
-        accumulatedCapitalByCategoryYear[category][year] = 
-          prevYearCategoryTotal + yearData.categories[category].invested;
+        accumulatedCapitalByCategoryYear[category][year] = runningCategoryTotals[category];
       });
     });
 
-    // Calculate returns using accumulated capital
+    // Calculate returns
     Object.values(insights).forEach((yearData) => {
       const accumulatedCapital = accumulatedCapitalByYear[yearData.year] || 0;
       
+      // Total return is just the sum - no percentage since it includes realized P/L
       yearData.totalReturn = yearData.totalDividends + yearData.totalRealizedPL;
-      yearData.returnPct =
-        accumulatedCapital > 0 ? (yearData.totalReturn / accumulatedCapital) * 100 : 0;
+      yearData.returnPct = 0; // Not meaningful
 
       Object.entries(yearData.categories).forEach(([category, categoryData]) => {
         const accumulatedCategoryCapital = 
           accumulatedCapitalByCategoryYear[category]?.[yearData.year] || 0;
         
+        // Dividend yield based on accumulated capital INCLUDING this year
         categoryData.dividendYield =
           accumulatedCategoryCapital > 0 
             ? (categoryData.dividends / accumulatedCategoryCapital) * 100 
             : 0;
+            
         categoryData.totalReturn = categoryData.dividends + categoryData.realizedPL;
-        categoryData.returnPct =
-          accumulatedCategoryCapital > 0 
-            ? (categoryData.totalReturn / accumulatedCategoryCapital) * 100 
-            : 0;
+        categoryData.returnPct = 0; // Not meaningful since it includes realized P/L
       });
     });
 
@@ -391,9 +394,19 @@ export default function InsightsPage() {
                     {formatCurrency(selectedYearData.totalDividends)}
                   </div>
                   <div className="overview-sub">
-                    {selectedYearData.totalInvested > 0
-                      ? `${((selectedYearData.totalDividends / selectedYearData.totalInvested) * 100).toFixed(2)}% yield on new capital`
-                      : '—'}
+                    {(() => {
+                      const accumulatedCapital = Object.keys(yearInsights)
+                        .map(Number)
+                        .sort((a, b) => a - b)
+                        .filter(y => y <= selectedYear)
+                        .reduce((sum, y) => sum + yearInsights[y].totalInvested, 0);
+                      
+                      const yieldPct = accumulatedCapital > 0 
+                        ? (selectedYearData.totalDividends / accumulatedCapital) * 100 
+                        : 0;
+                      
+                      return `${yieldPct.toFixed(2)}% yield on accumulated capital`;
+                    })()}
                   </div>
                 </div>
 
@@ -411,10 +424,7 @@ export default function InsightsPage() {
                     {formatCurrency(selectedYearData.totalReturn)}
                   </div>
                   <div className="overview-sub">
-                    <span className={`return-badge ${selectedYearData.returnPct >= 0 ? 'positive' : 'negative'}`}>
-                      {selectedYearData.returnPct >= 0 ? '+' : ''}
-                      {selectedYearData.returnPct.toFixed(2)}% on accumulated capital
-                    </span>
+                    Dividends + Realized P/L
                   </div>
                 </div>
               </div>
@@ -466,12 +476,6 @@ export default function InsightsPage() {
                             <span className="metric-label">Total Return</span>
                             <span className={`metric-value ${data.totalReturn >= 0 ? 'positive' : 'negative'}`}>
                               {formatCurrency(data.totalReturn)}
-                            </span>
-                          </div>
-                          <div className="return-pct-badge-container">
-                            <span className={`return-pct-badge ${data.returnPct >= 0 ? 'positive' : 'negative'}`}>
-                              {data.returnPct >= 0 ? '+' : ''}
-                              {data.returnPct.toFixed(2)}%
                             </span>
                           </div>
                         </div>
@@ -560,30 +564,6 @@ export default function InsightsPage() {
                     </div>
                   </div>
 
-                  <div className="comparison-card">
-                    <div className="comparison-metric">Return %</div>
-                    <div className="comparison-values">
-                      <div className="comparison-value-item">
-                        <span className="comparison-year">{selectedYear}</span>
-                        <span className={`comparison-amount ${selectedYearData.returnPct >= 0 ? 'positive' : 'negative'}`}>
-                          {selectedYearData.returnPct >= 0 ? '+' : ''}
-                          {selectedYearData.returnPct.toFixed(2)}%
-                        </span>
-                      </div>
-                      <div className="comparison-divider">vs</div>
-                      <div className="comparison-value-item">
-                        <span className="comparison-year">{compareYear}</span>
-                        <span className={`comparison-amount ${compareYearData.returnPct >= 0 ? 'positive' : 'negative'}`}>
-                          {compareYearData.returnPct >= 0 ? '+' : ''}
-                          {compareYearData.returnPct.toFixed(2)}%
-                        </span>
-                      </div>
-                    </div>
-                    <div className="comparison-diff">
-                      {selectedYearData.returnPct > compareYearData.returnPct ? '↑' : '↓'}
-                      {Math.abs(selectedYearData.returnPct - compareYearData.returnPct).toFixed(2)}%
-                    </div>
-                  </div>
                 </div>
               </section>
             )}
