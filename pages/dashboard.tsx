@@ -443,7 +443,7 @@ export default function HomePage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [lastPriceUpdate, setLastPriceUpdate] = useState<Date | null>(null);
   const [isRefreshingPrices, setIsRefreshingPrices] = useState(false);
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid');
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
   const [holdingsPage, setHoldingsPage] = useState(1);
   const [transactionsPage, setTransactionsPage] = useState(1);
   const [dividendYearFilter, setDividendYearFilter] = useState<number>(new Date().getFullYear());
