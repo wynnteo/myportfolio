@@ -1480,7 +1480,6 @@ th.sortable:hover {
 }
 
 .holdings-table td {
-  padding: 16px 12px;
   vertical-align: middle;
 }
 
@@ -1531,6 +1530,7 @@ th.sortable:hover {
   text-align: right;
   font-variant-numeric: tabular-nums;
   color: var(--primary-dark);
+  font-size: x-small;
 }
 
 .value-cell.subdued {
@@ -1541,6 +1541,7 @@ th.sortable:hover {
 /* P&L cell - prominent display */
 .pl-cell {
   text-align: right;
+  font-size: x-small;
 }
 
 .pl-value {
