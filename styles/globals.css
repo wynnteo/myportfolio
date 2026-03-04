@@ -1527,10 +1527,12 @@ th.sortable:hover {
 
 /* Value cells - right aligned numbers */
 .value-cell {
-  text-align: right;
+  text-align: center;
+  font-feature-settings: "tnum";
   font-variant-numeric: tabular-nums;
   color: var(--primary-dark);
-  font-size: x-small;
+  font-size: smaller;
+  font-weight: 500;
 }
 
 .value-cell.subdued {
