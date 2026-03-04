@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
-import { fetchWithAuth } from '../lib/AuthContext';
+import { fetchWithAuth } from '../lib/api';
 import { useAuth } from '../lib/AuthContext';
 
 interface Transaction {
