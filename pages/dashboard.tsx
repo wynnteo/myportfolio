@@ -65,7 +65,7 @@ interface TransactionFormState {
   notes?: string;
 }
 
-const brokers = ['Moo Moo', 'CMC Invest', 'OCBC', 'DBS', 'HSBC', 'POEMS', 'FSMOne', 'IBKR', 'Other'];
+const brokers = ['Moo Moo', 'CMC Invest', 'OCBC', 'DBS', 'HSBC', 'Longbridge', 'POEMS', 'FSMOne', 'IBKR', 'Other'];
 const categories = ['Unit Trusts', 'Stocks', 'ETF', 'Bond', 'Cash', 'Crypto', 'Other'];
 const currencies = ['SGD', 'USD', 'MYR'];
 
@@ -449,6 +449,15 @@ export default function HomePage() {
   const [dividendYearFilter, setDividendYearFilter] = useState<number>(new Date().getFullYear());
   const [showDividendDetailsModal, setShowDividendDetailsModal] = useState(false);
   const ITEMS_PER_PAGE = 6;
+  const [showAddTransaction, setShowAddTransaction] = useState(false);
+  const [transactionForm, setTransactionForm] = useState({
+    broker: '',
+    type: 'BUY' as Transaction['type'],
+    quantity: '',
+    price: '',
+    commission: '',
+    notes: ''
+  });
 
   async function loadTransactions() {
     try {
@@ -990,6 +999,14 @@ export default function HomePage() {
     [sortedTransactions, selectedHoldingKey]
   );
 
+  const uniqueSymbols = useMemo(() => {
+    return Array.from(new Set(transactions.map(tx => tx.symbol))).sort();
+  }, [transactions]);
+
+  const uniqueProducts = useMemo(() => {
+    return Array.from(new Set(transactions.map(tx => tx.product_name).filter(Boolean))).sort();
+  }, [transactions]);
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = event.currentTarget;
@@ -1284,6 +1301,50 @@ function formatLastUpdate(date: Date | null) {
       .sort((a, b) => new Date(b.trade_date!).getTime() - new Date(a.trade_date!).getTime());
   }, [transactions, dividendYearFilter]);
 
+  async function handleAddTransactionFromModal() {
+    if (!selectedHolding) return;
+    
+    const payload = {
+      symbol: selectedHolding.symbol,
+      productName: selectedHolding.productName,
+      category: selectedHolding.category,
+      broker: transactionForm.broker,
+      currency: selectedHolding.currency,
+      type: transactionForm.type,
+      quantity: Number(transactionForm.quantity),
+      price: Number(transactionForm.price),
+      commission: Number(transactionForm.commission) || 0,
+      tradeDate: new Date().toISOString().split('T')[0],
+      notes: transactionForm.notes,
+    };
+
+    const response = await fetchWithAuth('/api/transactions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({}));
+      setActionMessage(`Failed to add transaction: ${(error as any)?.error ?? 'Unknown error'}`);
+      return;
+    }
+
+    setActionMessage('Transaction added successfully.');
+    setShowAddTransaction(false);
+    setTransactionForm({
+      broker: '',
+      type: 'BUY',
+      quantity: '',
+      price: '',
+      commission: '',
+      notes: ''
+    });
+    await loadTransactions();
+  }
+
   return (
     <>
     <header className="site-header">
@@ -1536,11 +1597,32 @@ function formatLastUpdate(date: Date | null) {
         <form onSubmit={(event) => void handleSubmit(event)} className="form-grid">
           <label>
             Symbol
-            <input name="symbol" type="text" required placeholder="e.g. M44U" />
+            <input 
+              name="symbol" 
+              type="text" 
+              required 
+              placeholder="e.g. M44U"
+              list="symbol-suggestions"
+            />
+            <datalist id="symbol-suggestions">
+              {uniqueSymbols.map(symbol => (
+                <option key={symbol} value={symbol} />
+              ))}
+            </datalist>
           </label>
           <label>
             Product Name
-            <input name="productName" type="text" placeholder="Full fund / stock name" />
+            <input 
+              name="productName" 
+              type="text" 
+              placeholder="Full fund / stock name"
+              list="product-suggestions"
+            />
+            <datalist id="product-suggestions">
+              {uniqueProducts.map(product => (
+                <option key={product} value={product} />
+              ))}
+            </datalist>
           </label>
           <label>
             Category

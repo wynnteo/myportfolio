@@ -57,7 +57,7 @@ interface TransactionFormState {
   notes?: string;
 }
 
-const brokers = ['All', 'Moo Moo', 'CMC Invest', 'OCBC', 'DBS', 'HSBC', 'POEMS', 'FSMOne', 'IBKR', 'Other'];
+const brokers = ['All', 'Moo Moo', 'CMC Invest', 'OCBC', 'DBS', 'HSBC', 'Longbridge', 'POEMS', 'FSMOne', 'IBKR', 'Other'];
 const categories = ['All', 'Unit Trusts', 'Stocks', 'ETF', 'Bond', 'Cash', 'Crypto', 'Other'];
 
 function formatCurrency(value: number, currency: string) {
@@ -426,6 +426,7 @@ export default function TransactionHistoryPage() {
                         <th>Type</th>
                         <th>Symbol</th>
                         <th>Product Name</th>
+                        <th>Category</th>
                         <th>Broker</th>
                         <th style={{textAlign: 'right'}}>Quantity</th>
                         <th style={{textAlign: 'right'}}>Price</th>
@@ -494,6 +495,21 @@ export default function TransactionHistoryPage() {
                                 />
                               ) : (
                                 tx.product_name || '-'
+                              )}
+                            </td>
+                            <td>
+                              {isEditing ? (
+                                <select
+                                  value={editForm.category ?? tx.category}
+                                  onChange={(e) => setEditForm((prev) => ({ ...prev, category: e.target.value }))}
+                                  style={{ width: '100%', fontSize: '12px' }}
+                                >
+                                  {categories.filter(c => c !== 'All').map(cat => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                tx.category
                               )}
                             </td>
                             <td>
