@@ -33,7 +33,6 @@ interface QuoteResponse {
 interface StockPosition {
   symbol: string;
   productName: string;
-  broker: string;
   currency: string;
   quantity: number;
   avgPrice: number;
@@ -44,9 +43,14 @@ interface StockPosition {
   plPct: number | null;
 }
 
-function formatCurrency(value: number | null, currency: string = 'SGD') {
+function formatCurrency(value: number | null, currency: string = 'SGD', decimals: number = 2) {
   if (value === null || Number.isNaN(value)) return '-';
-  return new Intl.NumberFormat('en-SG', { style: 'currency', currency }).format(value);
+  return new Intl.NumberFormat('en-SG', { 
+    style: 'currency', 
+    currency,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  }).format(value);
 }
 
 function formatQuantity(value: number) {
@@ -123,11 +127,10 @@ export default function WatchlistPage() {
     transactions
       .filter(tx => tx.category === 'Stocks' && (tx.type === 'BUY' || tx.type === 'SELL'))
       .forEach(tx => {
-        const key = `${tx.symbol}__${tx.broker}`;
+        const key = tx.symbol; // Group by symbol only
         const existing = positions.get(key) || {
           symbol: tx.symbol,
           productName: tx.product_name,
-          broker: tx.broker,
           currency: tx.currency,
           quantity: 0,
           avgPrice: 0,
@@ -364,9 +367,6 @@ export default function WatchlistPage() {
                     <th onClick={() => handleSort('productName')} className="sortable">
                       Product Name {sortField === 'productName' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
-                    <th onClick={() => handleSort('broker')} className="sortable">
-                      Broker {sortField === 'broker' && (sortDirection === 'asc' ? '↑' : '↓')}
-                    </th>
                     <th onClick={() => handleSort('quantity')} className="sortable" style={{ textAlign: 'right' }}>
                       Units {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
                     </th>
@@ -403,26 +403,25 @@ export default function WatchlistPage() {
                         <td>
                           <div className="product-cell">{pos.productName || '-'}</div>
                         </td>
-                        <td>{pos.broker}</td>
                         <td className="value-cell">{formatQuantity(pos.quantity)}</td>
-                        <td className="value-cell">{formatCurrency(pos.avgPrice, pos.currency)}</td>
+                        <td className="value-cell">{formatCurrency(pos.avgPrice, pos.currency, 4)}</td>
                         <td className="value-cell">
                           {pos.currentPrice !== null ? (
                             <span style={{ fontWeight: 700 }}>
-                              {formatCurrency(pos.currentPrice, pos.currency)}
+                              {formatCurrency(pos.currentPrice, pos.currency, 4)}
                             </span>
                           ) : (
                             '-'
                           )}
                         </td>
-                        <td className="value-cell">{formatCurrency(pos.totalCost, pos.currency)}</td>
+                        <td className="value-cell">{formatCurrency(pos.totalCost, pos.currency, 2)}</td>
                         <td className="value-cell">
-                          {pos.marketValue !== null ? formatCurrency(pos.marketValue, pos.currency) : '-'}
+                          {pos.marketValue !== null ? formatCurrency(pos.marketValue, pos.currency, 2) : '-'}
                         </td>
                         <td className="pl-cell">
                           <div className={`pl-value ${plClass}`}>
                             <span className="pl-amount">
-                              {pos.pl !== null ? formatCurrency(pos.pl, pos.currency) : '-'}
+                              {pos.pl !== null ? formatCurrency(pos.pl, pos.currency, 2) : '-'}
                             </span>
                             {pos.plPct !== null && (
                               <span className="pl-percentage">
