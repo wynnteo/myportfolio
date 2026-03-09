@@ -122,62 +122,108 @@ export default function WatchlistPage() {
 
   // Calculate stock positions
   const stockPositions = useMemo(() => {
-    const positions = new Map<string, StockPosition>();
+    const positions = new Map<string, {
+      symbol: string;
+      productName: string;
+      currency: string;
+      buyLots: Array<{ qty: number; costPerShare: number; totalCost: number }>;
+    }>();
 
+    // First pass: collect all transactions by symbol
+    const txBySymbol = new Map<string, Transaction[]>();
     transactions
       .filter(tx => tx.category === 'Stocks' && (tx.type === 'BUY' || tx.type === 'SELL'))
       .forEach(tx => {
-        const key = tx.symbol; // Group by symbol only
-        const existing = positions.get(key) || {
-          symbol: tx.symbol,
-          productName: tx.product_name,
-          currency: tx.currency,
-          quantity: 0,
-          avgPrice: 0,
-          totalCost: 0,
+        const key = tx.symbol;
+        if (!txBySymbol.has(key)) {
+          txBySymbol.set(key, []);
+        }
+        txBySymbol.get(key)!.push(tx);
+      });
+
+    // Second pass: process each symbol's transactions in order
+    txBySymbol.forEach((txList, symbol) => {
+      // Sort by date
+      const sortedTx = [...txList].sort((a, b) => {
+        const dateA = new Date(a.trade_date || a.created_at).getTime();
+        const dateB = new Date(b.trade_date || b.created_at).getTime();
+        return dateA - dateB;
+      });
+
+      const position = {
+        symbol,
+        productName: '',
+        currency: '',
+        buyLots: [] as Array<{ qty: number; costPerShare: number; totalCost: number }>,
+      };
+
+      sortedTx.forEach(tx => {
+        if (tx.type === 'BUY') {
+          // Add a new buy lot
+          const qty = tx.quantity ?? 0;
+          const price = tx.price ?? 0;
+          const commission = tx.commission ?? 0;
+          const costPerShare = qty > 0 ? (qty * price + commission) / qty : 0;
+          
+          position.buyLots.push({
+            qty,
+            costPerShare,
+            totalCost: qty * price + commission,
+          });
+          
+          position.productName = tx.product_name;
+          position.currency = tx.currency;
+        } else if (tx.type === 'SELL') {
+          // FIFO: Remove shares from oldest buy lots first
+          let qtyToSell = Math.abs(tx.quantity ?? 0);
+          
+          while (qtyToSell > 0 && position.buyLots.length > 0) {
+            const oldestLot = position.buyLots[0];
+            
+            if (oldestLot.qty <= qtyToSell) {
+              // Sell entire lot
+              qtyToSell -= oldestLot.qty;
+              position.buyLots.shift(); // Remove this lot completely
+            } else {
+              // Partial sell from this lot
+              const sellFromLot = qtyToSell;
+              oldestLot.qty -= sellFromLot;
+              oldestLot.totalCost = oldestLot.qty * oldestLot.costPerShare;
+              qtyToSell = 0;
+            }
+          }
+        }
+      });
+
+      if (position.buyLots.length > 0) {
+        positions.set(symbol, position);
+      }
+    });
+
+    // Calculate final positions
+    const result: StockPosition[] = [];
+    positions.forEach(pos => {
+      const totalQty = pos.buyLots.reduce((sum, lot) => sum + lot.qty, 0);
+      const totalCost = pos.buyLots.reduce((sum, lot) => sum + lot.totalCost, 0);
+      const avgPrice = totalQty > 0 ? totalCost / totalQty : 0;
+
+      if (totalQty > 0.0001) {
+        result.push({
+          symbol: pos.symbol,
+          productName: pos.productName,
+          currency: pos.currency,
+          quantity: totalQty,
+          avgPrice,
+          totalCost,
           currentPrice: null,
           marketValue: null,
           pl: null,
           plPct: null,
-        };
-
-        if (tx.type === 'BUY') {
-          // For BUY: add quantity and cost
-          const qty = tx.quantity ?? 0;
-          const price = tx.price ?? 0;
-          const commission = tx.commission ?? 0;
-          existing.quantity += qty;
-          existing.totalCost += (qty * price) + commission;
-        } else if (tx.type === 'SELL') {
-          // For SELL: subtract quantity (quantity is already negative in DB)
-          // but reduce cost proportionally based on average cost
-          const qty = Math.abs(tx.quantity ?? 0); // Make positive for calculation
-          
-          // Calculate current average price before selling
-          const currentAvgPrice = existing.quantity > 0 ? existing.totalCost / existing.quantity : 0;
-          
-          // Reduce quantity
-          existing.quantity -= qty;
-          
-          // Reduce total cost proportionally (based on average cost, not sell price)
-          existing.totalCost -= (qty * currentAvgPrice);
-          
-          // Ensure totalCost doesn't go negative due to rounding
-          if (existing.totalCost < 0) existing.totalCost = 0;
-        }
-
-        positions.set(key, existing);
-      });
-
-    // Calculate average price
-    positions.forEach(pos => {
-      if (pos.quantity > 0) {
-        pos.avgPrice = pos.totalCost / pos.quantity;
+        });
       }
     });
 
-    // Filter out positions with zero or negative quantity
-    return Array.from(positions.values()).filter(pos => pos.quantity > 0.0001);
+    return result;
   }, [transactions]);
 
   // Fetch prices for all stocks
