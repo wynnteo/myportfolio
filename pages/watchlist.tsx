@@ -141,12 +141,29 @@ export default function WatchlistPage() {
           plPct: null,
         };
 
-        if (tx.type === 'BUY' || tx.type === 'SELL') {
+        if (tx.type === 'BUY') {
+          // For BUY: add quantity and cost
           const qty = tx.quantity ?? 0;
           const price = tx.price ?? 0;
           const commission = tx.commission ?? 0;
           existing.quantity += qty;
-          existing.totalCost += qty * price + commission;
+          existing.totalCost += (qty * price) + commission;
+        } else if (tx.type === 'SELL') {
+          // For SELL: subtract quantity (quantity is already negative in DB)
+          // but reduce cost proportionally based on average cost
+          const qty = Math.abs(tx.quantity ?? 0); // Make positive for calculation
+          
+          // Calculate current average price before selling
+          const currentAvgPrice = existing.quantity > 0 ? existing.totalCost / existing.quantity : 0;
+          
+          // Reduce quantity
+          existing.quantity -= qty;
+          
+          // Reduce total cost proportionally (based on average cost, not sell price)
+          existing.totalCost -= (qty * currentAvgPrice);
+          
+          // Ensure totalCost doesn't go negative due to rounding
+          if (existing.totalCost < 0) existing.totalCost = 0;
         }
 
         positions.set(key, existing);
@@ -154,7 +171,7 @@ export default function WatchlistPage() {
 
     // Calculate average price
     positions.forEach(pos => {
-      if (pos.quantity !== 0) {
+      if (pos.quantity > 0) {
         pos.avgPrice = pos.totalCost / pos.quantity;
       }
     });
