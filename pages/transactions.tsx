@@ -234,6 +234,72 @@ export default function TransactionHistoryPage() {
     setTimeout(() => setActionMessage(null), 3000);
   }
 
+  function exportToCSV() {
+    // Prepare CSV headers
+    const headers = [
+      'Date',
+      'Type',
+      'Symbol',
+      'Product Name',
+      'Category',
+      'Broker',
+      'Currency',
+      'Quantity',
+      'Price',
+      'Commission',
+      'Dividend Amount',
+      'Total Value',
+      'Notes'
+    ];
+
+    // Prepare CSV rows
+    const rows = filteredTransactions.map(tx => {
+      const totalValue = tx.type === 'DIVIDEND' 
+        ? (tx.dividend_amount || 0)
+        : ((Math.abs(tx.quantity || 0) * (tx.price || 0)) + (tx.commission || 0));
+
+      return [
+        tx.trade_date || tx.created_at.split('T')[0],
+        tx.type,
+        tx.symbol,
+        tx.product_name || '',
+        tx.category,
+        tx.broker,
+        tx.currency,
+        tx.type !== 'DIVIDEND' ? Math.abs(tx.quantity || 0).toString() : '',
+        tx.type !== 'DIVIDEND' && tx.price !== null ? tx.price.toString() : '',
+        tx.type !== 'DIVIDEND' && tx.commission !== null ? tx.commission.toString() : '',
+        tx.type === 'DIVIDEND' && tx.dividend_amount !== null ? tx.dividend_amount.toString() : '',
+        totalValue.toString(),
+        tx.notes || ''
+      ];
+    });
+
+    // Combine headers and rows
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => {
+        // Escape cells containing commas or quotes
+        const cellStr = String(cell);
+        if (cellStr.includes(',') || cellStr.includes('"') || cellStr.includes('\n')) {
+          return `"${cellStr.replace(/"/g, '""')}"`;
+        }
+        return cellStr;
+      }).join(','))
+    ].join('\n');
+
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `transactions_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   // Analyze trades by symbol to calculate realized P/L
   const tradeAnalyses = useMemo(() => {
     const grouped = new Map<string, TradeAnalysis>();
@@ -335,6 +401,7 @@ export default function TransactionHistoryPage() {
             <Link href="/">Home</Link>
             <Link href="/dashboard">Dashboard</Link>
             <Link href="/transactions">Transactions</Link>
+            <Link href="/watchlist">Watchlist</Link>
             <Link href="/insights">Insights</Link>
             <Link href="/calculator">Calculator</Link>
             <Link href="/referrals">Referrals</Link>
@@ -345,8 +412,23 @@ export default function TransactionHistoryPage() {
 
       <main>
         <div className="page-header">
-          <h1>Transaction History</h1>
-          <p>Track all your buy, sell, and dividend transactions</p>
+          <div>
+            <h1>Transaction History</h1>
+            <p>Track all your buy, sell, and dividend transactions</p>
+          </div>
+          <button 
+            type="button" 
+            className="btn-primary"
+            onClick={exportToCSV}
+            style={{ 
+              padding: '8px 16px',
+              fontSize: '14px',
+              fontWeight: 600,
+              height: 'fit-content'
+            }}
+          >
+            📥 Export to CSV
+          </button>
         </div>
 
         {actionMessage && (
