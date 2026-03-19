@@ -451,11 +451,11 @@ export default function HomePage() {
   const ITEMS_PER_PAGE = 6;
   const [showAddTransaction, setShowAddTransaction] = useState(false);
   const [transactionForm, setTransactionForm] = useState({
-    broker: '',
     type: 'BUY' as Transaction['type'],
     quantity: '',
     price: '',
     commission: '',
+    tradeDate: new Date().toISOString().split('T')[0],
     notes: ''
   });
 
@@ -1308,16 +1308,16 @@ function formatLastUpdate(date: Date | null) {
       symbol: selectedHolding.symbol,
       productName: selectedHolding.productName,
       category: selectedHolding.category,
-      broker: transactionForm.broker,
+      broker: selectedHolding.broker, // Use holding's broker
       currency: selectedHolding.currency,
       type: transactionForm.type,
       quantity: Number(transactionForm.quantity),
       price: Number(transactionForm.price),
       commission: Number(transactionForm.commission) || 0,
-      tradeDate: new Date().toISOString().split('T')[0],
+      tradeDate: transactionForm.tradeDate, // Use form's trade date
       notes: transactionForm.notes,
     };
-
+ 
     const response = await fetchWithAuth('/api/transactions', {
       method: 'POST',
       headers: {
@@ -1325,21 +1325,21 @@ function formatLastUpdate(date: Date | null) {
       },
       body: JSON.stringify(payload),
     });
-
+ 
     if (!response.ok) {
       const error = await response.json().catch(() => ({}));
       setActionMessage(`Failed to add transaction: ${(error as any)?.error ?? 'Unknown error'}`);
       return;
     }
-
+ 
     setActionMessage('Transaction added successfully.');
     setShowAddTransaction(false);
     setTransactionForm({
-      broker: '',
       type: 'BUY',
       quantity: '',
       price: '',
       commission: '',
+      tradeDate: new Date().toISOString().split('T')[0],
       notes: ''
     });
     await loadTransactions();
@@ -1356,6 +1356,7 @@ function formatLastUpdate(date: Date | null) {
           <Link href="/">Home</Link>
           <Link href="/dashboard">Dashboard</Link>
           <Link href="/transactions">Transactions</Link>
+          <Link href="/watchlist">Watchlist</Link>
           <Link href="/insights">Insights</Link>
           <Link href="/calculator">Calculator</Link>
           <Link href="/referrals">Referrals</Link>
@@ -1943,7 +1944,18 @@ function formatLastUpdate(date: Date | null) {
                   <span>Qty: {formatQuantity(selectedHolding.quantity)}</span>
                 </div>
               </div>
-              <button type="button" className="ghost" onClick={() => setSelectedHoldingKey(null)}>
+              <button type="button" className="ghost" onClick={() => {
+                setSelectedHoldingKey(null);
+                setShowAddTransaction(false);
+                setTransactionForm({
+                  type: 'BUY',
+                  quantity: '',
+                  price: '',
+                  commission: '',
+                  tradeDate: new Date().toISOString().split('T')[0],
+                  notes: ''
+                });
+              }}>
                 Close
               </button>
             </div>
@@ -1997,7 +2009,88 @@ function formatLastUpdate(date: Date | null) {
             <div className="modal-transactions-section">
               <div className="modal-section-header">
                 <h3 className="modal-section-title">Buy/Sell Transactions</h3>
+                <button 
+                  type="button" 
+                  className="add-dividend-btn"
+                  onClick={() => setShowAddTransaction(!showAddTransaction)}
+                >
+                  {showAddTransaction ? 'Cancel' : '+ Add Transaction'}
+                </button>
               </div>
+              {showAddTransaction && (
+                <div className="dividend-form-inline">
+                  <label>
+                    Type
+                    <select
+                      value={transactionForm.type}
+                      onChange={(e) => setTransactionForm({ ...transactionForm, type: e.target.value as Transaction['type'] })}
+                    >
+                      <option value="BUY">BUY</option>
+                      <option value="SELL">SELL</option>
+                    </select>
+                  </label>
+                  <label>
+                    Quantity
+                    <input
+                      type="number"
+                      step="0.0001"
+                      min="0"
+                      value={transactionForm.quantity}
+                      onChange={(e) => setTransactionForm({ ...transactionForm, quantity: e.target.value })}
+                      placeholder="0"
+                      required
+                    />
+                  </label>
+                  <label>
+                    Price ({selectedHolding.currency})
+                    <input
+                      type="number"
+                      step="0.00001"
+                      min="0"
+                      value={transactionForm.price}
+                      onChange={(e) => setTransactionForm({ ...transactionForm, price: e.target.value })}
+                      placeholder="0.00"
+                      required
+                    />
+                  </label>
+                  <label>
+                    Commission
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={transactionForm.commission}
+                      onChange={(e) => setTransactionForm({ ...transactionForm, commission: e.target.value })}
+                      placeholder="0.00"
+                    />
+                  </label>
+                  <label>
+                    Trade Date
+                    <input
+                      type="date"
+                      value={transactionForm.tradeDate}
+                      onChange={(e) => setTransactionForm({ ...transactionForm, tradeDate: e.target.value })}
+                    />
+                  </label>
+                  <label>
+                    Notes
+                    <input
+                      type="text"
+                      value={transactionForm.notes}
+                      onChange={(e) => setTransactionForm({ ...transactionForm, notes: e.target.value })}
+                      placeholder="Optional"
+                    />
+                  </label>
+                  <button 
+                    type="button" 
+                    className="save-btn"
+                    onClick={() => void handleAddTransactionFromModal()}
+                    style={{height: '38px', marginTop: 'auto'}}
+                  >
+                    Save
+                  </button>
+                </div>
+              )}
               
               {selectedHoldingTransactions.length === 0 ? (
                 <div className="dividend-empty-state">
