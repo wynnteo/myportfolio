@@ -1942,6 +1942,8 @@ function formatLastUpdate(date: Date | null) {
                   <span>Broker: {selectedHolding.broker}</span>
                   <span>Currency: {selectedHolding.currency}</span>
                   <span>Qty: {formatQuantity(selectedHolding.quantity)}</span>
+                  <span>Commission: {formatPrice(selectedHolding.totalCommission, selectedHolding.currency, 2)}</span>
+                  <span>Breakeven: {formatPriceWithoutCurrency(selectedHolding.averagePrice, selectedHolding.currency, 5)}</span>
                 </div>
               </div>
               <button type="button" className="ghost" onClick={() => {
