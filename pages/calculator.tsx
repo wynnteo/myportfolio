@@ -112,7 +112,6 @@ function SGIncomeTaxCalculator() {
   const [others, setOthers]   = useState('');
 
   // ── Deductions ───────────────────────────────────────────────────────────
-  const [donation, setDonation]     = useState('90');          // % default 90 (2.5× deduction)
   const [donationAmt, setDonationAmt] = useState('');          // raw donation amount before multiplier
   const [child2Relief, setChild2Relief] = useState('10000');
   const [cpfTopUp, setCpfTopUp]     = useState('');
@@ -128,11 +127,11 @@ function SGIncomeTaxCalculator() {
     if (totalIncome <= 0) return null;
 
     // CPF Relief (employee OW + AW)
-    // Ordinary Wage ceiling: $6,000/month → $72,000/year contribution base
+    // Ordinary Wage ceiling: $7,400/month → $88,800/year contribution base
     // Additional Wage (bonus) ceiling: $102,000 - OW contributed
     // Employee CPF rate assumed 20% (age ≤ 55)
-    const owContrib = Math.min(salaryNum, 72_000) * 0.20;
-    const awCeiling = Math.max(0, 102_000 - Math.min(salaryNum, 72_000));
+    const owContrib = Math.min(salaryNum, 88800) * 0.20;
+    const awCeiling = Math.max(0, 102_000 - Math.min(salaryNum, 88800));
     const awContrib = Math.min(bonusNum, awCeiling) * 0.20;
     const cpfRelief = owContrib + awContrib;
 
@@ -142,10 +141,7 @@ function SGIncomeTaxCalculator() {
 
     // Donation: amount * (donation% / 100) → actual deduction at 2.5×
     const donAmt = parseFloat(donationAmt) || 0;
-    const donPct = parseFloat(donation) || 90;   // default 90 means full 2.5× relief
-    // Singapore donation deduction = donation × 2.5 (tax deduction, capped)
-    // We treat the "90%" field as: deductible portion = donAmt × 2.5 × (donPct/100)
-    const donationDeduction = donAmt * 2.5 * (donPct / 100);
+    const donationDeduction = donAmt * 2.5;
 
     const child2  = parseFloat(child2Relief) || 0;
     const cpfTop  = parseFloat(cpfTopUp)     || 0;
@@ -170,7 +166,7 @@ function SGIncomeTaxCalculator() {
       effectiveRate,
       earnedIncome,
     };
-  }, [salary, bonus, others, donation, donationAmt, child2Relief, cpfTopUp, srsTopUp]);
+  }, [salary, bonus, others, donationAmt, child2Relief, cpfTopUp, srsTopUp]);
 
   function handleReset() {
     setSalary(''); setBonus(''); setOthers('');
@@ -232,14 +228,6 @@ function SGIncomeTaxCalculator() {
                 Donation Amount (S$)
                 <input type="number" step="1" min="0" value={donationAmt}
                   onChange={e => setDonationAmt(e.target.value)} placeholder="e.g. 500" />
-              </label>
-              <label>
-                Donation Deductible (%)
-                <input type="number" step="1" min="0" max="100" value={donation}
-                  onChange={e => setDonation(e.target.value)} placeholder="90" />
-                <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
-                  Approved donations get 2.5× tax deduction. Default 90% → 2.25× net.
-                </span>
               </label>
 
               {/* Child Relief */}
