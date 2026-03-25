@@ -170,7 +170,6 @@ function SGIncomeTaxCalculator() {
 
   function handleReset() {
     setSalary(''); setBonus(''); setOthers('');
-    setDonation('90'); setDonationAmt('');
     setChild2Relief('10000'); setCpfTopUp(''); setSrsTopUp('');
   }
 
@@ -256,7 +255,7 @@ function SGIncomeTaxCalculator() {
                   style={{ background: '#f8fafc', color: '#64748b', cursor: 'default' }}
                 />
                 <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
-                  Employee CPF @ 20% on OW (≤S$6K/mo) + AW (≤S$102K − OW ceiling)
+                  Employee CPF @ 20% on OW (≤S$8K/mo) + AW (≤S$102K − OW ceiling)
                 </span>
               </label>
 
