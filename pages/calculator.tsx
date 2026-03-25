@@ -73,7 +73,7 @@ interface TaxBracket {
   baseTax: number;     // tax already paid on income up to previous bracket
 }
 
-// YA 2024 tax table (resident individuals)
+// YA 2025 tax table (resident individuals)
 const TAX_BRACKETS: TaxBracket[] = [
   { upTo: 20_000,    rate: 0,    baseTax: 0 },
   { upTo: 30_000,    rate: 2,    baseTax: 0 },
@@ -137,7 +137,7 @@ function SGIncomeTaxCalculator() {
 
     // Child 1: 15% of earned income (salary + bonus)
     const earnedIncome = salaryNum + bonusNum;
-    const child1Relief = earnedIncome * 0.15;
+    const child1Relief = totalIncome * 0.15;
 
     // Donation: amount * (donation% / 100) → actual deduction at 2.5×
     const donAmt = parseFloat(donationAmt) || 0;
@@ -336,6 +336,9 @@ function SGIncomeTaxCalculator() {
                 </div>
               </div>
 
+              {/* Tax Rates Applicable breakdown */}
+              <TaxRatesBreakdown chargeableIncome={result.chargeableIncome} />
+
               {/* Tax payable */}
               <div style={{
                 background: result.taxPayable === 0 ? '#f0fdf4' : '#fef2f2',
@@ -379,6 +382,145 @@ function SGIncomeTaxCalculator() {
     </div>
   );
 }
+
+function TaxRatesBreakdown({ chargeableIncome }: { chargeableIncome: number }) {
+  if (chargeableIncome <= 0) return null;
+ 
+  // Build rows: for each bracket touched, emit two rows:
+  //   Row A: "First S$X,XXX"   →  S$baseTax  (cumulative flat)
+  //   Row B: "Next S$Y,YYY @ r%"  →  S$tax  (marginal slice)
+  // Then a total row.
+  const rows: Array<{
+    key: string;
+    description: string;
+    amount: number | null;  // null = separator / label-only
+    tax: number | null;
+    isSlice: boolean;
+    isTotal: boolean;
+  }> = [];
+ 
+  let totalTax = 0;
+ 
+  for (let i = 0; i < TAX_BRACKETS.length; i++) {
+    const bracket = TAX_BRACKETS[i];
+    const prevLimit = TAX_BRACKETS[i - 1]?.upTo ?? 0;
+ 
+    if (chargeableIncome <= prevLimit) break;
+ 
+    const sliceIncome = Math.min(chargeableIncome, bracket.upTo) - prevLimit;
+    const taxOnSlice = (sliceIncome * bracket.rate) / 100;
+ 
+    // "First S$X" flat row — shows the gross tax already accumulated to this point
+    if (prevLimit > 0) {
+      rows.push({
+        key: `first-${i}`,
+        description: `First S$${prevLimit.toLocaleString('en-SG')}`,
+        amount: null,
+        tax: bracket.baseTax,
+        isSlice: false,
+        isTotal: false,
+      });
+    } else {
+      // First bracket (0–20k, 0%) — still show it
+      rows.push({
+        key: `first-${i}`,
+        description: `First S$${bracket.upTo.toLocaleString('en-SG')}`,
+        amount: Math.min(chargeableIncome, bracket.upTo),
+        tax: 0,
+        isSlice: false,
+        isTotal: false,
+      });
+      if (chargeableIncome <= bracket.upTo) break;
+      continue;
+    }
+ 
+    // "Next S$Y @ r%" slice row
+    rows.push({
+      key: `next-${i}`,
+      description: `Next S$${sliceIncome.toLocaleString('en-SG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} @ ${bracket.rate}%`,
+      amount: sliceIncome,
+      tax: taxOnSlice,
+      isSlice: true,
+      isTotal: false,
+    });
+ 
+    totalTax = bracket.baseTax + taxOnSlice;
+ 
+    if (chargeableIncome <= bracket.upTo) break;
+  }
+ 
+  rows.push({
+    key: 'total',
+    description: 'Gross Tax Payable',
+    amount: chargeableIncome,
+    tax: totalTax,
+    isSlice: false,
+    isTotal: true,
+  });
+ 
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
+      {/* Header */}
+      <div style={{ background: '#1e293b', padding: '10px 14px', display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '8px', alignItems: 'center' }}>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Tax Rates Applicable</span>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textAlign: 'right', minWidth: '90px' }}>Income (S$)</span>
+        <span style={{ fontSize: '11px', fontWeight: 700, color: '#94a3b8', textAlign: 'right', minWidth: '90px' }}>Tax (S$)</span>
+      </div>
+ 
+      {/* Rows */}
+      {rows.map((row, idx) => {
+        if (row.isTotal) {
+          return (
+            <div key={row.key} style={{
+              display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '8px',
+              padding: '10px 14px', alignItems: 'center',
+              background: '#f0f9ff', borderTop: '2px solid #bfdbfe',
+            }}>
+              <span style={{ fontSize: '13px', fontWeight: 800, color: '#1e40af' }}>{row.description}</span>
+              <span style={{ fontSize: '13px', fontWeight: 700, color: '#1e40af', textAlign: 'right', minWidth: '90px' }}>
+                {fmt(row.amount ?? 0)}
+              </span>
+              <span style={{ fontSize: '13px', fontWeight: 800, color: '#1e40af', textAlign: 'right', minWidth: '90px' }}>
+                {fmt(row.tax ?? 0)}
+              </span>
+            </div>
+          );
+        }
+ 
+        const isAlt = idx % 2 === 1;
+        return (
+          <div key={row.key} style={{
+            display: 'grid', gridTemplateColumns: '1fr auto auto', gap: '8px',
+            padding: '7px 14px', alignItems: 'center',
+            background: row.isSlice ? (isAlt ? '#f8fafc' : '#ffffff') : '#f8fafc',
+            borderTop: idx === 0 ? 'none' : '1px solid #f1f5f9',
+          }}>
+            <span style={{
+              fontSize: '12px',
+              fontWeight: row.isSlice ? 600 : 500,
+              color: row.isSlice ? '#0f172a' : '#64748b',
+              paddingLeft: row.isSlice ? '12px' : '0',
+            }}>
+              {row.isSlice && <span style={{ color: '#3b82f6', marginRight: '4px' }}>↳</span>}
+              {row.description}
+            </span>
+            <span style={{ fontSize: '12px', color: row.isSlice ? '#334155' : '#94a3b8', textAlign: 'right', minWidth: '90px' }}>
+              {row.amount !== null ? fmt(row.amount) : '—'}
+            </span>
+            <span style={{
+              fontSize: '12px', textAlign: 'right', minWidth: '90px',
+              fontWeight: row.isSlice ? 700 : 400,
+              color: row.isSlice ? '#059669' : (row.tax !== null && row.tax > 0 ? '#475569' : '#94a3b8'),
+            }}>
+              {row.tax !== null ? fmt(row.tax) : '—'}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 
 function TaxBracketIndicator({ chargeableIncome }: { chargeableIncome: number }) {
   const brackets = [
