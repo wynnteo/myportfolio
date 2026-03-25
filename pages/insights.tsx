@@ -93,10 +93,10 @@ export default function InsightsPage() {
     }
   }
 
-  // Calculate current holdings for unrealized P/L
   const currentHoldings = useMemo(() => {
     const map = new Map<string, {
       symbol: string;
+      productName: string;
       category: string;
       broker: string;
       currency: string;
@@ -108,6 +108,7 @@ export default function InsightsPage() {
       const key = `${tx.symbol}__${tx.broker}`;
       const existing = map.get(key) ?? {
         symbol: tx.symbol,
+        productName: tx.product_name,
         category: tx.category,
         broker: tx.broker,
         currency: tx.currency,
@@ -123,17 +124,19 @@ export default function InsightsPage() {
         existing.totalCost += qty * price + commission;
       }
 
+      if (tx.product_name) {
+        existing.productName = tx.product_name;
+      }
+
       map.set(key, existing);
     }
 
     return Array.from(map.values()).filter(h => h.quantity > 0.0001);
   }, [transactions]);
 
-  // Fetch prices for all current holdings
   useEffect(() => {
     async function fetchQuotes() {
-      const symbols = Array.from(new Set(currentHoldings.map(h => h.symbol))).filter(Boolean);
-      if (symbols.length === 0) {
+      if (currentHoldings.length === 0) {
         setQuotes({});
         return;
       }
@@ -141,15 +144,46 @@ export default function InsightsPage() {
       setLoadingPrices(true);
       const nextQuotes: Record<string, QuoteResponse> = {};
 
+      const unitTrustHoldings = currentHoldings.filter(h => h.category === 'Unit Trusts');
+      const otherHoldings = currentHoldings.filter(h => h.category !== 'Unit Trusts');
+
+      const unitTrustSymbols = Array.from(new Set(unitTrustHoldings.map(h => h.symbol))).filter(Boolean);
+      const otherSymbols = Array.from(new Set(otherHoldings.map(h => h.symbol))).filter(Boolean);
+
       await Promise.all(
-        symbols.map(async (symbol) => {
+        unitTrustSymbols.map(async (sym) => {
+          const holding = currentHoldings.find(h => h.symbol === sym);
+          const sParam = sym.includes(':') ? sym : `${sym}:SGD`;
+          const fundName = holding?.productName ?? '';
+          try {
+            const resp = await fetch(
+              `/api/fund-quote?s=${encodeURIComponent(sParam)}&name=${encodeURIComponent(fundName)}`
+            );
+            if (!resp.ok) return;
+            const j = await resp.json();
+            if (typeof j.price === 'number') {
+              nextQuotes[sym] = {
+                symbol: sym,
+                currency: 'SGD',
+                price: j.price,
+                asOf: j.lastUpdated ?? null,
+              };
+            }
+          } catch {
+            // ignore
+          }
+        })
+      );
+
+      await Promise.all(
+        otherSymbols.map(async (symbol) => {
           try {
             const resp = await fetch(`/api/quote?symbol=${encodeURIComponent(symbol)}`);
             if (!resp.ok) return;
             const data: QuoteResponse = await resp.json();
             nextQuotes[symbol] = data;
-          } catch (err) {
-            // ignore individual failures
+          } catch {
+            // ignore
           }
         })
       );
@@ -161,7 +195,6 @@ export default function InsightsPage() {
     void fetchQuotes();
   }, [currentHoldings]);
 
-  // Calculate category breakdowns
   const categoryBreakdowns = useMemo(() => {
     const breakdowns = new Map<string, CategoryBreakdown>();
     const currentYear = new Date().getFullYear();
@@ -190,7 +223,7 @@ export default function InsightsPage() {
         .filter(tx => tx.category === category && tx.type === 'DIVIDEND')
         .forEach(tx => {
           breakdown.totalDividends += tx.dividend_amount || 0;
-          
+
           if (tx.trade_date && new Date(tx.trade_date).getFullYear() === currentYear) {
             breakdown.ytdDividends += tx.dividend_amount || 0;
           }
@@ -235,16 +268,15 @@ export default function InsightsPage() {
         }
       });
 
-      // Calculate unrealized returns (from current holdings)
+      // Calculate unrealized returns (from current holdings with live prices)
       const categoryHoldings = currentHoldings.filter(h => h.category === category);
       let totalCurrentValue = 0;
       let totalCost = 0;
 
       categoryHoldings.forEach(holding => {
         const quote = quotes[holding.symbol];
-        if (quote && quote.price) {
-          const currentValue = quote.price * holding.quantity;
-          totalCurrentValue += currentValue;
+        if (quote && typeof quote.price === 'number') {
+          totalCurrentValue += quote.price * holding.quantity;
           totalCost += holding.totalCost;
         }
       });
@@ -316,6 +348,7 @@ export default function InsightsPage() {
             <Link href="/">Home</Link>
             <Link href="/dashboard">Dashboard</Link>
             <Link href="/transactions">Transactions</Link>
+            <Link href="/watchlist">Watchlist</Link>
             <Link href="/insights">Insights</Link>
             <Link href="/calculator">Calculator</Link>
             <Link href="/referrals">Referrals</Link>
