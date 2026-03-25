@@ -112,8 +112,9 @@ function SGIncomeTaxCalculator() {
   const [others, setOthers]   = useState('');
 
   // ── Deductions ───────────────────────────────────────────────────────────
-  const [donationAmt, setDonationAmt] = useState('');          // raw donation amount before multiplier
+  const [donationAmt, setDonationAmt] = useState('');
   const [child2Relief, setChild2Relief] = useState('10000');
+  const [earnedRelief, setEarnedRelief] = useState('1000');
   const [cpfTopUp, setCpfTopUp]     = useState('');
   const [srsTopUp, setSrsTopUp]     = useState('');
 
@@ -139,6 +140,8 @@ function SGIncomeTaxCalculator() {
     const earnedIncome = salaryNum + bonusNum;
     const child1Relief = totalIncome * 0.15;
 
+    const earnedRelief = 1000;
+
     // Donation: amount * (donation% / 100) → actual deduction at 2.5×
     const donAmt = parseFloat(donationAmt) || 0;
     const donationDeduction = donAmt * 2.5;
@@ -147,13 +150,14 @@ function SGIncomeTaxCalculator() {
     const cpfTop  = parseFloat(cpfTopUp)     || 0;
     const srsTop  = parseFloat(srsTopUp)     || 0;
 
-    const totalDeductions = donationDeduction + child1Relief + child2 + cpfRelief + cpfTop + srsTop;
+    const totalDeductions = donationDeduction + child1Relief + child2 + cpfRelief + cpfTop + srsTop + earnedRelief;
     const chargeableIncome = Math.max(0, totalIncome - totalDeductions);
     const taxPayable = computeTax(chargeableIncome);
     const effectiveRate = totalIncome > 0 ? (taxPayable / totalIncome) * 100 : 0;
 
     return {
       totalIncome,
+      earnedRelief,
       donationDeduction,
       child1Relief,
       child2,
@@ -166,7 +170,7 @@ function SGIncomeTaxCalculator() {
       effectiveRate,
       earnedIncome,
     };
-  }, [salary, bonus, others, donationAmt, child2Relief, cpfTopUp, srsTopUp]);
+  }, [salary, bonus, others, donationAmt, earnedRelief, child2Relief, cpfTopUp, srsTopUp]);
 
   function handleReset() {
     setSalary(''); setBonus(''); setOthers('');
@@ -178,7 +182,7 @@ function SGIncomeTaxCalculator() {
       <div className="calc-header">
         <h2>🇸🇬 Singapore Income Tax Estimator</h2>
         <p className="calc-description">
-          Estimate your YA 2024 personal income tax based on your income and reliefs
+          Estimate your YA personal income tax based on your income and reliefs
         </p>
       </div>
 
@@ -227,6 +231,13 @@ function SGIncomeTaxCalculator() {
                 Donation Amount (S$)
                 <input type="number" step="1" min="0" value={donationAmt}
                   onChange={e => setDonationAmt(e.target.value)} placeholder="e.g. 500" />
+              </label>
+
+              {/* Earned Relief */}
+              <label>
+                Earned Relief (S$)
+                <input type="text"
+                  readOnly value={earnedRelief} style={{ background: '#f8fafc', color: '#64748b', cursor: 'default' }}/>
               </label>
 
               {/* Child Relief */}
@@ -306,6 +317,7 @@ function SGIncomeTaxCalculator() {
                 </div>
                 {[
                   { label: 'Donation Relief (2.5×)', value: result.donationDeduction },
+                  { label: 'Earned Relief', value: result.earnedRelief },
                   { label: 'Child 1 Relief (15%)', value: result.child1Relief },
                   { label: `Child 2 Relief`, value: result.child2 },
                   { label: 'CPF Employee Relief', value: result.cpfRelief },
