@@ -128,11 +128,11 @@ function SGIncomeTaxCalculator() {
     if (totalIncome <= 0) return null;
 
     // CPF Relief (employee OW + AW)
-    // Ordinary Wage ceiling: $7,400/month → $88,800/year contribution base
+    // Ordinary Wage ceiling: $8,000/month → $96,000/year contribution base
     // Additional Wage (bonus) ceiling: $102,000 - OW contributed
     // Employee CPF rate assumed 20% (age ≤ 55)
-    const owContrib = Math.min(salaryNum, 88800) * 0.20;
-    const awCeiling = Math.max(0, 102_000 - Math.min(salaryNum, 88800));
+    const owContrib = Math.min(salaryNum, 96000) * 0.20;
+    const awCeiling = Math.max(0, 102_000 - Math.min(salaryNum, 96000));
     const awContrib = Math.min(bonusNum, awCeiling) * 0.20;
     const cpfRelief = owContrib + awContrib;
 
