@@ -75,32 +75,46 @@ function parsePriceAndTime(html: string) {
   return { price, priceText, lastUpdated, disclaimer };
 }
 
-// ---------------- OCBC fallback ----------------
-async function fetchOcbcPrice(fundName: string) {
+// ---------------- OCBC fallback (new page structure) ----------------
+async function fetchOcbcPrice(fundCode: string) {
   try {
-    const url = 'https://www.ocbc.com/rates/daily_price_unit_trust.html';
+    const url = `https://www.ocbc.com/personal-banking/investments/unit-trusts/funds-details?fundCode=${fundCode}`;
     const resp = await axios.get(url, { timeout: 15_000 });
     const $ = cheerio.load(resp.data);
 
-    let foundPrice: number | null = null;
+    let price: number | null = null;
     let lastUpdated: string | null = null;
 
-    $('.funds-table tr').each((_, tr) => {
-      const nameTd = $(tr).find('td').first();
-      const nameText = nameTd.text().trim();
-      if (nameText.toLowerCase() === fundName.toLowerCase()) {
-        const priceTd = nameTd.next('td');
-        const dateTd = priceTd.next('td');
-        const priceNum = Number(priceTd.text().trim().replace(/[,$\s]/g, ''));
-        if (!Number.isNaN(priceNum)) foundPrice = priceNum;
-        lastUpdated = dateTd.text().trim();
+    // Find the block that contains "Indicative price"
+    $('.inner-content .block').each((_, el) => {
+      const title = $(el).find('h4.title-text').text().trim();
+
+      if (title.toLowerCase().includes('indicative price')) {
+        // Extract price from <strong>
+        const priceText = $(el)
+          .find('.value-text strong')
+          .first()
+          .text()
+          .trim();
+
+        const parsedPrice = Number(priceText.replace(/[,$\s]/g, ''));
+        if (!Number.isNaN(parsedPrice)) {
+          price = parsedPrice;
+        }
+
+        // Extract last updated date
+        lastUpdated = $(el)
+          .find('p.small')
+          .text()
+          .replace('Updated as of', '')
+          .trim();
       }
     });
 
-    if (!foundPrice) return null;
+    if (!price) return null;
 
     return {
-      price: foundPrice,
+      price,
       lastUpdated,
       source: 'ocbc',
       cached: false,
