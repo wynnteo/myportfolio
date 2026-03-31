@@ -78,7 +78,7 @@ function parsePriceAndTime(html: string) {
 // ---------------- OCBC fallback (new page structure) ----------------
 async function fetchOcbcPrice(fundCode: string) {
   try {
-    const url = `https://www.ocbc.com/personal-banking/investments/unit-trusts/funds-details?fundCode=${fundCode}`;
+    const url = `https://www.ocbc.com/personal-banking/investments/unit-trusts/funds-details?fundCode=AGDDSHIOP2`;
 
     const resp = await axios.get(url, {
       timeout: 15000,
@@ -96,7 +96,7 @@ async function fetchOcbcPrice(fundCode: string) {
 
     if (!$('.inner-content').length) {
       console.log('OCBC HTML missing expected structure');
-      return "OCBC HTML missing expected structure";
+      return esp.data;
     }
 
     let price: number | null = null;
