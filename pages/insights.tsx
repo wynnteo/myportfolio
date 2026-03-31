@@ -229,12 +229,12 @@ export default function InsightsPage() {
       transactions
         .filter(tx => tx.category === category && tx.type === 'DIVIDEND')
         .forEach(tx => {
-          breakdown.totalDividends += tx.dividend_amount || 0;
+          const amount = tx.dividend_amount || 0;
+          breakdown.totalDividends += amount;
 
           if (tx.trade_date) {
             const d = new Date(tx.trade_date);
 
-            // YTD
             if (d.getFullYear() === currentYear) {
               breakdown.ytdDividends += amount;
             }
