@@ -168,7 +168,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       } else {
         // still not found
         cache.set(cacheKey, { ...parsed }, 60 * 5);
-        return res.status(200).json({ ...parsed, note: 'price not found on FT or OCBC', url });
+        return res.status(200).json({ ...parsed, note: 'price not found on FT or OCBC', url:ocbcResult });
       }
     }
 
