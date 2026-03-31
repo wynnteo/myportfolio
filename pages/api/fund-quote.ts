@@ -139,9 +139,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const parsed = parsePriceAndTime(html);
 
     let result;
-    const fundName = (req.query.name as string) ?? req.body?.name;
+    //const fundName = (req.query.name as string) ?? req.body?.name;
     if (!parsed.price && fundName) {
-      const ocbcResult = await fetchOcbcPrice(fundName);
+      const ocbcResult = await fetchOcbcPrice(s);
       if (ocbcResult) {
         result = { s, price: ocbcResult.price, lastUpdated: ocbcResult.lastUpdated, source: 'ocbc', cached: false };
         cache.set(cacheKey, result, 60 * 15);
