@@ -631,7 +631,6 @@ export default function HomePage() {
             return;
           }
           const j = await resp.json();
-          console.log(j)
           nextQuotes[sym] = { price: typeof j.price === 'number' ? j.price : null, asOf: j.lastUpdated ?? j.asOf ?? null, source: 'ft', cached: !!j.cached };
         } catch (e) {
           nextQuotes[sym] = { price: null, source: 'ft', cached: false };

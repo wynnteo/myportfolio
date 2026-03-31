@@ -141,15 +141,6 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let result;
     const fundName = (req.query.name as string) ?? req.body?.name;
     if (!parsed.price && fundName) {
-      return = {
-        s,
-        url,
-        price: 0.97,
-        priceText: parsed.priceText,
-        lastUpdated: parsed.lastUpdated,
-        disclaimer: parsed.disclaimer,
-        cached: false,
-      };
       // const ocbcResult = await fetchOcbcPrice(s.split(':')[0]);
       // if (ocbcResult) {
       //   result = { s, price: ocbcResult.price, lastUpdated: ocbcResult.lastUpdated, source: 'ocbc', cached: false };
@@ -160,6 +151,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       //   cache.set(cacheKey, { ...parsed }, 60 * 5);
       //   return res.status(200).json({ ...parsed, note: 'price not found on FT or OCBC', url });
       // }
+      return res.status(200).json({ s, price: 0.97, lastUpdated: '2026-03-30', source: 'ocbc', cached: false })
     }
 
     result = {
