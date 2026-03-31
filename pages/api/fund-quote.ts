@@ -142,8 +142,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     let result;
     const fundName = (req.query.name as string) ?? req.body?.name;
-    console.log(parsed)
-    if (!parsed.price && fundName) {
+
+    if (parsed.price == null) {
       const ocbcResult = await fetchOcbcPrice(s.split('%3A')[0]);
       console.log(ocbcResult)
       if (ocbcResult) {
