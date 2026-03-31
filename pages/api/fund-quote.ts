@@ -96,7 +96,7 @@ async function fetchOcbcPrice(fundCode: string) {
 
     if (!$('.inner-content').length) {
       console.log('OCBC HTML missing expected structure');
-      return esp.data;
+      return resp.data;
     }
 
     let price: number | null = null;
