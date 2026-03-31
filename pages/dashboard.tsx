@@ -625,13 +625,14 @@ export default function HomePage() {
         const fundName = holding?.productName ?? ''; 
 
         try {
+          console.log(sParam)
           const resp = await fetch(`/api/fund-quote?s=${encodeURIComponent(sParam)}&name=${encodeURIComponent(fundName)}`);
           if (!resp.ok) {
             nextQuotes[sym] = { price: null, source: 'ft', cached: false };
             return;
           }
           const j = await resp.json();
-          console.log(j)
+
           nextQuotes[sym] = { price: typeof j.price === 'number' ? j.price : null, asOf: j.lastUpdated ?? j.asOf ?? null, source: 'ft', cached: !!j.cached };
         } catch (e) {
           nextQuotes[sym] = { price: null, source: 'ft', cached: false };
