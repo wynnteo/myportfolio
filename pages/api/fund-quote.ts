@@ -88,8 +88,8 @@ async function fetchOcbcPrice(fundCode: string) {
         'Accept': 'text/html,application/xhtml+xml',
         'Accept-Language': 'en-SG,en;q=0.9',
         'Connection': 'keep-alive',
-      },
-      Referer: 'https://www.ocbc.com/',
+        'Referer': 'https://www.ocbc.com/',
+      }
     });
 
     const $ = cheerio.load(resp.data);
