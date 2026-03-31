@@ -96,6 +96,7 @@ async function fetchOcbcPrice(fundCode: string) {
 
     if (!$('.inner-content').length) {
       console.log('OCBC HTML missing expected structure');
+      return "OCBC HTML missing expected structure";
     }
 
     let price: number | null = null;
@@ -126,7 +127,7 @@ async function fetchOcbcPrice(fundCode: string) {
 
     if (!price) {
       console.log('OCBC parse failed');
-      return null;
+      return "OCBC parse failed";
     }
 
     return {
@@ -137,7 +138,7 @@ async function fetchOcbcPrice(fundCode: string) {
     };
   } catch (err) {
     console.error('OCBC fallback error', err);
-    return null;
+    return err;
   }
 }
 
