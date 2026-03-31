@@ -34,6 +34,8 @@ interface CategoryBreakdown {
   totalInvested: number;
   totalDividends: number;
   ytdDividends: number;
+  thisMonthDividends: number;
+  lastYearDividends: number;
   realizedReturn: number;
   unrealizedReturn: number;
   unrealizedReturnPct: number;
@@ -197,13 +199,18 @@ export default function InsightsPage() {
 
   const categoryBreakdowns = useMemo(() => {
     const breakdowns = new Map<string, CategoryBreakdown>();
-    const currentYear = new Date().getFullYear();
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
+    const lastYear = currentYear - 1;
 
     categories.forEach(category => {
       const breakdown: CategoryBreakdown = {
         totalInvested: 0,
         totalDividends: 0,
         ytdDividends: 0,
+        thisMonthDividends: 0,
+        lastYearDividends: 0,
         realizedReturn: 0,
         unrealizedReturn: 0,
         unrealizedReturnPct: 0,
@@ -224,8 +231,24 @@ export default function InsightsPage() {
         .forEach(tx => {
           breakdown.totalDividends += tx.dividend_amount || 0;
 
-          if (tx.trade_date && new Date(tx.trade_date).getFullYear() === currentYear) {
-            breakdown.ytdDividends += tx.dividend_amount || 0;
+          if (tx.trade_date) {
+            const d = new Date(tx.trade_date);
+
+            // YTD
+            if (d.getFullYear() === currentYear) {
+              breakdown.ytdDividends += amount;
+            }
+
+            if (
+              d.getFullYear() === currentYear &&
+              d.getMonth() === currentMonth
+            ) {
+              breakdown.thisMonthDividends += amount;
+            }
+
+            if (d.getFullYear() === lastYear) {
+              breakdown.lastYearDividends += amount;
+            }
           }
         });
 
@@ -443,9 +466,25 @@ export default function InsightsPage() {
                     </span>
                   </div>
                   <div className="metric-row highlight-row">
+                    <span className="metric-label">
+                      Last Year {new Date().getFullYear() - 1}
+                    </span>
+                    <span className="metric-value positive">
+                      {formatCurrency(data.lastYearDividends)}
+                    </span>
+                  </div>
+                  <div className="metric-row highlight-row">
                     <span className="metric-label">YTD Dividends {new Date().getFullYear()}</span>
                     <span className="metric-value positive">
                       {formatCurrency(data.ytdDividends)}
+                    </span>
+                  </div>
+                  <div className="metric-row highlight-row">
+                    <span className="metric-label">
+                      This Month {new Date().toLocaleString('en-SG', { month: 'short' })}
+                    </span>
+                    <span className="metric-value positive">
+                      {formatCurrency(data.thisMonthDividends)}
                     </span>
                   </div>
                   <div className="metric-row total-row">
