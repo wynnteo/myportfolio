@@ -78,8 +78,6 @@ function parsePriceAndTime(html: string) {
 // ---------------- OCBC fallback (new page structure) ----------------
 async function fetchOcbcPrice(fundCode: string) {
   try {
-
-    console.log(fundCode)
     const url = `https://www.ocbc.com/personal-banking/investments/unit-trusts/funds-details?fundCode=${fundCode}`;
     const resp = await axios.get(url, { timeout: 15_000 });
     const $ = cheerio.load(resp.data);
@@ -132,7 +130,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const s = (req.query.s as string) ?? req.body?.s;
     if (!s) return res.status(400).json({ error: 'missing s parameter (e.g. LU0320765646:SGD or fund name)' });
 
-    const cacheKey = `ft:${s}`;
+    const cleanSymbol = s.replace(/:.+$/, '');
+    const cacheKey = `ft:${cleanSymbol}`;
     const cached = cache.get(cacheKey);
     if (cached) return res.status(200).json({ ...cached, cached: true });
 
@@ -144,8 +143,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const fundName = (req.query.name as string) ?? req.body?.name;
 
     if (parsed.price == null) {
-      const ocbcResult = await fetchOcbcPrice(s.split('%3A')[0]);
-      console.log(ocbcResult)
+      const ocbcResult = await fetchOcbcPrice(cleanSymbol);
+
       if (ocbcResult) {
         result = { s, price: ocbcResult.price, lastUpdated: ocbcResult.lastUpdated, source: 'ocbc', cached: false };
         cache.set(cacheKey, result, 60 * 15);
