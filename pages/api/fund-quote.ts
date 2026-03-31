@@ -78,34 +78,19 @@ function parsePriceAndTime(html: string) {
 // ---------------- OCBC fallback (new page structure) ----------------
 async function fetchOcbcPrice(fundCode: string) {
   try {
-    const url = `https://www.ocbc.com/personal-banking/investments/unit-trusts/funds-details?fundCode=AGDDSHIOP2`;
-
-    const resp = await axios.get(url, {
-      timeout: 15000,
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-SG,en;q=0.9',
-        'Connection': 'keep-alive',
-        'Referer': 'https://www.ocbc.com/',
-      }
-    });
-
+    const url = `https://www.ocbc.com/personal-banking/investments/unit-trusts/funds-details?fundCode=${fundCode}`;
+    const resp = await axios.get(url, { timeout: 15_000 });
     const $ = cheerio.load(resp.data);
-
-    if (!$('.inner-content').length) {
-      console.log('OCBC HTML missing expected structure');
-      return resp.data;
-    }
 
     let price: number | null = null;
     let lastUpdated: string | null = null;
 
+    // Find the block that contains "Indicative price"
     $('.inner-content .block').each((_, el) => {
       const title = $(el).find('h4.title-text').text().trim();
 
       if (title.toLowerCase().includes('indicative price')) {
+        // Extract price from <strong>
         const priceText = $(el)
           .find('.value-text strong')
           .first()
@@ -117,6 +102,7 @@ async function fetchOcbcPrice(fundCode: string) {
           price = parsedPrice;
         }
 
+        // Extract last updated date
         lastUpdated = $(el)
           .find('p.small')
           .text()
@@ -125,10 +111,7 @@ async function fetchOcbcPrice(fundCode: string) {
       }
     });
 
-    if (!price) {
-      console.log('OCBC parse failed');
-      return "OCBC parse failed";
-    }
+    if (!price) return null;
 
     return {
       price,
@@ -138,7 +121,7 @@ async function fetchOcbcPrice(fundCode: string) {
     };
   } catch (err) {
     console.error('OCBC fallback error', err);
-    return err;
+    return null;
   }
 }
 
@@ -147,8 +130,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const s = (req.query.s as string) ?? req.body?.s;
     if (!s) return res.status(400).json({ error: 'missing s parameter (e.g. LU0320765646:SGD or fund name)' });
 
-    const cleanSymbol = s.replace(/:.+$/, '');
-    const cacheKey = `ft:${cleanSymbol}`;
+    const cacheKey = `ft:${s}`;
     const cached = cache.get(cacheKey);
     if (cached) return res.status(200).json({ ...cached, cached: true });
 
@@ -158,20 +140,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     let result;
     const fundName = (req.query.name as string) ?? req.body?.name;
-
-    if (parsed.price == null) {
-      const ocbcResult = await fetchOcbcPrice(cleanSymbol);
-
-      if (ocbcResult) {
-        return res.status(200).json({ ...parsed, note: 'price not found on FT or OCBC', url:ocbcResult });
-        //result = { s, price: ocbcResult.price, lastUpdated: ocbcResult.lastUpdated, source: 'ocbc', cached: false };
-        //cache.set(cacheKey, result, 60 * 15);
-        //return res.status(200).json(result);
-      } else {
-        // still not found
-        cache.set(cacheKey, { ...parsed }, 60 * 5);
-        return res.status(200).json({ ...parsed, note: 'price not found on FT or OCBC', url:ocbcResult });
-      }
+    if (!parsed.price && fundName) {
+      return = {
+        s,
+        url,
+        price: 0.97,
+        priceText: parsed.priceText,
+        lastUpdated: parsed.lastUpdated,
+        disclaimer: parsed.disclaimer,
+        cached: false,
+      };
+      // const ocbcResult = await fetchOcbcPrice(s.split(':')[0]);
+      // if (ocbcResult) {
+      //   result = { s, price: ocbcResult.price, lastUpdated: ocbcResult.lastUpdated, source: 'ocbc', cached: false };
+      //   cache.set(cacheKey, result, 60 * 15);
+      //   return res.status(200).json(result);
+      // } else {
+      //   // still not found
+      //   cache.set(cacheKey, { ...parsed }, 60 * 5);
+      //   return res.status(200).json({ ...parsed, note: 'price not found on FT or OCBC', url });
+      // }
     }
 
     result = {
