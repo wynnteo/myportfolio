@@ -163,9 +163,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       const ocbcResult = await fetchOcbcPrice(cleanSymbol);
 
       if (ocbcResult) {
-        result = { s, price: ocbcResult.price, lastUpdated: ocbcResult.lastUpdated, source: 'ocbc', cached: false };
-        cache.set(cacheKey, result, 60 * 15);
-        return res.status(200).json(result);
+        return res.status(200).json({ ...parsed, note: 'price not found on FT or OCBC', url:ocbcResult });
+        //result = { s, price: ocbcResult.price, lastUpdated: ocbcResult.lastUpdated, source: 'ocbc', cached: false };
+        //cache.set(cacheKey, result, 60 * 15);
+        //return res.status(200).json(result);
       } else {
         // still not found
         cache.set(cacheKey, { ...parsed }, 60 * 5);
