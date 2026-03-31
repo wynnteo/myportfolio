@@ -79,18 +79,32 @@ function parsePriceAndTime(html: string) {
 async function fetchOcbcPrice(fundCode: string) {
   try {
     const url = `https://www.ocbc.com/personal-banking/investments/unit-trusts/funds-details?fundCode=${fundCode}`;
-    const resp = await axios.get(url, { timeout: 15_000 });
+
+    const resp = await axios.get(url, {
+      timeout: 15000,
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'en-SG,en;q=0.9',
+        'Connection': 'keep-alive',
+      },
+      Referer: 'https://www.ocbc.com/',
+    });
+
     const $ = cheerio.load(resp.data);
+
+    if (!$('.inner-content').length) {
+      console.log('OCBC HTML missing expected structure');
+    }
 
     let price: number | null = null;
     let lastUpdated: string | null = null;
 
-    // Find the block that contains "Indicative price"
     $('.inner-content .block').each((_, el) => {
       const title = $(el).find('h4.title-text').text().trim();
 
       if (title.toLowerCase().includes('indicative price')) {
-        // Extract price from <strong>
         const priceText = $(el)
           .find('.value-text strong')
           .first()
@@ -102,7 +116,6 @@ async function fetchOcbcPrice(fundCode: string) {
           price = parsedPrice;
         }
 
-        // Extract last updated date
         lastUpdated = $(el)
           .find('p.small')
           .text()
@@ -111,7 +124,10 @@ async function fetchOcbcPrice(fundCode: string) {
       }
     });
 
-    if (!price) return null;
+    if (!price) {
+      console.log('OCBC parse failed');
+      return null;
+    }
 
     return {
       price,
