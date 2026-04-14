@@ -75,6 +75,55 @@ function parsePriceAndTime(html: string) {
   return { price, priceText, lastUpdated, disclaimer };
 }
 
+
+async function fetchAberdeenPrice(isin: string): Promise<{
+  price: number;
+  lastUpdated: string | null;
+  source: string;
+  cached: boolean;
+} | null> {
+ 
+  const baseUrl = `https://www.aberdeeninvestments.com/en-sg/investor/funds/view-all-funds/abrdn-global-dynamic-dividend-fund-sgxz84873520?subTab=keyInformationTab `;
+ 
+  try {
+    const html = await fetchPage(baseUrl, {
+      Referer: 'https://www.aberdeeninvestments.com/en-sg/investor/funds/',
+    });
+ 
+    const $ = cheerio.load(html);
+ 
+    let price: number | null = null;
+    let lastUpdated: string | null = null;
+ 
+    $('[class*="section-header-small"]').each((_, el) => {
+      const labelText = $(el).text().trim().toLowerCase();
+      if (labelText !== 'daily price') return;
+ 
+      const parent = $(el).parent();
+ 
+      const valueEl = parent.find('.h4, h4').first();
+      const rawValue = valueEl.text().trim().replace(/[,$\s]/g, '');
+      const parsed = Number(rawValue);
+      if (!Number.isNaN(parsed) && parsed > 0) {
+        price = parsed;
+      }
+ 
+      // Date: a child with class containing "body-small"
+      const dateEl = parent.find('[class*="body-small"]').first();
+      if (dateEl.length) {
+        lastUpdated = dateEl.text().trim();
+      }
+    });
+ 
+    if (price === null) return null;
+ 
+    return { price, lastUpdated, source: 'aberdeen', cached: false };
+  } catch (err) {
+    console.error('Aberdeen fallback error', (err as Error)?.message ?? err);
+    return null;
+  }
+}
+
 // ---------------- OCBC fallback (new page structure) ----------------
 async function fetchOcbcPrice(fundCode: string) {
   try {
@@ -141,6 +190,24 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     let result;
     const fundName = (req.query.name as string) ?? req.body?.name;
     if (!parsed.price && fundName) {
+      const aberdeenResult = await fetchAberdeenPrice(slug);
+      if (aberdeenResult) {
+        const result = {
+          s,
+          price: aberdeenResult.price,
+          lastUpdated: aberdeenResult.lastUpdated,
+          source: 'aberdeen',
+          cached: false,
+        };
+        cache.set(cacheKey, result, 60 * 15);
+        return res.status(200).json(result);
+      }
+ 
+      return res.status(200).json({
+        s,
+        price: null,
+        note: 'price not found on Aberdeen Investments',
+      });
       // const ocbcResult = await fetchOcbcPrice(s.split(':')[0]);
       // if (ocbcResult) {
       //   result = { s, price: ocbcResult.price, lastUpdated: ocbcResult.lastUpdated, source: 'ocbc', cached: false };
@@ -151,7 +218,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       //   cache.set(cacheKey, { ...parsed }, 60 * 5);
       //   return res.status(200).json({ ...parsed, note: 'price not found on FT or OCBC', url });
       // }
-      return res.status(200).json({ s, price: 0.97, lastUpdated: '2026-03-30', source: 'ocbc', cached: false })
+      //return res.status(200).json({ s, price: 0.97, lastUpdated: '2026-03-30', source: 'ocbc', cached: false })
     }
 
     result = {
