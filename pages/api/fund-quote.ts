@@ -76,7 +76,7 @@ function parsePriceAndTime(html: string) {
 }
 
 
-async function fetchAberdeenPrice(isin: string): Promise<{
+async function fetchAberdeenPrice(): Promise<{
   price: number;
   lastUpdated: string | null;
   source: string;
@@ -122,6 +122,21 @@ async function fetchAberdeenPrice(isin: string): Promise<{
     console.error('Aberdeen fallback error', (err as Error)?.message ?? err);
     return null;
   }
+}
+
+async function fetchPage(url: string, extraHeaders?: Record<string, string>) {
+  return limiter.schedule(async () => {
+    const headers = {
+      'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120 Safari/537.36',
+      Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.9',
+      Referer: 'https://markets.ft.com/',
+      ...extraHeaders,
+    };
+    const resp = await axios.get(url, { headers, timeout: 15_000 });
+    return resp.data as string;
+  });
 }
 
 // ---------------- OCBC fallback (new page structure) ----------------
@@ -183,14 +198,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const cached = cache.get(cacheKey);
     if (cached) return res.status(200).json({ ...cached, cached: true });
 
-    const url = ftUrlFromS(s);
-    const html = await fetchFtPage(url);
-    const parsed = parsePriceAndTime(html);
-
     let result;
     const fundName = (req.query.name as string) ?? req.body?.name;
-    if (!parsed.price && fundName) {
-      const aberdeenResult = await fetchAberdeenPrice(slug);
+    if (fundName.startsWith("ABRDN")) {
+      const aberdeenResult = await fetchAberdeenPrice();
       if (aberdeenResult) {
         const result = {
           s,
@@ -208,18 +219,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         price: null,
         note: 'price not found on Aberdeen Investments',
       });
-      // const ocbcResult = await fetchOcbcPrice(s.split(':')[0]);
-      // if (ocbcResult) {
-      //   result = { s, price: ocbcResult.price, lastUpdated: ocbcResult.lastUpdated, source: 'ocbc', cached: false };
-      //   cache.set(cacheKey, result, 60 * 15);
-      //   return res.status(200).json(result);
-      // } else {
-      //   // still not found
-      //   cache.set(cacheKey, { ...parsed }, 60 * 5);
-      //   return res.status(200).json({ ...parsed, note: 'price not found on FT or OCBC', url });
-      // }
-      //return res.status(200).json({ s, price: 0.97, lastUpdated: '2026-03-30', source: 'ocbc', cached: false })
     }
+
+    const url = ftUrlFromS(s);
+    const html = await fetchFtPage(url);
+    const parsed = parsePriceAndTime(html);
 
     result = {
       s,
