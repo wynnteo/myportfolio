@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { fetchWithAuth } from '../lib/api';
 import { useAuth } from '../lib/AuthContext';
@@ -58,6 +58,123 @@ function getCategoryColor(category: string) {
     Other: '#94a3b8',
   };
   return palette[category] || '#64748b';
+}
+
+function BrokerBreakdownChart({ data }: {
+  data: { broker: string; invested: number; currentValue: number; gainLoss: number; hasLivePrice: boolean }[]
+}) {
+  const chartRef = useRef<HTMLCanvasElement>(null);
+  const chartInstance = useRef<unknown>(null);
+
+  useEffect(() => {
+    if (!chartRef.current || data.length === 0) return;
+
+    // Dynamically import Chart.js (already bundled in Next.js)
+    import('chart.js/auto').then(({ default: Chart }) => {
+      if (chartInstance.current) {
+        (chartInstance.current as InstanceType<typeof Chart>).destroy();
+      }
+
+      chartInstance.current = new Chart(chartRef.current!, {
+        type: 'bar',
+        data: {
+          labels: data.map(d => d.broker),
+          datasets: [
+            {
+              label: 'Invested',
+              data: data.map(d => d.invested),
+              backgroundColor: '#378ADD',
+              borderRadius: 4,
+              borderSkipped: false,
+            },
+            {
+              label: 'Current Value',
+              data: data.map(d => d.currentValue),
+              backgroundColor: '#1D9E75',
+              borderRadius: 4,
+              borderSkipped: false,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => ' ' + ctx.dataset.label + ': ' + formatCurrency(ctx.parsed.y as number),
+              },
+            },
+          },
+          scales: {
+            x: { grid: { display: false } },
+            y: {
+              grid: { color: 'rgba(128,128,128,0.12)' },
+              ticks: {
+                callback: v => 'S$' + (Number(v) >= 1000 ? (Number(v) / 1000).toFixed(0) + 'k' : v),
+              },
+              beginAtZero: true,
+            },
+          },
+        },
+      });
+    });
+
+    return () => {
+      if (chartInstance.current) {
+        (chartInstance.current as { destroy: () => void }).destroy();
+      }
+    };
+  }, [data]);
+
+  return (
+    <div>
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#378ADD', display: 'inline-block' }} />
+          Invested
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#1D9E75', display: 'inline-block' }} />
+          Current value
+        </span>
+      </div>
+
+      <div style={{ position: 'relative', width: '100%', height: `${Math.max(240, data.length * 60)}px` }}>
+        <canvas ref={chartRef} />
+      </div>
+
+      <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        {data.map(d => {
+          const pos = d.gainLoss >= 0;
+          const pct = d.invested > 0 ? ((d.gainLoss / d.invested) * 100).toFixed(2) : '0.00';
+          return (
+            <div key={d.broker} style={{
+              display: 'flex', alignItems: 'center', gap: '12px',
+              padding: '10px 14px', background: 'var(--color-background-secondary)',
+              borderRadius: 'var(--border-radius-md)', fontSize: '13px', flexWrap: 'wrap',
+            }}>
+              <span style={{ fontWeight: 500, minWidth: '80px', color: 'var(--color-text-primary)' }}>{d.broker}</span>
+              <span style={{ color: 'var(--color-text-secondary)', flex: 1 }}>
+                Invested: <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{formatCurrency(d.invested)}</span>
+              </span>
+              <span style={{ color: 'var(--color-text-secondary)', flex: 1 }}>
+                Current: <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>
+                  {d.hasLivePrice ? formatCurrency(d.currentValue) : '—'}
+                </span>
+              </span>
+              {d.hasLivePrice && (
+                <span style={{ color: pos ? '#1D9E75' : '#E24B4A', fontWeight: 500, minWidth: '120px', textAlign: 'right' }}>
+                  {pos ? '+' : ''}{formatCurrency(d.gainLoss)} ({pos ? '+' : ''}{pct}%)
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 export default function InsightsPage() {
@@ -343,6 +460,29 @@ export default function InsightsPage() {
     };
   }, [categoryBreakdowns]);
 
+  const brokerBreakdowns = useMemo(() => {
+    const map = new Map<string, { invested: number; currentValue: number; hasLivePrice: boolean }>();
+
+    for (const holding of currentHoldings) {
+      const broker = holding.broker || 'Unknown';
+      const existing = map.get(broker) ?? { invested: 0, currentValue: 0, hasLivePrice: false };
+
+      existing.invested += holding.totalCost;
+
+      const quote = quotes[holding.symbol];
+      if (quote && typeof quote.price === 'number') {
+        existing.currentValue += quote.price * holding.quantity;
+        existing.hasLivePrice = true;
+      }
+
+      map.set(broker, existing);
+    }
+
+    return Array.from(map.entries())
+      .map(([broker, data]) => ({ broker, ...data, gainLoss: data.currentValue - data.invested }))
+      .sort((a, b) => b.invested - a.invested);
+  }, [currentHoldings, quotes]);
+
   if (authLoading || loading) {
     return (
       <>
@@ -509,6 +649,21 @@ export default function InsightsPage() {
             ))}
           </div>
         </section>
+
+        {brokerBreakdowns.length > 0 && (
+          <section className="insights-category-section">
+            <div className="section-title">
+              <h2>By Broker</h2>
+              {loadingPrices && (
+                <span className="muted" style={{ fontSize: '14px' }}>
+                  <span className="loading-spinner" style={{ width: '12px', height: '12px', marginRight: '6px' }}></span>
+                  Loading current prices...
+                </span>
+              )}
+            </div>
+            <BrokerBreakdownChart data={brokerBreakdowns} />
+          </section>
+        )}
 
         {categoryBreakdowns.size === 0 && (
           <div className="empty-state">
