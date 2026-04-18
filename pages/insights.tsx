@@ -69,13 +69,15 @@ function BrokerBreakdownChart({ data }: {
   useEffect(() => {
     if (!chartRef.current || data.length === 0) return;
 
-    // Dynamically import Chart.js (already bundled in Next.js)
-    import('chart.js/auto').then(({ default: Chart }) => {
+    function renderChart() {
+      const ChartJS = (window as unknown as { Chart: new (...args: unknown[]) => { destroy: () => void } }).Chart;
+      if (!ChartJS || !chartRef.current) return;
+
       if (chartInstance.current) {
-        (chartInstance.current as InstanceType<typeof Chart>).destroy();
+        (chartInstance.current as { destroy: () => void }).destroy();
       }
 
-      chartInstance.current = new Chart(chartRef.current!, {
+      chartInstance.current = new ChartJS(chartRef.current, {
         type: 'bar',
         data: {
           labels: data.map(d => d.broker),
@@ -103,7 +105,8 @@ function BrokerBreakdownChart({ data }: {
             legend: { display: false },
             tooltip: {
               callbacks: {
-                label: ctx => ' ' + ctx.dataset.label + ': ' + formatCurrency(ctx.parsed.y as number),
+                label: (ctx: { dataset: { label: string }; parsed: { y: number } }) =>
+                  ' ' + ctx.dataset.label + ': ' + formatCurrency(ctx.parsed.y),
               },
             },
           },
@@ -112,18 +115,30 @@ function BrokerBreakdownChart({ data }: {
             y: {
               grid: { color: 'rgba(128,128,128,0.12)' },
               ticks: {
-                callback: v => 'S$' + (Number(v) >= 1000 ? (Number(v) / 1000).toFixed(0) + 'k' : v),
+                callback: (v: unknown) =>
+                  'S$' + (Number(v) >= 1000 ? (Number(v) / 1000).toFixed(0) + 'k' : v),
               },
               beginAtZero: true,
             },
           },
         },
       });
-    });
+    }
+
+    const win = window as unknown as { Chart?: unknown };
+    if (win.Chart) {
+      renderChart();
+    } else {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js';
+      script.onload = renderChart;
+      document.head.appendChild(script);
+    }
 
     return () => {
       if (chartInstance.current) {
         (chartInstance.current as { destroy: () => void }).destroy();
+        chartInstance.current = null;
       }
     };
   }, [data]);
