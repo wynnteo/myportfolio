@@ -360,21 +360,15 @@ function SnapshotModal({ account, snapshots, onClose, onSaved }: SnapshotModalPr
     onSaved();
   }
 
-  // Chart data: months 1–12 for selectedYear, but only up to current month if same year
-  // No carry-forward into future months
+  // Chart data: only include months that have actually happened
+  // For current year: Jan up to curMonth. For past years: all 12 months.
   const chartData = useMemo(() => {
     const maxMonth = selectedYear === curYear ? curMonth : 12;
-    const months: { label: string; balance: number | null }[] = [];
+    const months: { label: string; balance: number }[] = [];
 
-    for (let m = 1; m <= 12; m++) {
-      if (m > maxMonth) {
-        // Future month — show null (bar chart will skip/show 0)
-        months.push({ label: MONTHS[m - 1], balance: null });
-        continue;
-      }
-
+    for (let m = 1; m <= maxMonth; m++) {
       const bal = getEffectiveBalance(snapMap, account.starting_balance, selectedYear, m, curYear, curMonth);
-      months.push({ label: MONTHS[m - 1], balance: bal });
+      months.push({ label: MONTHS[m - 1], balance: bal ?? account.starting_balance });
     }
     return months;
   }, [snapMap, selectedYear, account.starting_balance, curYear, curMonth]);
@@ -418,9 +412,7 @@ function SnapshotModal({ account, snapshots, onClose, onSaved }: SnapshotModalPr
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip
-                formatter={(v: number | null) => v !== null ? fmt(v, account.currency) : 'No data'}
-              />
+              <Tooltip formatter={(v: number) => fmt(v, account.currency)} />
               <Bar dataKey="balance" fill={TYPE_COLORS[account.type]} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -663,19 +655,12 @@ export default function AccountsPage() {
       .sort((a, b) => b.value - a.value);
   }, [includedAccounts, accountCurrentBalances]);
 
-  // 12-month net worth trend — only up to current month, future = null/skip
+  // Net worth trend — only months Jan through curMonth (no future months at all)
   const nwTrend = useMemo(() => {
-    return MONTHS.map((label, idx) => {
-      const m = idx + 1;
-      const isFuture = m > curMonth; // for curYear chart
-
-      if (isFuture) {
-        return { label, netWorth: null };
-      }
-
+    const result: { label: string; netWorth: number }[] = [];
+    for (let m = 1; m <= curMonth; m++) {
       let assets = 0;
       let liabilities = 0;
-
       includedAccounts.forEach(acc => {
         const snapMap = accountSnapMaps[acc.id] ?? {};
         const bal = getEffectiveBalance(snapMap, acc.starting_balance, curYear, m, curYear, curMonth);
@@ -683,9 +668,9 @@ export default function AccountsPage() {
         if (LIABILITY_TYPES.includes(acc.type)) liabilities += bal;
         else assets += bal;
       });
-
-      return { label, netWorth: assets - liabilities };
-    });
+      result.push({ label: MONTHS[m - 1], netWorth: assets - liabilities });
+    }
+    return result;
   }, [includedAccounts, accountSnapMaps, curYear, curMonth]);
 
   if (authLoading || loadingData) {
@@ -803,19 +788,10 @@ export default function AccountsPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v: number | null) => v !== null ? fmt(v) : 'No data'} />
+                  <Tooltip formatter={(v: number) => fmt(v)} />
                   <Bar dataKey="netWorth" radius={[4, 4, 0, 0]}>
                     {nwTrend.map((entry, index) => (
-                      <Cell
-                        key={index}
-                        fill={
-                          entry.netWorth === null
-                            ? '#f1f5f9'
-                            : entry.netWorth >= 0
-                              ? '#00257c'
-                              : '#dc2626'
-                        }
-                      />
+                      <Cell key={index} fill={entry.netWorth >= 0 ? '#00257c' : '#dc2626'} />
                     ))}
                   </Bar>
                 </BarChart>
