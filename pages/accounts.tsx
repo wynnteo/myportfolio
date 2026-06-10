@@ -913,8 +913,6 @@ export default function AccountsPage() {
           )}
         </section>
       </main>
-
-      {/* ── Snapshot Modal ── */}
       {selectedAccount && (
         <SnapshotModal
           account={selectedAccount}
