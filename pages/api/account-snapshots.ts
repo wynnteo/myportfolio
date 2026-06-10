@@ -59,7 +59,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(200).json(rows.rows);
     }
 
-    // POST create snapshot (upsert: if same account+year+month exists, update it)
+    // POST — always upsert: if same account+year+month exists, update balance/note
     if (req.method === 'POST') {
       const { account_id, year, month, balance, note } = req.body;
       if (!account_id || !year || !month || balance === undefined) {
@@ -80,9 +80,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       );
 
       if (existing.rows.length > 0) {
-        // Update existing
+        // Always update to latest balance — multiple saves in same month = take latest
         await client.execute(
-          `UPDATE account_snapshots SET balance = ?, note = ?, updated_at = datetime('now')
+          `UPDATE account_snapshots
+           SET balance = ?, note = ?, updated_at = datetime('now')
            WHERE account_id = ? AND year = ? AND month = ?;`,
           [Number(balance), note ?? null, account_id, year, month]
         );
@@ -98,10 +99,19 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       return res.status(201).json({ ok: true, id });
     }
 
-    // PUT update existing snapshot
+    // PUT update existing snapshot by id
     if (req.method === 'PUT') {
       const { id, balance, note } = req.body;
       if (!id) return res.status(400).json({ error: 'id is required' });
+
+      // Verify ownership via join
+      const check = await client.execute(
+        `SELECT s.id FROM account_snapshots s
+         JOIN accounts a ON s.account_id = a.id
+         WHERE s.id = ? AND a.user_id = ?;`,
+        [id, userId]
+      );
+      if (check.rows.length === 0) return res.status(403).json({ error: 'Snapshot not found' });
 
       await client.execute(
         `UPDATE account_snapshots SET balance = ?, note = ?, updated_at = datetime('now')
@@ -115,6 +125,15 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     if (req.method === 'DELETE') {
       const id = req.query.id as string;
       if (!id) return res.status(400).json({ error: 'id is required' });
+
+      // Verify ownership
+      const check = await client.execute(
+        `SELECT s.id FROM account_snapshots s
+         JOIN accounts a ON s.account_id = a.id
+         WHERE s.id = ? AND a.user_id = ?;`,
+        [id, userId]
+      );
+      if (check.rows.length === 0) return res.status(403).json({ error: 'Snapshot not found' });
 
       await client.execute('DELETE FROM account_snapshots WHERE id = ?;', [id]);
       return res.status(200).json({ ok: true });

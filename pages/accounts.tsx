@@ -27,10 +27,10 @@ interface Account {
   user_id: string;
   name: string;
   type: AccountType;
-  tags: string; // comma-separated
+  tags: string;
   currency: string;
   starting_balance: number;
-  include_in_networth: number; // 0 or 1 (SQLite boolean)
+  include_in_networth: number;
   created_at: string;
 }
 
@@ -38,7 +38,7 @@ interface MonthlySnapshot {
   id: string;
   account_id: string;
   year: number;
-  month: number; // 1–12
+  month: number;
   balance: number;
   note: string | null;
   updated_at: string;
@@ -70,7 +70,6 @@ const TYPE_COLORS: Record<AccountType, string> = {
   Other: '#94a3b8',
 };
 
-// Liability-type accounts subtract from net worth
 const LIABILITY_TYPES: AccountType[] = ['Liability', 'Loan', 'Credit Card'];
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -94,6 +93,46 @@ function currentYM() {
 
 function ymKey(year: number, month: number) {
   return `${year}-${String(month).padStart(2, '0')}`;
+}
+
+/**
+ * Get the effective balance for an account at a given year/month.
+ * Carry-forward: use the most recent snapshot AT OR BEFORE that month.
+ * If no snapshot exists at all before that month, fall back to starting_balance.
+ * Never project into the future — if year/month is in the future, return null.
+ */
+function getEffectiveBalance(
+  snapMap: Record<string, MonthlySnapshot>,
+  startingBalance: number,
+  targetYear: number,
+  targetMonth: number,
+  currentYear: number,
+  currentMonth: number
+): number | null {
+  // Don't project into future months
+  if (
+    targetYear > currentYear ||
+    (targetYear === currentYear && targetMonth > currentMonth)
+  ) {
+    return null;
+  }
+
+  // Walk backwards from targetMonth to find the most recent snapshot
+  // First check same year, same month back to 1
+  for (let m = targetMonth; m >= 1; m--) {
+    const snap = snapMap[ymKey(targetYear, m)];
+    if (snap) return snap.balance;
+  }
+
+  // Then check previous years (up to 5 years back)
+  for (let y = targetYear - 1; y >= targetYear - 5; y--) {
+    for (let m = 12; m >= 1; m--) {
+      const snap = snapMap[ymKey(y, m)];
+      if (snap) return snap.balance;
+    }
+  }
+
+  return startingBalance;
 }
 
 // ─── API helpers ─────────────────────────────────────────────────────────────
@@ -256,35 +295,47 @@ function SnapshotModal({ account, snapshots, onClose, onSaved }: SnapshotModalPr
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
 
-  // Build a lookup map for this account's snapshots
+  // Build a lookup map for this account's snapshots (all years)
   const snapMap = useMemo(() => {
     const m: Record<string, MonthlySnapshot> = {};
     snapshots.forEach(s => { m[ymKey(s.year, s.month)] = s; });
     return m;
   }, [snapshots]);
 
-  // Fill balance field when month changes
+  // Fill balance field when month/year changes
   useEffect(() => {
     const existing = snapMap[ymKey(selectedYear, selectedMonth)];
     if (existing) {
       setBalance(existing.balance.toString());
       setNote(existing.note ?? '');
     } else {
-      // Find last available month's balance
+      // Find most recent snapshot before this month as a starting suggestion
       let fallback = account.starting_balance;
+      // Check earlier months in same year
       for (let m2 = selectedMonth - 1; m2 >= 1; m2--) {
         const prev = snapMap[ymKey(selectedYear, m2)];
         if (prev) { fallback = prev.balance; break; }
       }
+      // If nothing found, check previous years
+      if (fallback === account.starting_balance) {
+        for (let y = selectedYear - 1; y >= selectedYear - 5; y--) {
+          let found = false;
+          for (let m2 = 12; m2 >= 1; m2--) {
+            const prev = snapMap[ymKey(y, m2)];
+            if (prev) { fallback = prev.balance; found = true; break; }
+          }
+          if (found) break;
+        }
+      }
       setBalance(fallback.toString());
       setNote('');
     }
-  }, [selectedYear, selectedMonth, snapMap]);
+  }, [selectedYear, selectedMonth, snapMap, account.starting_balance]);
 
   async function handleSave() {
     setSaving(true);
     setMsg('');
-    const existing = snapMap[ymKey(selectedYear, selectedMonth)];
+    // Always POST — the API will upsert (update if same month exists, insert if new)
     const body = {
       account_id: account.id,
       year: selectedYear,
@@ -292,9 +343,7 @@ function SnapshotModal({ account, snapshots, onClose, onSaved }: SnapshotModalPr
       balance: parseFloat(balance) || 0,
       note: note.trim() || null,
     };
-    const resp = existing
-      ? await apiSnapshots('PUT', { ...body, id: existing.id }, existing.id)
-      : await apiSnapshots('POST', body);
+    const resp = await apiSnapshots('POST', body);
     setSaving(false);
     if (resp.ok) {
       setMsg('Saved!');
@@ -311,17 +360,24 @@ function SnapshotModal({ account, snapshots, onClose, onSaved }: SnapshotModalPr
     onSaved();
   }
 
-  // Chart data: last 12 months
+  // Chart data: months 1–12 for selectedYear, but only up to current month if same year
+  // No carry-forward into future months
   const chartData = useMemo(() => {
-    const months: { label: string; balance: number }[] = [];
-    let lastBalance = account.starting_balance;
+    const maxMonth = selectedYear === curYear ? curMonth : 12;
+    const months: { label: string; balance: number | null }[] = [];
+
     for (let m = 1; m <= 12; m++) {
-      const snap = snapMap[ymKey(selectedYear, m)];
-      if (snap) lastBalance = snap.balance;
-      months.push({ label: MONTHS[m - 1], balance: lastBalance });
+      if (m > maxMonth) {
+        // Future month — show null (bar chart will skip/show 0)
+        months.push({ label: MONTHS[m - 1], balance: null });
+        continue;
+      }
+
+      const bal = getEffectiveBalance(snapMap, account.starting_balance, selectedYear, m, curYear, curMonth);
+      months.push({ label: MONTHS[m - 1], balance: bal });
     }
     return months;
-  }, [snapMap, selectedYear, account.starting_balance]);
+  }, [snapMap, selectedYear, account.starting_balance, curYear, curMonth]);
 
   const years = [];
   for (let y = curYear; y >= curYear - 5; y--) years.push(y);
@@ -344,7 +400,14 @@ function SnapshotModal({ account, snapshots, onClose, onSaved }: SnapshotModalPr
         {/* Year balance trend chart */}
         <div style={{ background: '#f8fafc', borderRadius: 10, padding: 14, marginBottom: 20, border: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <span style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>Balance Trend</span>
+            <div>
+              <span style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>Balance Trend</span>
+              {selectedYear === curYear && (
+                <span style={{ marginLeft: 8, fontSize: 11, color: '#94a3b8' }}>
+                  (shown up to {MONTHS[curMonth - 1]}, future months hidden)
+                </span>
+              )}
+            </div>
             <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}
               style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13 }}>
               {years.map(y => <option key={y} value={y}>{y}</option>)}
@@ -355,7 +418,9 @@ function SnapshotModal({ account, snapshots, onClose, onSaved }: SnapshotModalPr
               <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v: number) => fmt(v, account.currency)} />
+              <Tooltip
+                formatter={(v: number | null) => v !== null ? fmt(v, account.currency) : 'No data'}
+              />
               <Bar dataKey="balance" fill={TYPE_COLORS[account.type]} radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -409,31 +474,44 @@ function SnapshotModal({ account, snapshots, onClose, onSaved }: SnapshotModalPr
               {MONTHS.map((label, idx) => {
                 const m = idx + 1;
                 const snap = snapMap[ymKey(selectedYear, m)];
-                // Carry-forward logic
-                let displayBalance = account.starting_balance;
-                for (let pm = 1; pm <= m; pm++) {
-                  const ps = snapMap[ymKey(selectedYear, pm)];
-                  if (ps) displayBalance = ps.balance;
-                }
                 const isCurrent = m === curMonth && selectedYear === curYear;
+                const isFuture =
+                  selectedYear > curYear ||
+                  (selectedYear === curYear && m > curMonth);
+
+                // Effective balance: carry-forward (but not into future)
+                const displayBalance = isFuture
+                  ? null
+                  : getEffectiveBalance(snapMap, account.starting_balance, selectedYear, m, curYear, curMonth);
+
+                const isCarryForward = !snap && displayBalance !== null && !isFuture;
+
                 return (
-                  <tr key={m} style={{ background: isCurrent ? '#f0f9ff' : 'transparent' }}>
+                  <tr key={m} style={{ background: isCurrent ? '#f0f9ff' : isFuture ? '#fafafa' : 'transparent' }}>
                     <td>
-                      <span style={{ fontWeight: isCurrent ? 700 : 500 }}>
+                      <span style={{ fontWeight: isCurrent ? 700 : 500, color: isFuture ? '#cbd5e1' : 'inherit' }}>
                         {label} {selectedYear}
                         {isCurrent && <span style={{ marginLeft: 6, fontSize: 10, background: '#1e40af', color: '#fff', padding: '1px 6px', borderRadius: 4 }}>Current</span>}
+                        {isFuture && <span style={{ marginLeft: 6, fontSize: 10, color: '#94a3b8' }}>—</span>}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'right', fontWeight: 700, color: snap ? '#0f172a' : '#94a3b8', fontStyle: snap ? 'normal' : 'italic' }}>
-                      {fmt(displayBalance, account.currency)}
-                      {!snap && <span style={{ fontSize: 10, color: '#94a3b8', display: 'block' }}>carry-forward</span>}
+                    <td style={{ textAlign: 'right', fontWeight: 700, color: snap ? '#0f172a' : isCarryForward ? '#94a3b8' : '#e2e8f0', fontStyle: isCarryForward ? 'italic' : 'normal' }}>
+                      {isFuture
+                        ? <span style={{ color: '#e2e8f0' }}>—</span>
+                        : displayBalance !== null
+                          ? <>
+                              {fmt(displayBalance, account.currency)}
+                              {isCarryForward && <span style={{ fontSize: 10, color: '#94a3b8', display: 'block' }}>carry-forward</span>}
+                            </>
+                          : '—'
+                      }
                     </td>
-                    <td style={{ fontSize: 12, color: '#64748b' }}>{snap?.note || '—'}</td>
+                    <td style={{ fontSize: 12, color: isFuture ? '#e2e8f0' : '#64748b' }}>{snap?.note || (isFuture ? '' : '—')}</td>
                     <td style={{ fontSize: 11, color: '#94a3b8' }}>
                       {snap ? new Date(snap.updated_at).toLocaleDateString('en-SG') : '—'}
                     </td>
                     <td className="actions-cell">
-                      {snap && (
+                      {snap && !isFuture && (
                         <div className="modal-action-buttons">
                           <button className="edit-btn" onClick={() => {
                             setSelectedMonth(m);
@@ -533,19 +611,27 @@ export default function AccountsPage() {
 
   const { year: curYear, month: curMonth } = currentYM();
 
-  // For each account get its latest balance (current month carry-forward)
+  // Build per-account snapshot lookup maps
+  const accountSnapMaps = useMemo(() => {
+    const maps: Record<string, Record<string, MonthlySnapshot>> = {};
+    accounts.forEach(acc => { maps[acc.id] = {}; });
+    snapshots.forEach(s => {
+      if (!maps[s.account_id]) maps[s.account_id] = {};
+      maps[s.account_id][ymKey(s.year, s.month)] = s;
+    });
+    return maps;
+  }, [accounts, snapshots]);
+
+  // Current balance = effective balance at current month (with carry-forward, no future projection)
   const accountCurrentBalances = useMemo(() => {
     const result: Record<string, number> = {};
     accounts.forEach(acc => {
-      const acSnaps = snapshots
-        .filter(s => s.account_id === acc.id && s.year === curYear && s.month <= curMonth)
-        .sort((a, b) => a.month - b.month);
-      let balance = acc.starting_balance;
-      acSnaps.forEach(s => { balance = s.balance; });
-      result[acc.id] = balance;
+      const snapMap = accountSnapMaps[acc.id] ?? {};
+      const bal = getEffectiveBalance(snapMap, acc.starting_balance, curYear, curMonth, curYear, curMonth);
+      result[acc.id] = bal ?? acc.starting_balance;
     });
     return result;
-  }, [accounts, snapshots, curYear, curMonth]);
+  }, [accounts, accountSnapMaps, curYear, curMonth]);
 
   const includedAccounts = accounts.filter(a => a.include_in_networth === 1);
 
@@ -577,24 +663,30 @@ export default function AccountsPage() {
       .sort((a, b) => b.value - a.value);
   }, [includedAccounts, accountCurrentBalances]);
 
-  // 12-month net worth trend
+  // 12-month net worth trend — only up to current month, future = null/skip
   const nwTrend = useMemo(() => {
     return MONTHS.map((label, idx) => {
       const m = idx + 1;
+      const isFuture = m > curMonth; // for curYear chart
+
+      if (isFuture) {
+        return { label, netWorth: null };
+      }
+
       let assets = 0;
       let liabilities = 0;
+
       includedAccounts.forEach(acc => {
-        const acSnaps = snapshots
-          .filter(s => s.account_id === acc.id && s.year === curYear && s.month <= m)
-          .sort((a, b) => a.month - b.month);
-        let bal = acc.starting_balance;
-        acSnaps.forEach(s => { bal = s.balance; });
+        const snapMap = accountSnapMaps[acc.id] ?? {};
+        const bal = getEffectiveBalance(snapMap, acc.starting_balance, curYear, m, curYear, curMonth);
+        if (bal === null) return;
         if (LIABILITY_TYPES.includes(acc.type)) liabilities += bal;
         else assets += bal;
       });
+
       return { label, netWorth: assets - liabilities };
     });
-  }, [includedAccounts, snapshots, curYear]);
+  }, [includedAccounts, accountSnapMaps, curYear, curMonth]);
 
   if (authLoading || loadingData) {
     return (
@@ -698,18 +790,32 @@ export default function AccountsPage() {
               </div>
             </div>
 
-            {/* NW trend bar chart */}
+            {/* NW trend bar chart — only shows up to current month */}
             <div className="chart-card">
-              <div className="chart-header">Net Worth Trend {curYear}</div>
+              <div className="chart-header">
+                Net Worth Trend {curYear}
+                <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400, marginLeft: 8 }}>
+                  (up to {MONTHS[curMonth - 1]})
+                </span>
+              </div>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={nwTrend} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis tick={{ fontSize: 11 }} />
-                  <Tooltip formatter={(v: number) => fmt(v)} />
-                  <Bar dataKey="netWorth" fill="#00257c" radius={[4, 4, 0, 0]}>
+                  <Tooltip formatter={(v: number | null) => v !== null ? fmt(v) : 'No data'} />
+                  <Bar dataKey="netWorth" radius={[4, 4, 0, 0]}>
                     {nwTrend.map((entry, index) => (
-                      <Cell key={index} fill={entry.netWorth >= 0 ? '#00257c' : '#dc2626'} />
+                      <Cell
+                        key={index}
+                        fill={
+                          entry.netWorth === null
+                            ? '#f1f5f9'
+                            : entry.netWorth >= 0
+                              ? '#00257c'
+                              : '#dc2626'
+                        }
+                      />
                     ))}
                   </Bar>
                 </BarChart>
