@@ -15,6 +15,7 @@ export default function LandingPage() {
             {user ? (
               <>
                 <Link href="/dashboard">Dashboard</Link>
+                <Link href="/accounts">Accounts</Link>
                 <Link href="/transactions">Transactions</Link>
                 <Link href="/watchlist">Watchlist</Link>
                 <Link href="/insights">Insights</Link>

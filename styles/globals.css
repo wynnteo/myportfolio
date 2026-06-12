@@ -415,6 +415,7 @@ th {
   padding: 10px 8px;
   border-bottom: 1px solid #e2e8f0;
   text-align: left;
+  border-right: 1px solid #e2e8f0;
 }
 
 .cell-main {
@@ -2443,13 +2444,13 @@ th.sortable:hover {
   font-size: 11px;
 }
 
-.category-performer.positive {
+/*.category-performer.positive {
   background: linear-gradient(90deg, #ecfdf5 0%, #f0fdf4 100%);
 }
 
 .category-performer.negative {
   background: linear-gradient(90deg, #fef2f2 0%, #fef2f2 100%);
-}
+}*/
 
 .performer-icon {
   font-size: 14px;
