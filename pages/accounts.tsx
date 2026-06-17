@@ -71,6 +71,7 @@ const TYPE_COLORS: Record<AccountType, string> = {
 };
 
 const LIABILITY_TYPES: AccountType[] = ['Liability', 'Loan', 'Credit Card'];
+const ASSET_TYPES: AccountType[] = ['Savings', 'Investment', 'Crypto', 'Property', 'Cash', 'eWallet', 'Retirement', 'Insurance', 'Fixed Deposit', 'Other'];
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -79,10 +80,8 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
 
 function fmt(value: number, currency = 'SGD') {
   return new Intl.NumberFormat('en-SG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    style: 'currency', currency,
+    minimumFractionDigits: 2, maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -95,12 +94,6 @@ function ymKey(year: number, month: number) {
   return `${year}-${String(month).padStart(2, '0')}`;
 }
 
-/**
- * Get the effective balance for an account at a given year/month.
- * Carry-forward: use the most recent snapshot AT OR BEFORE that month.
- * If no snapshot exists at all before that month, fall back to starting_balance.
- * Never project into the future — if year/month is in the future, return null.
- */
 function getEffectiveBalance(
   snapMap: Record<string, MonthlySnapshot>,
   startingBalance: number,
@@ -109,33 +102,19 @@ function getEffectiveBalance(
   currentYear: number,
   currentMonth: number
 ): number | null {
-  // Don't project into future months
-  if (
-    targetYear > currentYear ||
-    (targetYear === currentYear && targetMonth > currentMonth)
-  ) {
-    return null;
-  }
-
-  // Walk backwards from targetMonth to find the most recent snapshot
-  // First check same year, same month back to 1
+  if (targetYear > currentYear || (targetYear === currentYear && targetMonth > currentMonth)) return null;
   for (let m = targetMonth; m >= 1; m--) {
     const snap = snapMap[ymKey(targetYear, m)];
     if (snap) return snap.balance;
   }
-
-  // Then check previous years (up to 5 years back)
   for (let y = targetYear - 1; y >= targetYear - 5; y--) {
     for (let m = 12; m >= 1; m--) {
       const snap = snapMap[ymKey(y, m)];
       if (snap) return snap.balance;
     }
   }
-
   return startingBalance;
 }
-
-// ─── API helpers ─────────────────────────────────────────────────────────────
 
 async function apiAccounts(method: string, body?: object, id?: string) {
   const url = id ? `/api/accounts?id=${id}` : '/api/accounts';
@@ -160,15 +139,9 @@ async function apiSnapshots(method: string, body?: object, id?: string) {
 function TypeBadge({ type }: { type: AccountType }) {
   return (
     <span style={{
-      display: 'inline-flex',
-      alignItems: 'center',
-      gap: 5,
-      padding: '3px 10px',
-      borderRadius: 5,
-      fontSize: 11,
-      fontWeight: 700,
-      background: `${TYPE_COLORS[type]}22`,
-      color: TYPE_COLORS[type],
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      padding: '3px 10px', borderRadius: 5, fontSize: 11, fontWeight: 700,
+      background: `${TYPE_COLORS[type]}22`, color: TYPE_COLORS[type],
       border: `1px solid ${TYPE_COLORS[type]}44`,
     }}>
       <span style={{ width: 7, height: 7, borderRadius: '50%', background: TYPE_COLORS[type], display: 'inline-block' }} />
@@ -177,20 +150,58 @@ function TypeBadge({ type }: { type: AccountType }) {
   );
 }
 
-function NetWorthPieChart({ data }: { data: { name: string; value: number; type: AccountType }[] }) {
-  if (data.length === 0) return (
-    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, color: '#94a3b8', fontWeight: 600, fontSize: 13 }}>
-      No data yet
+// ─── Metric Card ─────────────────────────────────────────────────────────────
+
+function MetricCard({ label, value, sub, color, highlight }: {
+  label: string; value: string; sub?: string; color?: string; highlight?: 'profit' | 'loss' | 'neutral';
+}) {
+  const bgMap = { profit: '#f0fdf4', loss: '#fef2f2', neutral: '#f8fafc' };
+  const borderMap = { profit: '#86efac', loss: '#fca5a5', neutral: '#e2e8f0' };
+  return (
+    <div style={{
+      background: highlight ? bgMap[highlight] : '#fff',
+      border: `1px solid ${highlight ? borderMap[highlight] : '#e2e8f0'}`,
+      borderRadius: 12, padding: '16px 20px',
+    }}>
+      <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: 6 }}>{label}</div>
+      <div style={{ fontSize: 24, fontWeight: 800, color: color ?? '#0f172a', marginBottom: 4 }}>{value}</div>
+      {sub && <div style={{ fontSize: 12, color: '#64748b' }}>{sub}</div>}
     </div>
   );
+}
 
+// ─── Alert Box ────────────────────────────────────────────────────────────────
+
+function AlertBox({ type, icon, title, body }: {
+  type: 'warn' | 'good' | 'info'; icon: string; title: string; body: string;
+}) {
+  const s = {
+    warn: { bg: '#FAEEDA', border: '#EF9F27', color: '#633806' },
+    good: { bg: '#EAF3DE', border: '#639922', color: '#27500A' },
+    info: { bg: '#E6F1FB', border: '#85B7EB', color: '#0C447C' },
+  }[type];
   return (
-    <ResponsiveContainer width="100%" height={200}>
+    <div style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 10 }}>
+      <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{icon}</span>
+      <div>
+        <div style={{ fontWeight: 700, fontSize: 13, color: s.color, marginBottom: 2 }}>{title}</div>
+        <div style={{ fontSize: 12, color: s.color, lineHeight: 1.5, opacity: 0.9 }}>{body}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Donut chart ─────────────────────────────────────────────────────────────
+
+function NetWorthDonut({ data }: { data: { name: string; value: number; type: AccountType }[] }) {
+  if (data.length === 0) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 180, color: '#94a3b8', fontWeight: 600, fontSize: 13 }}>No data yet</div>
+  );
+  return (
+    <ResponsiveContainer width="100%" height={180}>
       <PieChart>
-        <Pie data={data} cx="50%" cy="50%" outerRadius={80} dataKey="value" labelLine={false}>
-          {data.map((entry, i) => (
-            <Cell key={i} fill={TYPE_COLORS[entry.type]} />
-          ))}
+        <Pie data={data} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" labelLine={false}>
+          {data.map((entry, i) => <Cell key={i} fill={TYPE_COLORS[entry.type]} />)}
         </Pie>
         <Tooltip formatter={(v: number) => fmt(v)} />
       </PieChart>
@@ -248,7 +259,7 @@ function AccountForm({ initial = {}, onSave, onCancel, loading }: AccountFormPro
         <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13, fontWeight: 600 }}>
           Tags (comma-separated)
           <input value={form.tags} onChange={e => setForm(f => ({ ...f, tags: e.target.value }))}
-            placeholder="e.g. bank, joint, emergency"
+            placeholder="e.g. bank, joint, SG"
             style={{ padding: '8px 10px', borderRadius: 7, border: '1px solid #cbd5e1', fontSize: 13 }} />
         </label>
         <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13, fontWeight: 600 }}>
@@ -267,7 +278,8 @@ function AccountForm({ initial = {}, onSave, onCancel, loading }: AccountFormPro
         <button onClick={onCancel} style={{ padding: '8px 18px', borderRadius: 7, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
           Cancel
         </button>
-        <button onClick={() => onSave({ ...form, starting_balance: parseFloat(form.starting_balance) || 0, include_in_networth: form.include_in_networth ? 1 : 0 } as any)}
+        <button
+          onClick={() => onSave({ ...form, starting_balance: parseFloat(form.starting_balance) || 0, include_in_networth: form.include_in_networth ? 1 : 0 } as any)}
           disabled={loading || !form.name.trim()}
           style={{ padding: '8px 18px', borderRadius: 7, border: 'none', background: '#00257c', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 13, opacity: loading ? 0.6 : 1 }}>
           {loading ? 'Saving...' : 'Save Account'}
@@ -295,28 +307,23 @@ function SnapshotModal({ account, snapshots, onClose, onSaved }: SnapshotModalPr
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState('');
 
-  // Build a lookup map for this account's snapshots (all years)
   const snapMap = useMemo(() => {
     const m: Record<string, MonthlySnapshot> = {};
     snapshots.forEach(s => { m[ymKey(s.year, s.month)] = s; });
     return m;
   }, [snapshots]);
 
-  // Fill balance field when month/year changes
   useEffect(() => {
     const existing = snapMap[ymKey(selectedYear, selectedMonth)];
     if (existing) {
       setBalance(existing.balance.toString());
       setNote(existing.note ?? '');
     } else {
-      // Find most recent snapshot before this month as a starting suggestion
       let fallback = account.starting_balance;
-      // Check earlier months in same year
       for (let m2 = selectedMonth - 1; m2 >= 1; m2--) {
         const prev = snapMap[ymKey(selectedYear, m2)];
         if (prev) { fallback = prev.balance; break; }
       }
-      // If nothing found, check previous years
       if (fallback === account.starting_balance) {
         for (let y = selectedYear - 1; y >= selectedYear - 5; y--) {
           let found = false;
@@ -333,25 +340,12 @@ function SnapshotModal({ account, snapshots, onClose, onSaved }: SnapshotModalPr
   }, [selectedYear, selectedMonth, snapMap, account.starting_balance]);
 
   async function handleSave() {
-    setSaving(true);
-    setMsg('');
-    // Always POST — the API will upsert (update if same month exists, insert if new)
-    const body = {
-      account_id: account.id,
-      year: selectedYear,
-      month: selectedMonth,
-      balance: parseFloat(balance) || 0,
-      note: note.trim() || null,
-    };
+    setSaving(true); setMsg('');
+    const body = { account_id: account.id, year: selectedYear, month: selectedMonth, balance: parseFloat(balance) || 0, note: note.trim() || null };
     const resp = await apiSnapshots('POST', body);
     setSaving(false);
-    if (resp.ok) {
-      setMsg('Saved!');
-      onSaved();
-      setTimeout(() => setMsg(''), 2000);
-    } else {
-      setMsg('Failed to save');
-    }
+    if (resp.ok) { setMsg('Saved!'); onSaved(); setTimeout(() => setMsg(''), 2000); }
+    else setMsg('Failed to save');
   }
 
   async function handleDelete(snap: MonthlySnapshot) {
@@ -360,12 +354,9 @@ function SnapshotModal({ account, snapshots, onClose, onSaved }: SnapshotModalPr
     onSaved();
   }
 
-  // Chart data: only include months that have actually happened
-  // For current year: Jan up to curMonth. For past years: all 12 months.
   const chartData = useMemo(() => {
     const maxMonth = selectedYear === curYear ? curMonth : 12;
     const months: { label: string; balance: number }[] = [];
-
     for (let m = 1; m <= maxMonth; m++) {
       const bal = getEffectiveBalance(snapMap, account.starting_balance, selectedYear, m, curYear, curMonth);
       months.push({ label: MONTHS[m - 1], balance: bal ?? account.starting_balance });
@@ -391,17 +382,9 @@ function SnapshotModal({ account, snapshots, onClose, onSaved }: SnapshotModalPr
           <button className="ghost" onClick={onClose}>Close</button>
         </div>
 
-        {/* Year balance trend chart */}
         <div style={{ background: '#f8fafc', borderRadius: 10, padding: 14, marginBottom: 20, border: '1px solid #e2e8f0' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-            <div>
-              <span style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>Balance Trend</span>
-              {selectedYear === curYear && (
-                <span style={{ marginLeft: 8, fontSize: 11, color: '#94a3b8' }}>
-                  (shown up to {MONTHS[curMonth - 1]}, future months hidden)
-                </span>
-              )}
-            </div>
+            <span style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>Balance Trend</span>
             <select value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))}
               style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #cbd5e1', fontSize: 13 }}>
               {years.map(y => <option key={y} value={y}>{y}</option>)}
@@ -418,7 +401,6 @@ function SnapshotModal({ account, snapshots, onClose, onSaved }: SnapshotModalPr
           </ResponsiveContainer>
         </div>
 
-        {/* Update snapshot form */}
         <div style={{ background: '#f0f9ff', borderRadius: 10, padding: 14, marginBottom: 20, border: '1px solid #bfdbfe' }}>
           <div style={{ fontWeight: 700, fontSize: 13, color: '#1e40af', marginBottom: 12 }}>Update Monthly Balance</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12, alignItems: 'end' }}>
@@ -447,10 +429,7 @@ function SnapshotModal({ account, snapshots, onClose, onSaved }: SnapshotModalPr
           {msg && <div style={{ marginTop: 8, fontSize: 12, fontWeight: 700, color: msg === 'Saved!' ? '#059669' : '#dc2626' }}>{msg}</div>}
         </div>
 
-        {/* Snapshot table */}
-        <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: '#0f172a' }}>
-          All Snapshots ({selectedYear})
-        </div>
+        <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 10, color: '#0f172a' }}>All Snapshots ({selectedYear})</div>
         <div className="table-wrapper">
           <table className="modal-transaction-table">
             <thead>
@@ -467,49 +446,27 @@ function SnapshotModal({ account, snapshots, onClose, onSaved }: SnapshotModalPr
                 const m = idx + 1;
                 const snap = snapMap[ymKey(selectedYear, m)];
                 const isCurrent = m === curMonth && selectedYear === curYear;
-                const isFuture =
-                  selectedYear > curYear ||
-                  (selectedYear === curYear && m > curMonth);
-
-                // Effective balance: carry-forward (but not into future)
-                const displayBalance = isFuture
-                  ? null
-                  : getEffectiveBalance(snapMap, account.starting_balance, selectedYear, m, curYear, curMonth);
-
+                const isFuture = selectedYear > curYear || (selectedYear === curYear && m > curMonth);
+                const displayBalance = isFuture ? null : getEffectiveBalance(snapMap, account.starting_balance, selectedYear, m, curYear, curMonth);
                 const isCarryForward = !snap && displayBalance !== null && !isFuture;
-
                 return (
                   <tr key={m} style={{ background: isCurrent ? '#f0f9ff' : isFuture ? '#fafafa' : 'transparent' }}>
                     <td>
                       <span style={{ fontWeight: isCurrent ? 700 : 500, color: isFuture ? '#cbd5e1' : 'inherit' }}>
                         {label} {selectedYear}
                         {isCurrent && <span style={{ marginLeft: 6, fontSize: 10, background: '#1e40af', color: '#fff', padding: '1px 6px', borderRadius: 4 }}>Current</span>}
-                        {isFuture && <span style={{ marginLeft: 6, fontSize: 10, color: '#94a3b8' }}>—</span>}
                       </span>
                     </td>
                     <td style={{ textAlign: 'right', fontWeight: 700, color: snap ? '#0f172a' : isCarryForward ? '#94a3b8' : '#e2e8f0', fontStyle: isCarryForward ? 'italic' : 'normal' }}>
-                      {isFuture
-                        ? <span style={{ color: '#e2e8f0' }}>—</span>
-                        : displayBalance !== null
-                          ? <>
-                              {fmt(displayBalance, account.currency)}
-                              {isCarryForward && <span style={{ fontSize: 10, color: '#94a3b8', display: 'block' }}>carry-forward</span>}
-                            </>
-                          : '—'
-                      }
+                      {isFuture ? <span style={{ color: '#e2e8f0' }}>—</span>
+                        : displayBalance !== null ? <>{fmt(displayBalance, account.currency)}{isCarryForward && <span style={{ fontSize: 10, color: '#94a3b8', display: 'block' }}>carry-forward</span>}</> : '—'}
                     </td>
                     <td style={{ fontSize: 12, color: isFuture ? '#e2e8f0' : '#64748b' }}>{snap?.note || (isFuture ? '' : '—')}</td>
-                    <td style={{ fontSize: 11, color: '#94a3b8' }}>
-                      {snap ? new Date(snap.updated_at).toLocaleDateString('en-SG') : '—'}
-                    </td>
+                    <td style={{ fontSize: 11, color: '#94a3b8' }}>{snap ? new Date(snap.updated_at).toLocaleDateString('en-SG') : '—'}</td>
                     <td className="actions-cell">
                       {snap && !isFuture && (
                         <div className="modal-action-buttons">
-                          <button className="edit-btn" onClick={() => {
-                            setSelectedMonth(m);
-                            setBalance(snap.balance.toString());
-                            setNote(snap.note ?? '');
-                          }}>Edit</button>
+                          <button className="edit-btn" onClick={() => { setSelectedMonth(m); setBalance(snap.balance.toString()); setNote(snap.note ?? ''); }}>Edit</button>
                           <button className="delete-btn" onClick={() => void handleDelete(snap)}>Delete</button>
                         </div>
                       )}
@@ -539,6 +496,8 @@ export default function AccountsPage() {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
   const [savingAccount, setSavingAccount] = useState(false);
   const [actionMsg, setActionMsg] = useState('');
+  const [filterCountry, setFilterCountry] = useState<'All' | 'SG' | 'MY'>('All');
+  const [filterType, setFilterType] = useState<string>('All');
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/login');
@@ -557,23 +516,15 @@ export default function AccountsPage() {
       ]);
       if (acRes.ok) setAccounts(await acRes.json());
       if (snRes.ok) setSnapshots(await snRes.json());
-    } finally {
-      setLoadingData(false);
-    }
+    } finally { setLoadingData(false); }
   }
 
   async function handleAddAccount(data: Partial<Account>) {
     setSavingAccount(true);
     const resp = await apiAccounts('POST', data);
     setSavingAccount(false);
-    if (resp.ok) {
-      setShowAddForm(false);
-      setActionMsg('Account added!');
-      void load();
-    } else {
-      const err = await resp.json().catch(() => ({}));
-      setActionMsg((err as any).error ?? 'Failed');
-    }
+    if (resp.ok) { setShowAddForm(false); setActionMsg('Account added!'); void load(); }
+    else { const err = await resp.json().catch(() => ({})); setActionMsg((err as any).error ?? 'Failed'); }
     setTimeout(() => setActionMsg(''), 3000);
   }
 
@@ -582,14 +533,8 @@ export default function AccountsPage() {
     setSavingAccount(true);
     const resp = await apiAccounts('PUT', { ...data, id: editingAccount.id }, editingAccount.id);
     setSavingAccount(false);
-    if (resp.ok) {
-      setEditingAccount(null);
-      setActionMsg('Account updated!');
-      void load();
-    } else {
-      const err = await resp.json().catch(() => ({}));
-      setActionMsg((err as any).error ?? 'Failed');
-    }
+    if (resp.ok) { setEditingAccount(null); setActionMsg('Account updated!'); void load(); }
+    else { const err = await resp.json().catch(() => ({})); setActionMsg((err as any).error ?? 'Failed'); }
     setTimeout(() => setActionMsg(''), 3000);
   }
 
@@ -599,11 +544,8 @@ export default function AccountsPage() {
     void load();
   }
 
-  // ─── Derived analytics ────────────────────────────────────────────────────
-
   const { year: curYear, month: curMonth } = currentYM();
 
-  // Build per-account snapshot lookup maps
   const accountSnapMaps = useMemo(() => {
     const maps: Record<string, Record<string, MonthlySnapshot>> = {};
     accounts.forEach(acc => { maps[acc.id] = {}; });
@@ -614,7 +556,6 @@ export default function AccountsPage() {
     return maps;
   }, [accounts, snapshots]);
 
-  // Current balance = effective balance at current month (with carry-forward, no future projection)
   const accountCurrentBalances = useMemo(() => {
     const result: Record<string, number> = {};
     accounts.forEach(acc => {
@@ -628,39 +569,39 @@ export default function AccountsPage() {
   const includedAccounts = accounts.filter(a => a.include_in_networth === 1);
 
   const totalAssets = useMemo(() =>
-    includedAccounts
-      .filter(a => !LIABILITY_TYPES.includes(a.type))
+    includedAccounts.filter(a => !LIABILITY_TYPES.includes(a.type))
       .reduce((s, a) => s + (accountCurrentBalances[a.id] ?? a.starting_balance), 0),
     [includedAccounts, accountCurrentBalances]);
 
   const totalLiabilities = useMemo(() =>
-    includedAccounts
-      .filter(a => LIABILITY_TYPES.includes(a.type))
+    includedAccounts.filter(a => LIABILITY_TYPES.includes(a.type))
       .reduce((s, a) => s + (accountCurrentBalances[a.id] ?? a.starting_balance), 0),
     [includedAccounts, accountCurrentBalances]);
 
   const netWorth = totalAssets - totalLiabilities;
 
-  // Pie chart by type
+  // Investment accounts total (type = Investment, Crypto, Retirement)
+  const investmentTotal = useMemo(() =>
+    includedAccounts.filter(a => ['Investment', 'Crypto', 'Retirement'].includes(a.type))
+      .reduce((s, a) => s + (accountCurrentBalances[a.id] ?? a.starting_balance), 0),
+    [includedAccounts, accountCurrentBalances]);
+
+  // Pie by type (assets only)
   const pieData = useMemo(() => {
     const byType: Record<string, { type: AccountType; value: number }> = {};
-    includedAccounts.forEach(acc => {
+    includedAccounts.filter(a => !LIABILITY_TYPES.includes(a.type)).forEach(acc => {
       const bal = accountCurrentBalances[acc.id] ?? acc.starting_balance;
       if (!byType[acc.type]) byType[acc.type] = { type: acc.type, value: 0 };
       byType[acc.type].value += bal;
     });
-    return Object.entries(byType)
-      .map(([name, d]) => ({ name, ...d }))
-      .filter(d => d.value > 0)
-      .sort((a, b) => b.value - a.value);
+    return Object.entries(byType).map(([name, d]) => ({ name, ...d })).filter(d => d.value > 0).sort((a, b) => b.value - a.value);
   }, [includedAccounts, accountCurrentBalances]);
 
-  // Net worth trend — only months Jan through curMonth (no future months at all)
+  // Net worth trend
   const nwTrend = useMemo(() => {
     const result: { label: string; netWorth: number }[] = [];
     for (let m = 1; m <= curMonth; m++) {
-      let assets = 0;
-      let liabilities = 0;
+      let assets = 0, liabilities = 0;
       includedAccounts.forEach(acc => {
         const snapMap = accountSnapMaps[acc.id] ?? {};
         const bal = getEffectiveBalance(snapMap, acc.starting_balance, curYear, m, curYear, curMonth);
@@ -673,13 +614,40 @@ export default function AccountsPage() {
     return result;
   }, [includedAccounts, accountSnapMaps, curYear, curMonth]);
 
+  // Insight alerts
+  const alerts = useMemo(() => {
+    const list: { type: 'warn' | 'good' | 'info'; icon: string; title: string; body: string }[] = [];
+    const debtRatio = totalAssets > 0 ? (totalLiabilities / totalAssets) * 100 : 0;
+    if (debtRatio > 40) {
+      list.push({ type: 'warn', icon: '⚠️', title: 'High liability ratio', body: `Your liabilities are ${debtRatio.toFixed(0)}% of your total assets. Consider prioritising debt reduction.` });
+    }
+    if (netWorth > 0) {
+      list.push({ type: 'good', icon: '✅', title: 'Positive net worth', body: `Your net worth is ${fmt(netWorth)}. Assets exceed liabilities by ${((totalAssets / (totalLiabilities || 1)) ).toFixed(1)}×.` });
+    }
+    const investPct = totalAssets > 0 ? (investmentTotal / totalAssets) * 100 : 0;
+    if (investPct > 0) {
+      list.push({ type: 'info', icon: 'ℹ️', title: 'Investment allocation', body: `${investPct.toFixed(0)}% of your assets (${fmt(investmentTotal)}) are in investment/crypto/retirement accounts.` });
+    }
+    return list;
+  }, [netWorth, totalAssets, totalLiabilities, investmentTotal]);
+
+  // Filtered accounts for table
+  const filteredAccounts = useMemo(() => {
+    return accounts.filter(acc => {
+      const tags = acc.tags?.toLowerCase() ?? '';
+      const countryOk = filterCountry === 'All'
+        || (filterCountry === 'SG' && (tags.includes('sg') || tags.includes('singapore') || acc.currency === 'SGD'))
+        || (filterCountry === 'MY' && (tags.includes('my') || tags.includes('malaysia') || tags.includes('msia') || acc.currency === 'MYR'));
+      const typeOk = filterType === 'All' || acc.type === filterType;
+      return countryOk && typeOk;
+    });
+  }, [accounts, filterCountry, filterType]);
+
   if (authLoading || loadingData) {
     return (
       <>
         <header className="site-header">
-          <nav className="site-nav">
-            <Link href="/" className="site-logo">📊 Portfolio Tracker</Link>
-          </nav>
+          <nav className="site-nav"><Link href="/" className="site-logo">📊 Portfolio Tracker</Link></nav>
         </header>
         <main><div className="loading-state">Loading accounts...</div></main>
       </>
@@ -696,6 +664,7 @@ export default function AccountsPage() {
             <Link href="/dashboard">Dashboard</Link>
             <Link href="/transactions">Transactions</Link>
             <Link href="/accounts">Accounts</Link>
+            <Link href="/bills">Bills</Link>
             <Link href="/watchlist">Watchlist</Link>
             <Link href="/insights">Insights</Link>
             <Link href="/calculator">Calculator</Link>
@@ -709,8 +678,8 @@ export default function AccountsPage() {
         {/* ── Page Header ── */}
         <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h1>Accounts</h1>
-            <p>Track all your accounts and monthly balances for net worth calculation</p>
+            <h1>Accounts & Net Worth</h1>
+            <p>Track all your accounts across Singapore and Malaysia — savings, investments, property, and liabilities</p>
           </div>
           <button
             onClick={() => { setShowAddForm(true); setEditingAccount(null); }}
@@ -725,43 +694,33 @@ export default function AccountsPage() {
           </div>
         )}
 
-        {/* ── Net Worth Summary Cards ── */}
-        <div className="overview-grid" style={{ marginBottom: 20 }}>
-          <div className="summary-card">
-            <div className="stat-title">Total Assets</div>
-            <div className="stat-value" style={{ color: '#059669' }}>{fmt(totalAssets)}</div>
-            <div className="stat-sub">{includedAccounts.filter(a => !LIABILITY_TYPES.includes(a.type)).length} asset accounts</div>
-          </div>
-          <div className="summary-card">
-            <div className="stat-title">Total Liabilities</div>
-            <div className="stat-value" style={{ color: '#dc2626' }}>{fmt(totalLiabilities)}</div>
-            <div className="stat-sub">{includedAccounts.filter(a => LIABILITY_TYPES.includes(a.type)).length} liability accounts</div>
-          </div>
-          <div className={`summary-card ${netWorth >= 0 ? 'profit' : 'loss'}`}>
-            <div className="stat-title">Net Worth</div>
-            <div className="stat-value">{fmt(netWorth)}</div>
-            <div className="stat-sub">As of {MONTHS[curMonth - 1]} {curYear}</div>
-          </div>
-          <div className="summary-card">
-            <div className="stat-title">Total Accounts</div>
-            <div className="stat-value" style={{ color: '#0f172a', fontSize: 28 }}>{accounts.length}</div>
-            <div className="stat-sub">{accounts.filter(a => a.include_in_networth === 1).length} included in net worth</div>
-          </div>
+        {/* ── Summary Cards ── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 20 }}>
+          <MetricCard label="Total Assets" value={fmt(totalAssets)} sub={`${includedAccounts.filter(a => !LIABILITY_TYPES.includes(a.type)).length} asset accounts`} color="#059669" />
+          <MetricCard label="Total Liabilities" value={fmt(totalLiabilities)} sub={`${includedAccounts.filter(a => LIABILITY_TYPES.includes(a.type)).length} liability accounts`} color="#dc2626" />
+          <MetricCard label="Net Worth" value={fmt(netWorth)} sub={`As of ${MONTHS[curMonth - 1]} ${curYear}`} color={netWorth >= 0 ? '#059669' : '#dc2626'} highlight={netWorth >= 0 ? 'profit' : 'loss'} />
+          <MetricCard label="Investments & Crypto" value={fmt(investmentTotal)} sub="Investment + Crypto + Retirement" color="#00257c" />
+          <MetricCard label="Total Accounts" value={String(accounts.length)} sub={`${accounts.filter(a => a.include_in_networth === 1).length} in net worth`} />
         </div>
+
+        {/* ── Insight Alerts ── */}
+        {alerts.length > 0 && (
+          <section style={{ marginBottom: 20 }}>
+            <div className="section-title"><div><p className="eyebrow">Signals</p><h2>What your accounts are telling you</h2></div></div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+              {alerts.map((a, i) => <AlertBox key={i} {...a} />)}
+            </div>
+          </section>
+        )}
 
         {/* ── Charts ── */}
         <section style={{ marginBottom: 20 }}>
-          <div className="section-title">
-            <div>
-              <p className="eyebrow">Analytics</p>
-              <h2>Net Worth Overview</h2>
-            </div>
-          </div>
+          <div className="section-title"><div><p className="eyebrow">Analytics</p><h2>Net worth overview</h2></div></div>
           <div className="chart-grid-two-col">
-            {/* Pie chart */}
+            {/* Donut */}
             <div className="chart-card">
-              <div className="chart-header">Balance by Account Type</div>
-              <NetWorthPieChart data={pieData} />
+              <div className="chart-header">Balance by account type (assets)</div>
+              <NetWorthDonut data={pieData} />
               <div className="stacked-legend" style={{ marginTop: 8 }}>
                 {pieData.map((d, i) => (
                   <div key={i} className="legend-item">
@@ -775,14 +734,9 @@ export default function AccountsPage() {
               </div>
             </div>
 
-            {/* NW trend bar chart — only shows up to current month */}
+            {/* NW trend */}
             <div className="chart-card">
-              <div className="chart-header">
-                Net Worth Trend {curYear}
-                <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400, marginLeft: 8 }}>
-                  (up to {MONTHS[curMonth - 1]})
-                </span>
-              </div>
+              <div className="chart-header">Net worth trend {curYear} <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>(up to {MONTHS[curMonth - 1]})</span></div>
               <ResponsiveContainer width="100%" height={220}>
                 <BarChart data={nwTrend} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
@@ -800,38 +754,45 @@ export default function AccountsPage() {
           </div>
         </section>
 
-        {/* ── Add / Edit Form ── */}
+        {/* ── Accounts Table ── */}
         <section>
-          <div className="section-title">
+          <div className="section-title" style={{ flexWrap: 'wrap', gap: 12 }}>
             <div>
               <p className="eyebrow">Manage</p>
               <h2>All Accounts</h2>
             </div>
+            {/* Filters */}
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 4, borderRadius: 8 }}>
+                {(['All', 'SG', 'MY'] as const).map(c => (
+                  <button key={c} onClick={() => setFilterCountry(c)} style={{
+                    padding: '6px 14px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                    background: filterCountry === c ? '#fff' : 'transparent',
+                    color: filterCountry === c ? '#00257c' : '#64748b',
+                    boxShadow: filterCountry === c ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+                  }}>{c === 'All' ? '🌐 All' : c === 'SG' ? '🇸🇬 SG' : '🇲🇾 MY'}</button>
+                ))}
+              </div>
+              <select value={filterType} onChange={e => setFilterType(e.target.value)}
+                style={{ padding: '8px 12px', borderRadius: 8, border: '1px solid #cbd5e1', fontSize: 13, background: '#fff' }}>
+                <option value="All">All types</option>
+                {ACCOUNT_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
           </div>
 
           {showAddForm && !editingAccount && (
-            <AccountForm
-              onSave={handleAddAccount}
-              onCancel={() => setShowAddForm(false)}
-              loading={savingAccount}
-            />
+            <AccountForm onSave={handleAddAccount} onCancel={() => setShowAddForm(false)} loading={savingAccount} />
           )}
-
           {editingAccount && (
-            <AccountForm
-              initial={editingAccount}
-              onSave={handleEditAccount}
-              onCancel={() => setEditingAccount(null)}
-              loading={savingAccount}
-            />
+            <AccountForm initial={editingAccount} onSave={handleEditAccount} onCancel={() => setEditingAccount(null)} loading={savingAccount} />
           )}
 
-          {/* Accounts Table */}
-          {accounts.length === 0 ? (
+          {filteredAccounts.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>🏦</div>
-              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>No accounts yet</div>
-              <div style={{ fontSize: 13 }}>Add your first account to start tracking your net worth</div>
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>No accounts found</div>
+              <div style={{ fontSize: 13 }}>Add your first account or adjust the filters above</div>
             </div>
           ) : (
             <div className="holdings-table-wrapper">
@@ -840,16 +801,16 @@ export default function AccountsPage() {
                   <tr>
                     <th>Account Name</th>
                     <th>Type</th>
-                    <th>Tags</th>
+                    <th>Tags / Country</th>
                     <th>Currency</th>
-                    <th style={{ textAlign: 'right' }}>Starting Balance</th>
                     <th style={{ textAlign: 'right' }}>Current Balance</th>
+                    <th style={{ textAlign: 'right' }}>Change</th>
                     <th style={{ textAlign: 'center' }}>In Net Worth</th>
                     <th style={{ textAlign: 'center' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {accounts.map(acc => {
+                  {filteredAccounts.map(acc => {
                     const currentBal = accountCurrentBalances[acc.id] ?? acc.starting_balance;
                     const delta = currentBal - acc.starting_balance;
                     const isLiability = LIABILITY_TYPES.includes(acc.type);
@@ -857,6 +818,7 @@ export default function AccountsPage() {
                       <tr key={acc.id}>
                         <td>
                           <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{acc.name}</div>
+                          <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>Starting: {fmt(acc.starting_balance, acc.currency)}</div>
                         </td>
                         <td><TypeBadge type={acc.type} /></td>
                         <td>
@@ -869,18 +831,17 @@ export default function AccountsPage() {
                           </div>
                         </td>
                         <td style={{ fontWeight: 600, color: '#475569' }}>{acc.currency}</td>
-                        <td className="value-cell">{fmt(acc.starting_balance, acc.currency)}</td>
-                        <td className="value-cell">
-                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                            <span style={{ fontWeight: 700, color: isLiability ? '#dc2626' : '#0f172a' }}>
-                              {fmt(currentBal, acc.currency)}
+                        <td style={{ textAlign: 'right' }}>
+                          <span style={{ fontWeight: 700, color: isLiability ? '#dc2626' : '#0f172a' }}>
+                            {fmt(currentBal, acc.currency)}
+                          </span>
+                        </td>
+                        <td style={{ textAlign: 'right' }}>
+                          {delta !== 0 ? (
+                            <span style={{ fontSize: 12, fontWeight: 700, color: delta > 0 ? '#059669' : '#dc2626' }}>
+                              {delta > 0 ? '+' : ''}{fmt(delta, acc.currency)}
                             </span>
-                            {delta !== 0 && (
-                              <span style={{ fontSize: 10, fontWeight: 700, color: delta > 0 ? '#059669' : '#dc2626' }}>
-                                {delta > 0 ? '+' : ''}{fmt(delta, acc.currency)}
-                              </span>
-                            )}
-                          </div>
+                          ) : <span style={{ color: '#94a3b8', fontSize: 12 }}>—</span>}
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <span style={{
@@ -893,15 +854,9 @@ export default function AccountsPage() {
                         </td>
                         <td style={{ textAlign: 'center' }}>
                           <div className="modal-action-buttons" style={{ justifyContent: 'center' }}>
-                            <button className="view-btn" onClick={() => setSelectedAccount(acc)}>
-                              Snapshots
-                            </button>
-                            <button className="edit-btn" onClick={() => { setEditingAccount(acc); setShowAddForm(false); }}>
-                              Edit
-                            </button>
-                            <button className="delete-btn" onClick={() => void handleDeleteAccount(acc.id)}>
-                              Delete
-                            </button>
+                            <button className="view-btn" onClick={() => setSelectedAccount(acc)}>Snapshots</button>
+                            <button className="edit-btn" onClick={() => { setEditingAccount(acc); setShowAddForm(false); }}>Edit</button>
+                            <button className="delete-btn" onClick={() => void handleDeleteAccount(acc.id)}>Delete</button>
                           </div>
                         </td>
                       </tr>
@@ -913,6 +868,7 @@ export default function AccountsPage() {
           )}
         </section>
       </main>
+
       {selectedAccount && (
         <SnapshotModal
           account={selectedAccount}

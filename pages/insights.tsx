@@ -30,70 +30,87 @@ interface QuoteResponse {
   asOf: string | null;
 }
 
-interface CategoryBreakdown {
-  totalInvested: number;
-  totalDividends: number;
-  ytdDividends: number;
-  thisMonthDividends: number;
-  lastYearDividends: number;
-  realizedReturn: number;
-  unrealizedReturn: number;
-  unrealizedReturnPct: number;
+const CATEGORIES = ['Unit Trusts', 'Stocks', 'ETF', 'Bond', 'Cash', 'Crypto', 'Other'];
+
+const CATEGORY_COLORS: Record<string, string> = {
+  'Unit Trusts': '#64acdb',
+  Stocks: '#f8c268',
+  ETF: '#6fd2df',
+  Bond: '#f4609f',
+  Cash: '#fa9228',
+  Crypto: '#8b5cf6',
+  Other: '#94a3b8',
+};
+
+function fmt(value: number, currency = 'SGD') {
+  return new Intl.NumberFormat('en-SG', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
 }
 
-const categories = ['Unit Trusts', 'Stocks', 'ETF', 'Bond', 'Cash', 'Crypto', 'Other'];
-
-function formatCurrency(value: number, currency: string = 'SGD') {
-  return new Intl.NumberFormat('en-SG', { style: 'currency', currency }).format(value);
+function fmtPct(value: number, showPlus = true) {
+  const sign = showPlus && value > 0 ? '+' : '';
+  return `${sign}${value.toFixed(2)}%`;
 }
 
-function getCategoryColor(category: string) {
-  const palette: Record<string, string> = {
-    'Unit Trusts': '#64acdb',
-    Stocks: '#f8c268',
-    ETF: '#6fd2df',
-    Bond: '#f4609f',
-    Cash: '#fa9228',
-    Crypto: '#8b5cf6',
-    Other: '#94a3b8',
-  };
-  return palette[category] || '#64748b';
-}
+// ─── Mini YoY Dividend Chart ─────────────────────────────────────────────────
 
-function BrokerBreakdownChart({ data }: {
-  data: { broker: string; invested: number; currentValue: number; gainLoss: number; hasLivePrice: boolean }[]
-}) {
-  const chartRef = useRef<HTMLCanvasElement>(null);
-  const chartInstance = useRef<unknown>(null);
+function DividendYoYChart({ transactions }: { transactions: Transaction[] }) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const chartRef = useRef<any>(null);
+
+  const currentYear = new Date().getFullYear();
+  const lastYear = currentYear - 1;
+
+  const data = useMemo(() => {
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    const thisYear = Array(12).fill(0);
+    const prevYear = Array(12).fill(0);
+
+    transactions
+      .filter(tx => tx.type === 'DIVIDEND' && tx.trade_date)
+      .forEach(tx => {
+        const d = new Date(tx.trade_date!);
+        const yr = d.getFullYear();
+        const mo = d.getMonth();
+        const amt = tx.dividend_amount ?? 0;
+        if (yr === currentYear) thisYear[mo] += amt;
+        if (yr === lastYear) prevYear[mo] += amt;
+      });
+
+    return { months, thisYear, prevYear };
+  }, [transactions, currentYear, lastYear]);
 
   useEffect(() => {
-    if (!chartRef.current || data.length === 0) return;
+    if (!canvasRef.current) return;
 
-    function renderChart() {
-      const ChartJS = (window as unknown as { Chart: new (...args: unknown[]) => { destroy: () => void } }).Chart;
-      if (!ChartJS || !chartRef.current) return;
+    function render() {
+      const ChartJS = (window as any).Chart;
+      if (!ChartJS || !canvasRef.current) return;
+      if (chartRef.current) chartRef.current.destroy();
 
-      if (chartInstance.current) {
-        (chartInstance.current as { destroy: () => void }).destroy();
-      }
-
-      chartInstance.current = new ChartJS(chartRef.current, {
+      chartRef.current = new ChartJS(canvasRef.current, {
         type: 'bar',
         data: {
-          labels: data.map(d => d.broker),
+          labels: data.months,
           datasets: [
             {
-              label: 'Invested',
-              data: data.map(d => d.invested),
-              backgroundColor: '#378ADD',
-              borderRadius: 4,
+              label: String(lastYear),
+              data: data.prevYear,
+              backgroundColor: '#B5D4F4',
+              borderRadius: 3,
               borderSkipped: false,
             },
             {
-              label: 'Current Value',
-              data: data.map(d => d.currentValue),
-              backgroundColor: '#1D9E75',
-              borderRadius: 4,
+              label: String(currentYear),
+              data: data.thisYear,
+              backgroundColor: '#378ADD',
+              borderRadius: 3,
               borderSkipped: false,
             },
           ],
@@ -105,85 +122,123 @@ function BrokerBreakdownChart({ data }: {
             legend: { display: false },
             tooltip: {
               callbacks: {
-                label: (ctx: { dataset: { label: string }; parsed: { y: number } }) =>
-                  ' ' + ctx.dataset.label + ': ' + formatCurrency(ctx.parsed.y),
+                label: (ctx: any) => ` ${ctx.dataset.label}: ${fmt(ctx.parsed.y)}`,
               },
             },
           },
           scales: {
-            x: { grid: { display: false } },
+            x: { grid: { display: false }, ticks: { font: { size: 11 } } },
             y: {
-              grid: { color: 'rgba(128,128,128,0.12)' },
-              ticks: {
-                callback: (v: unknown) =>
-                  'S$' + (Number(v) >= 1000 ? (Number(v) / 1000).toFixed(0) + 'k' : v),
-              },
+              grid: { color: 'rgba(0,0,0,0.06)' },
               beginAtZero: true,
+              ticks: {
+                font: { size: 11 },
+                callback: (v: any) => 'S$' + (Number(v) >= 1000 ? (Number(v) / 1000).toFixed(1) + 'k' : v),
+              },
             },
           },
         },
       });
     }
 
-    const win = window as unknown as { Chart?: unknown };
+    const win = window as any;
     if (win.Chart) {
-      renderChart();
+      render();
     } else {
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js';
-      script.onload = renderChart;
-      document.head.appendChild(script);
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js';
+      s.onload = render;
+      document.head.appendChild(s);
     }
 
-    return () => {
-      if (chartInstance.current) {
-        (chartInstance.current as { destroy: () => void }).destroy();
-        chartInstance.current = null;
-      }
-    };
+    return () => { if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; } };
   }, [data]);
 
+  const thisYearTotal = data.thisYear.reduce((a, b) => a + b, 0);
+  const lastYearTotal = data.prevYear.reduce((a, b) => a + b, 0);
+  const growth = lastYearTotal > 0 ? ((thisYearTotal - lastYearTotal) / lastYearTotal) * 100 : 0;
+
   return (
-    <div>
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '16px', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#378ADD', display: 'inline-block' }} />
-          Invested
-        </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          <span style={{ width: '10px', height: '10px', borderRadius: '2px', background: '#1D9E75', display: 'inline-block' }} />
-          Current value
-        </span>
+    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
+            Dividend income — year on year
+          </div>
+          <div style={{ display: 'flex', gap: 16, fontSize: 12 }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#64748b' }}>
+              <span style={{ width: 10, height: 10, borderRadius: 2, background: '#B5D4F4', display: 'inline-block' }} />
+              {lastYear}: {fmt(lastYearTotal)}
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 5, color: '#64748b' }}>
+              <span style={{ width: 10, height: 10, borderRadius: 2, background: '#378ADD', display: 'inline-block' }} />
+              {currentYear} YTD: {fmt(thisYearTotal)}
+            </span>
+            {growth !== 0 && (
+              <span style={{
+                padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700,
+                background: growth > 0 ? '#EAF3DE' : '#FCEBEB',
+                color: growth > 0 ? '#3B6D11' : '#A32D2D',
+              }}>
+                {growth > 0 ? '↑' : '↓'} {Math.abs(growth).toFixed(1)}% vs last year
+              </span>
+            )}
+          </div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>Monthly avg ({currentYear})</div>
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#0f172a' }}>
+            {fmt(thisYearTotal / new Date().getMonth() || 1)}
+          </div>
+        </div>
       </div>
-
-      <div style={{ position: 'relative', width: '100%', height: `${Math.max(240, data.length * 60)}px` }}>
-        <canvas ref={chartRef} />
+      <div style={{ position: 'relative', height: 200 }}>
+        <canvas ref={canvasRef} />
       </div>
+    </div>
+  );
+}
 
-      <div style={{ marginTop: '20px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {data.map(d => {
-          const pos = d.gainLoss >= 0;
-          const pct = d.invested > 0 ? ((d.gainLoss / d.invested) * 100).toFixed(2) : '0.00';
+// ─── Allocation Bar ───────────────────────────────────────────────────────────
+
+function AllocationBar({ breakdown }: {
+  breakdown: { category: string; pct: number; capital: number }[]
+}) {
+  const CONCENTRATION_THRESHOLD = 50;
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 12 }}>
+        Portfolio allocation
+      </div>
+      {/* Stacked bar */}
+      <div style={{ display: 'flex', height: 16, borderRadius: 8, overflow: 'hidden', gap: 2, marginBottom: 16 }}>
+        {breakdown.map(d => (
+          <div
+            key={d.category}
+            style={{ width: `${d.pct}%`, background: CATEGORY_COLORS[d.category] ?? '#94a3b8', minWidth: d.pct > 1 ? 2 : 0 }}
+            title={`${d.category}: ${d.pct.toFixed(1)}%`}
+          />
+        ))}
+      </div>
+      {/* Legend rows */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {breakdown.map(d => {
+          const isHeavy = d.pct >= CONCENTRATION_THRESHOLD;
+          const isWatch = d.category === 'Crypto';
+          const badge = isHeavy ? { label: 'Heavy', bg: '#FAEEDA', color: '#854F0B' }
+            : isWatch ? { label: 'Watch', bg: '#E6F1FB', color: '#185FA5' }
+            : { label: 'OK', bg: '#EAF3DE', color: '#3B6D11' };
+
           return (
-            <div key={d.broker} style={{
-              display: 'flex', alignItems: 'center', gap: '12px',
-              padding: '10px 14px', background: 'var(--color-background-secondary)',
-              borderRadius: 'var(--border-radius-md)', fontSize: '13px', flexWrap: 'wrap',
-            }}>
-              <span style={{ fontWeight: 500, minWidth: '80px', color: 'var(--color-text-primary)' }}>{d.broker}</span>
-              <span style={{ color: 'var(--color-text-secondary)', flex: 1 }}>
-                Invested: <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>{formatCurrency(d.invested)}</span>
+            <div key={d.category} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
+              <span style={{ width: 10, height: 10, borderRadius: 2, background: CATEGORY_COLORS[d.category] ?? '#94a3b8', flexShrink: 0 }} />
+              <span style={{ flex: 1, color: '#475569', fontWeight: 500 }}>{d.category}</span>
+              <span style={{ fontWeight: 700, color: '#0f172a', minWidth: 50, textAlign: 'right' }}>{fmt(d.capital)}</span>
+              <span style={{ fontWeight: 700, color: '#64748b', minWidth: 38, textAlign: 'right' }}>{d.pct.toFixed(1)}%</span>
+              <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: badge.bg, color: badge.color, minWidth: 46, textAlign: 'center' }}>
+                {badge.label}
               </span>
-              <span style={{ color: 'var(--color-text-secondary)', flex: 1 }}>
-                Current: <span style={{ color: 'var(--color-text-primary)', fontWeight: 500 }}>
-                  {d.hasLivePrice ? formatCurrency(d.currentValue) : '—'}
-                </span>
-              </span>
-              {d.hasLivePrice && (
-                <span style={{ color: pos ? '#1D9E75' : '#E24B4A', fontWeight: 500, minWidth: '120px', textAlign: 'right' }}>
-                  {pos ? '+' : ''}{formatCurrency(d.gainLoss)} ({pos ? '+' : ''}{pct}%)
-                </span>
-              )}
             </div>
           );
         })}
@@ -191,6 +246,207 @@ function BrokerBreakdownChart({ data }: {
     </div>
   );
 }
+
+// ─── Category Return Table ────────────────────────────────────────────────────
+
+function CategoryReturnTable({ rows }: {
+  rows: {
+    category: string;
+    capital: number;
+    currentValue: number;
+    capitalGainPct: number;
+    dividendYield: number;
+    totalReturnPct: number;
+    ytdDividends: number;
+    hasLivePrice: boolean;
+  }[]
+}) {
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ padding: '14px 20px', borderBottom: '1px solid #e2e8f0', fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+        Performance by category — what's working, what isn't
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: '#f8fafc' }}>
+              {['Category', 'Capital', 'Market value', 'Capital gain', 'Div yield on cost', 'Total return', 'YTD dividends'].map(h => (
+                <th key={h} style={{ padding: '10px 14px', textAlign: h === 'Category' ? 'left' : 'right', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr key={row.category} style={{ borderBottom: i < rows.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                <td style={{ padding: '12px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: CATEGORY_COLORS[row.category] ?? '#94a3b8', flexShrink: 0 }} />
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{row.category}</span>
+                  </div>
+                </td>
+                <td style={{ padding: '12px 14px', textAlign: 'right', color: '#475569' }}>{fmt(row.capital)}</td>
+                <td style={{ padding: '12px 14px', textAlign: 'right', color: '#0f172a', fontWeight: 500 }}>
+                  {row.hasLivePrice ? fmt(row.currentValue) : <span style={{ color: '#94a3b8' }}>—</span>}
+                </td>
+                <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                  {row.hasLivePrice ? (
+                    <span style={{ fontWeight: 700, color: row.capitalGainPct >= 0 ? '#059669' : '#dc2626' }}>
+                      {fmtPct(row.capitalGainPct)}
+                    </span>
+                  ) : <span style={{ color: '#94a3b8' }}>—</span>}
+                </td>
+                <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                  <span style={{ fontWeight: 700, color: row.dividendYield > 0 ? '#059669' : '#94a3b8' }}>
+                    {row.dividendYield > 0 ? fmtPct(row.dividendYield, false) : '—'}
+                  </span>
+                </td>
+                <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                  {row.hasLivePrice ? (
+                    <span style={{
+                      fontWeight: 700,
+                      color: row.totalReturnPct >= 0 ? '#059669' : '#dc2626',
+                      padding: '3px 8px', borderRadius: 4,
+                      background: row.totalReturnPct >= 0 ? '#EAF3DE' : '#FCEBEB',
+                    }}>
+                      {fmtPct(row.totalReturnPct)}
+                    </span>
+                  ) : <span style={{ color: '#94a3b8' }}>—</span>}
+                </td>
+                <td style={{ padding: '12px 14px', textAlign: 'right', color: '#059669', fontWeight: 600 }}>
+                  {row.ytdDividends > 0 ? fmt(row.ytdDividends) : <span style={{ color: '#94a3b8' }}>—</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ padding: '10px 20px', background: '#f8fafc', borderTop: '1px solid #e2e8f0', fontSize: 11, color: '#64748b' }}>
+        Total return = unrealised capital gain % + dividend yield on cost (YTD). Live prices required for capital gain.
+      </div>
+    </div>
+  );
+}
+
+// ─── Alert Box ────────────────────────────────────────────────────────────────
+
+function AlertBox({ type, icon, title, body }: {
+  type: 'warn' | 'good' | 'info';
+  icon: string;
+  title: string;
+  body: string;
+}) {
+  const styles = {
+    warn: { bg: '#FAEEDA', border: '#EF9F27', color: '#633806' },
+    good: { bg: '#EAF3DE', border: '#639922', color: '#27500A' },
+    info: { bg: '#E6F1FB', border: '#85B7EB', color: '#0C447C' },
+  }[type];
+
+  return (
+    <div style={{ background: styles.bg, border: `1px solid ${styles.border}`, borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+      <span style={{ fontSize: 18, flexShrink: 0 }}>{icon}</span>
+      <div>
+        <div style={{ fontWeight: 700, fontSize: 13, color: styles.color, marginBottom: 3 }}>{title}</div>
+        <div style={{ fontSize: 12, color: styles.color, lineHeight: 1.5, opacity: 0.9 }}>{body}</div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Top / Worst Performer ────────────────────────────────────────────────────
+
+function PerformersRow({ holdings }: {
+  holdings: { symbol: string; productName: string; plPct: number | null; pl: number | null; currency: string; ytdDividends: number; capital: number }[]
+}) {
+  const withPrices = holdings.filter(h => h.plPct !== null);
+  if (withPrices.length === 0) return null;
+
+  const best = withPrices.reduce((a, b) => (b.plPct! > a.plPct! ? b : a));
+  const worst = withPrices.reduce((a, b) => (b.plPct! < a.plPct! ? b : a));
+
+  // best dividend yield on cost
+  const bestDiv = holdings
+    .filter(h => h.capital > 0 && h.ytdDividends > 0)
+    .sort((a, b) => (b.ytdDividends / b.capital) - (a.ytdDividends / a.capital))[0];
+
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+      {[
+        { label: '🔥 Top performer', holding: best, color: '#059669', bg: '#EAF3DE', pctStr: fmtPct(best.plPct!) },
+        { label: '📉 Worst performer', holding: worst, color: '#dc2626', bg: '#FCEBEB', pctStr: fmtPct(worst.plPct!) },
+        ...(bestDiv ? [{ label: '💰 Best dividend yield', holding: bestDiv, color: '#185FA5', bg: '#E6F1FB', pctStr: fmtPct((bestDiv.ytdDividends / bestDiv.capital) * 100, false) + ' yield' }] : []),
+      ].map(({ label, holding, color, bg, pctStr }) => (
+        <div key={label} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>{label}</div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{holding.symbol}</div>
+              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{holding.productName}</div>
+            </div>
+            <span style={{ fontWeight: 800, fontSize: 16, color, background: bg, padding: '4px 10px', borderRadius: 6 }}>
+              {pctStr}
+            </span>
+          </div>
+          {holding.pl !== null && (
+            <div style={{ fontSize: 11, color: '#64748b', marginTop: 6, paddingTop: 6, borderTop: '1px solid #f1f5f9' }}>
+              {holding.pl >= 0 ? '+' : ''}{fmt(holding.pl, holding.currency)} unrealised
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ─── Broker Table ─────────────────────────────────────────────────────────────
+
+function BrokerTable({ data }: {
+  data: { broker: string; invested: number; currentValue: number; hasLivePrice: boolean }[]
+}) {
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ padding: '14px 20px', borderBottom: '1px solid #e2e8f0', fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
+        By broker
+      </div>
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead>
+          <tr style={{ background: '#f8fafc' }}>
+            {['Broker', 'Invested', 'Current value', 'Gain / Loss'].map(h => (
+              <th key={h} style={{ padding: '10px 16px', textAlign: h === 'Broker' ? 'left' : 'right', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', borderBottom: '1px solid #e2e8f0' }}>
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((d, i) => {
+            const gl = d.currentValue - d.invested;
+            const glPct = d.invested > 0 ? (gl / d.invested) * 100 : 0;
+            return (
+              <tr key={d.broker} style={{ borderBottom: i < data.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                <td style={{ padding: '12px 16px', fontWeight: 600, color: '#0f172a' }}>{d.broker}</td>
+                <td style={{ padding: '12px 16px', textAlign: 'right', color: '#475569' }}>{fmt(d.invested)}</td>
+                <td style={{ padding: '12px 16px', textAlign: 'right', color: '#0f172a', fontWeight: 500 }}>
+                  {d.hasLivePrice ? fmt(d.currentValue) : <span style={{ color: '#94a3b8' }}>—</span>}
+                </td>
+                <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                  {d.hasLivePrice ? (
+                    <span style={{ fontWeight: 700, color: gl >= 0 ? '#059669' : '#dc2626' }}>
+                      {gl >= 0 ? '+' : ''}{fmt(gl)} ({fmtPct(glPct)})
+                    </span>
+                  ) : <span style={{ color: '#94a3b8' }}>—</span>}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function InsightsPage() {
   const router = useRouter();
@@ -201,331 +457,207 @@ export default function InsightsPage() {
   const [loadingPrices, setLoadingPrices] = useState(false);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login');
-    }
+    if (!authLoading && !user) router.push('/login');
   }, [authLoading, user, router]);
 
   useEffect(() => {
-    if (user) {
-      void loadTransactions();
-    }
+    if (user) void loadData();
   }, [user]);
 
-  async function loadTransactions() {
+  async function loadData() {
+    setLoading(true);
     try {
-      setLoading(true);
-      const response = await fetchWithAuth('/api/transactions');
-      if (response.ok) {
-        const data: Transaction[] = await response.json();
-        setTransactions(data);
-      }
-    } catch (error) {
-      console.error('Failed to load transactions:', error);
-    } finally {
-      setLoading(false);
-    }
+      const res = await fetchWithAuth('/api/transactions');
+      if (res.ok) setTransactions(await res.json());
+    } catch {}
+    finally { setLoading(false); }
   }
 
+  // Current holdings (quantity > 0)
   const currentHoldings = useMemo(() => {
     const map = new Map<string, {
-      symbol: string;
-      productName: string;
-      category: string;
-      broker: string;
-      currency: string;
-      quantity: number;
-      totalCost: number;
+      symbol: string; productName: string; category: string;
+      broker: string; currency: string; quantity: number; totalCost: number;
     }>();
-
     for (const tx of transactions) {
       const key = `${tx.symbol}__${tx.broker}`;
       const existing = map.get(key) ?? {
-        symbol: tx.symbol,
-        productName: tx.product_name,
-        category: tx.category,
-        broker: tx.broker,
-        currency: tx.currency,
-        quantity: 0,
-        totalCost: 0,
+        symbol: tx.symbol, productName: tx.product_name, category: tx.category,
+        broker: tx.broker, currency: tx.currency, quantity: 0, totalCost: 0,
       };
-
       if (tx.type === 'BUY' || tx.type === 'SELL') {
-        const qty = tx.quantity ?? 0;
-        const price = tx.price ?? 0;
-        const commission = tx.commission ?? 0;
-        existing.quantity += qty;
-        existing.totalCost += qty * price + commission;
+        existing.quantity += tx.quantity ?? 0;
+        existing.totalCost += (tx.quantity ?? 0) * (tx.price ?? 0) + (tx.commission ?? 0);
       }
-
-      if (tx.product_name) {
-        existing.productName = tx.product_name;
-      }
-
+      if (tx.product_name) existing.productName = tx.product_name;
       map.set(key, existing);
     }
-
     return Array.from(map.values()).filter(h => h.quantity > 0.0001);
   }, [transactions]);
 
+  // Fetch quotes
   useEffect(() => {
-    async function fetchQuotes() {
-      if (currentHoldings.length === 0) {
-        setQuotes({});
-        return;
-      }
-
+    if (currentHoldings.length === 0) return;
+    void (async () => {
       setLoadingPrices(true);
-      const nextQuotes: Record<string, QuoteResponse> = {};
+      const next: Record<string, QuoteResponse> = {};
 
-      const unitTrustHoldings = currentHoldings.filter(h => h.category === 'Unit Trusts');
+      const utHoldings = currentHoldings.filter(h => h.category === 'Unit Trusts');
       const otherHoldings = currentHoldings.filter(h => h.category !== 'Unit Trusts');
 
-      const unitTrustSymbols = Array.from(new Set(unitTrustHoldings.map(h => h.symbol))).filter(Boolean);
-      const otherSymbols = Array.from(new Set(otherHoldings.map(h => h.symbol))).filter(Boolean);
+      await Promise.all(Array.from(new Set(utHoldings.map(h => h.symbol))).map(async sym => {
+        const h = currentHoldings.find(x => x.symbol === sym);
+        try {
+          const r = await fetch(`/api/fund-quote?s=${encodeURIComponent(sym.includes(':') ? sym : sym + ':SGD')}&name=${encodeURIComponent(h?.productName ?? '')}`);
+          if (!r.ok) return;
+          const j = await r.json();
+          if (typeof j.price === 'number') next[sym] = { symbol: sym, currency: 'SGD', price: j.price, asOf: j.lastUpdated ?? null };
+        } catch {}
+      }));
 
-      await Promise.all(
-        unitTrustSymbols.map(async (sym) => {
-          const holding = currentHoldings.find(h => h.symbol === sym);
-          const sParam = sym.includes(':') ? sym : `${sym}:SGD`;
-          const fundName = holding?.productName ?? '';
-          try {
-            const resp = await fetch(
-              `/api/fund-quote?s=${encodeURIComponent(sParam)}&name=${encodeURIComponent(fundName)}`
-            );
-            if (!resp.ok) return;
-            const j = await resp.json();
-            if (typeof j.price === 'number') {
-              nextQuotes[sym] = {
-                symbol: sym,
-                currency: 'SGD',
-                price: j.price,
-                asOf: j.lastUpdated ?? null,
-              };
-            }
-          } catch {
-            // ignore
-          }
-        })
-      );
+      await Promise.all(Array.from(new Set(otherHoldings.map(h => h.symbol))).map(async sym => {
+        try {
+          const r = await fetch(`/api/quote?symbol=${encodeURIComponent(sym)}`);
+          if (!r.ok) return;
+          next[sym] = await r.json();
+        } catch {}
+      }));
 
-      await Promise.all(
-        otherSymbols.map(async (symbol) => {
-          try {
-            const resp = await fetch(`/api/quote?symbol=${encodeURIComponent(symbol)}`);
-            if (!resp.ok) return;
-            const data: QuoteResponse = await resp.json();
-            nextQuotes[symbol] = data;
-          } catch {
-            // ignore
-          }
-        })
-      );
-
-      setQuotes(nextQuotes);
+      setQuotes(next);
       setLoadingPrices(false);
-    }
+    })();
+  }, [currentHoldings.length]);
 
-    void fetchQuotes();
-  }, [currentHoldings]);
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const lastYear = currentYear - 1;
 
-  const categoryBreakdowns = useMemo(() => {
-    const breakdowns = new Map<string, CategoryBreakdown>();
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-    const lastYear = currentYear - 1;
+  // Per-holding enriched data
+  const enrichedHoldings = useMemo(() => {
+    return currentHoldings.map(h => {
+      const quote = quotes[h.symbol];
+      const currentPrice = quote?.price ?? null;
+      const currentValue = currentPrice !== null ? currentPrice * h.quantity : null;
+      const pl = currentValue !== null ? currentValue - h.totalCost : null;
+      const plPct = pl !== null && h.totalCost > 0 ? (pl / h.totalCost) * 100 : null;
 
-    categories.forEach(category => {
-      const breakdown: CategoryBreakdown = {
-        totalInvested: 0,
-        totalDividends: 0,
-        ytdDividends: 0,
-        thisMonthDividends: 0,
-        lastYearDividends: 0,
-        realizedReturn: 0,
-        unrealizedReturn: 0,
-        unrealizedReturnPct: 0,
-      };
+      const ytdDividends = transactions
+        .filter(tx => tx.type === 'DIVIDEND' && tx.symbol === h.symbol && tx.broker === h.broker
+          && tx.trade_date && new Date(tx.trade_date).getFullYear() === currentYear)
+        .reduce((s, tx) => s + (tx.dividend_amount ?? 0), 0);
 
-      // Calculate total invested
-      transactions
-        .filter(tx => tx.category === category && tx.type === 'BUY')
-        .forEach(tx => {
-          if (tx.quantity && tx.price !== null) {
-            breakdown.totalInvested += tx.quantity * tx.price + (tx.commission || 0);
-          }
-        });
-
-      // Calculate total dividends
-      transactions
-        .filter(tx => tx.category === category && tx.type === 'DIVIDEND')
-        .forEach(tx => {
-          const amount = tx.dividend_amount || 0;
-          breakdown.totalDividends += amount;
-
-          if (tx.trade_date) {
-            const d = new Date(tx.trade_date);
-
-            if (d.getFullYear() === currentYear) {
-              breakdown.ytdDividends += amount;
-            }
-
-            if (
-              d.getFullYear() === currentYear &&
-              d.getMonth() === currentMonth
-            ) {
-              breakdown.thisMonthDividends += amount;
-            }
-
-            if (d.getFullYear() === lastYear) {
-              breakdown.lastYearDividends += amount;
-            }
-          }
-        });
-
-      // Calculate realized returns (from closed positions)
-      const positionsMap = new Map<string, {
-        totalBought: number;
-        totalBuyCost: number;
-        totalSold: number;
-        totalSellValue: number;
-      }>();
-
-      transactions
-        .filter(tx => tx.category === category && (tx.type === 'BUY' || tx.type === 'SELL'))
-        .forEach(tx => {
-          const key = `${tx.symbol}__${tx.broker}`;
-          const position = positionsMap.get(key) ?? {
-            totalBought: 0,
-            totalBuyCost: 0,
-            totalSold: 0,
-            totalSellValue: 0,
-          };
-
-          if (tx.type === 'BUY' && tx.quantity && tx.price !== null) {
-            position.totalBought += tx.quantity;
-            position.totalBuyCost += tx.quantity * tx.price + (tx.commission || 0);
-          } else if (tx.type === 'SELL' && tx.quantity && tx.price !== null) {
-            position.totalSold += Math.abs(tx.quantity);
-            position.totalSellValue += Math.abs(tx.quantity) * tx.price - (tx.commission || 0);
-          }
-
-          positionsMap.set(key, position);
-        });
-
-      positionsMap.forEach(position => {
-        if (position.totalSold > 0 && position.totalBought > 0) {
-          const avgBuyPrice = position.totalBuyCost / position.totalBought;
-          const soldCost = position.totalSold * avgBuyPrice;
-          const realizedPL = position.totalSellValue - soldCost;
-          breakdown.realizedReturn += realizedPL;
-        }
-      });
-
-      // Calculate unrealized returns (from current holdings with live prices)
-      const categoryHoldings = currentHoldings.filter(h => h.category === category);
-      let totalCurrentValue = 0;
-      let totalCost = 0;
-
-      categoryHoldings.forEach(holding => {
-        const quote = quotes[holding.symbol];
-        if (quote && typeof quote.price === 'number') {
-          totalCurrentValue += quote.price * holding.quantity;
-          totalCost += holding.totalCost;
-        }
-      });
-
-      breakdown.unrealizedReturn = totalCurrentValue - totalCost;
-      breakdown.unrealizedReturnPct = totalCost !== 0 ? (breakdown.unrealizedReturn / totalCost) * 100 : 0;
-
-      if (breakdown.totalInvested > 0 || breakdown.totalDividends > 0 || breakdown.unrealizedReturn !== 0) {
-        breakdowns.set(category, breakdown);
-      }
+      return { ...h, currentPrice, currentValue, pl, plPct, ytdDividends, hasLivePrice: currentPrice !== null };
     });
+  }, [currentHoldings, quotes, transactions, currentYear]);
 
-    return breakdowns;
-  }, [transactions, currentHoldings, quotes]);
-
-  // Calculate totals
+  // Totals
   const totals = useMemo(() => {
-    let totalInvested = 0;
-    let totalDividends = 0;
-    let ytdDividends = 0;
-    let totalRealized = 0;
-    let totalUnrealized = 0;
+    const totalCapital = enrichedHoldings.reduce((s, h) => s + h.totalCost, 0);
+    const totalCurrentValue = enrichedHoldings.filter(h => h.hasLivePrice).reduce((s, h) => s + (h.currentValue ?? 0), 0);
+    const totalUnrealised = enrichedHoldings.filter(h => h.hasLivePrice).reduce((s, h) => s + (h.pl ?? 0), 0);
+    const totalUnrealisedPct = totalCapital > 0 ? (totalUnrealised / totalCapital) * 100 : 0;
 
-    categoryBreakdowns.forEach(breakdown => {
-      totalInvested += breakdown.totalInvested;
-      totalDividends += breakdown.totalDividends;
-      ytdDividends += breakdown.ytdDividends;
-      totalRealized += breakdown.realizedReturn;
-      totalUnrealized += breakdown.unrealizedReturn;
-    });
+    const allTimeDividends = transactions.filter(tx => tx.type === 'DIVIDEND').reduce((s, tx) => s + (tx.dividend_amount ?? 0), 0);
+    const ytdDividends = transactions.filter(tx => tx.type === 'DIVIDEND' && tx.trade_date && new Date(tx.trade_date).getFullYear() === currentYear).reduce((s, tx) => s + (tx.dividend_amount ?? 0), 0);
+    const lastYearDividends = transactions.filter(tx => tx.type === 'DIVIDEND' && tx.trade_date && new Date(tx.trade_date).getFullYear() === lastYear).reduce((s, tx) => s + (tx.dividend_amount ?? 0), 0);
 
-    const unrealizedPct = totalInvested !== 0 ? (totalUnrealized / totalInvested) * 100 : 0;
+    const totalReturn = totalUnrealised + allTimeDividends;
+    const totalReturnPct = totalCapital > 0 ? (totalReturn / totalCapital) * 100 : 0;
+
+    const divGrowth = lastYearDividends > 0 ? ((ytdDividends - lastYearDividends) / lastYearDividends) * 100 : null;
+    const monthlyAvgDiv = ytdDividends / (now.getMonth() + 1);
 
     return {
-      totalInvested,
-      totalDividends,
-      ytdDividends,
-      totalRealized,
-      totalUnrealized,
-      unrealizedPct,
+      totalCapital, totalCurrentValue, totalUnrealised, totalUnrealisedPct,
+      allTimeDividends, ytdDividends, lastYearDividends, divGrowth,
+      totalReturn, totalReturnPct, monthlyAvgDiv,
     };
-  }, [categoryBreakdowns]);
+  }, [enrichedHoldings, transactions, currentYear, lastYear]);
 
-  const brokerBreakdowns = useMemo(() => {
-    const map = new Map<string, { invested: number; currentValue: number; hasLivePrice: boolean }>();
+  // Category breakdown for table
+  const categoryRows = useMemo(() => {
+    return CATEGORIES.map(cat => {
+      const hs = enrichedHoldings.filter(h => h.category === cat);
+      if (hs.length === 0) return null;
 
-    for (const holding of currentHoldings) {
-      const broker = holding.broker || 'Unknown';
-      const existing = map.get(broker) ?? { invested: 0, currentValue: 0, hasLivePrice: false };
+      const capital = hs.reduce((s, h) => s + h.totalCost, 0);
+      const priced = hs.filter(h => h.hasLivePrice);
+      const currentValue = priced.reduce((s, h) => s + (h.currentValue ?? 0), 0);
+      const pricedCapital = priced.reduce((s, h) => s + h.totalCost, 0);
+      const capitalGainPct = pricedCapital > 0 ? ((currentValue - pricedCapital) / pricedCapital) * 100 : 0;
+      const ytdDividends = hs.reduce((s, h) => s + h.ytdDividends, 0);
+      const dividendYield = capital > 0 ? (ytdDividends / capital) * 100 : 0;
+      const totalReturnPct = capitalGainPct + dividendYield;
 
-      existing.invested += holding.totalCost;
+      return { category: cat, capital, currentValue, capitalGainPct, dividendYield, totalReturnPct, ytdDividends, hasLivePrice: priced.length > 0 };
+    }).filter(Boolean) as any[];
+  }, [enrichedHoldings]);
 
-      const quote = quotes[holding.symbol];
-      if (quote && typeof quote.price === 'number') {
-        existing.currentValue += quote.price * holding.quantity;
-        existing.hasLivePrice = true;
-      }
+  // Allocation for bar
+  const allocationBreakdown = useMemo(() => {
+    const total = categoryRows.reduce((s, r) => s + r.capital, 0);
+    return categoryRows.map(r => ({ category: r.category, capital: r.capital, pct: total > 0 ? (r.capital / total) * 100 : 0 }))
+      .sort((a, b) => b.pct - a.pct);
+  }, [categoryRows]);
 
-      map.set(broker, existing);
+  // Alerts
+  const alerts = useMemo(() => {
+    const list: { type: 'warn' | 'good' | 'info'; icon: string; title: string; body: string }[] = [];
+    const top = allocationBreakdown[0];
+    if (top && top.pct >= 50) {
+      list.push({ type: 'warn', icon: '⚠️', title: 'Concentration risk', body: `${top.category} makes up ${top.pct.toFixed(0)}% of your portfolio. A single category dip drags everything. Consider if you're comfortable with this.` });
     }
+    if (totals.divGrowth !== null && totals.divGrowth > 0) {
+      list.push({ type: 'good', icon: '✅', title: 'Dividend growing well', body: `Your YTD dividend income is up ${totals.divGrowth.toFixed(1)}% vs last year. You're building a solid passive income stream — keep topping up.` });
+    }
+    const bigUnrealised = enrichedHoldings.filter(h => h.pl !== null && h.pl > 0).sort((a, b) => (b.pl ?? 0) - (a.pl ?? 0))[0];
+    if (bigUnrealised) {
+      list.push({ type: 'info', icon: 'ℹ️', title: 'Unrealised gains sitting idle', body: `${bigUnrealised.symbol} has +${fmt(bigUnrealised.pl!, bigUnrealised.currency)} unrealised gain. Consider whether it's time to take some profit or rebalance.` });
+    }
+    if (list.length === 0) {
+      list.push({ type: 'info', icon: 'ℹ️', title: 'Portfolio looks balanced', body: 'No major concentration risks detected. Keep tracking your dividends and review quarterly.' });
+    }
+    return list;
+  }, [allocationBreakdown, totals, enrichedHoldings]);
 
-    return Array.from(map.entries())
-      .map(([broker, data]) => ({ broker, ...data, gainLoss: data.currentValue - data.invested }))
-      .sort((a, b) => b.invested - a.invested);
-  }, [currentHoldings, quotes]);
+  // Broker breakdown
+  const brokerBreakdown = useMemo(() => {
+    const map = new Map<string, { invested: number; currentValue: number; hasLivePrice: boolean }>();
+    for (const h of enrichedHoldings) {
+      const b = h.broker || 'Unknown';
+      const ex = map.get(b) ?? { invested: 0, currentValue: 0, hasLivePrice: false };
+      ex.invested += h.totalCost;
+      if (h.currentValue !== null) { ex.currentValue += h.currentValue; ex.hasLivePrice = true; }
+      map.set(b, ex);
+    }
+    return Array.from(map.entries()).map(([broker, d]) => ({ broker, ...d })).sort((a, b) => b.invested - a.invested);
+  }, [enrichedHoldings]);
 
   if (authLoading || loading) {
     return (
       <>
         <header className="site-header">
           <nav className="site-nav">
-            <Link href="/" className="site-logo">
-              📊 Portfolio Tracker
-            </Link>
+            <Link href="/" className="site-logo">📊 Portfolio Tracker</Link>
           </nav>
         </header>
-        <main>
-          <div className="loading-state">Loading insights...</div>
-        </main>
+        <main><div className="loading-state">Loading insights...</div></main>
       </>
     );
   }
+
+  const DIV_GOAL = 500; // monthly dividend goal in SGD
 
   return (
     <>
       <header className="site-header">
         <nav className="site-nav">
-          <Link href="/" className="site-logo">
-            📊 Portfolio Tracker
-          </Link>
+          <Link href="/" className="site-logo">📊 Portfolio Tracker</Link>
           <div className="nav-menu">
             <Link href="/">Home</Link>
             <Link href="/dashboard">Dashboard</Link>
             <Link href="/transactions">Transactions</Link>
+            <Link href="/accounts">Accounts</Link>
             <Link href="/watchlist">Watchlist</Link>
             <Link href="/insights">Insights</Link>
             <Link href="/calculator">Calculator</Link>
@@ -536,153 +668,143 @@ export default function InsightsPage() {
       </header>
 
       <main>
-        <div className="page-header">
-          <h1>Investment Insights</h1>
-          <p>Breakdown of your investment performance and passive income by category</p>
+        <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h1>Investment Insights</h1>
+            <p>Understand your portfolio — not just the numbers, but what they mean</p>
+          </div>
+          {loadingPrices && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#64748b', padding: '8px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+              <span className="loading-spinner" style={{ width: 12, height: 12 }} />
+              Loading live prices...
+            </div>
+          )}
         </div>
 
-        {/* Overall Summary */}
-        <section className="insights-overview-section">
-          <div className="section-title">
-            <h2>Portfolio Overview</h2>
-          </div>
-
-          <div className="insights-overview-grid">
-            <div className="insight-overview-card">
-              <div className="overview-label">Total Invested</div>
-              <div className="overview-value">{formatCurrency(totals.totalInvested)}</div>
-              <div className="overview-sub">Total capital deployed</div>
+        {/* ── Section 1: Net worth snapshot ── */}
+        <section style={{ marginBottom: 20 }}>
+          <div className="section-title"><div><p className="eyebrow">Overview</p><h2>Net worth snapshot</h2></div></div>
+          <div className="overview-grid">
+            <div className="summary-card">
+              <div className="stat-title">Total invested</div>
+              <div className="stat-value">{fmt(totals.totalCapital)}</div>
+              <div className="stat-sub">{currentHoldings.length} active holdings</div>
             </div>
-
-            <div className="insight-overview-card highlight-dividends">
-              <div className="overview-label">Total Dividends</div>
-              <div className="overview-value positive">
-                {formatCurrency(totals.totalDividends)}
-              </div>
-              <div className="overview-sub">
-                YTD {new Date().getFullYear()}: {formatCurrency(totals.ytdDividends)}
-              </div>
+            <div className={`summary-card ${totals.totalUnrealised >= 0 ? 'profit' : 'loss'}`}>
+              <div className="stat-title">Unrealised P/L</div>
+              <div className="stat-value">{fmt(totals.totalUnrealised)}</div>
+              <div className="stat-sub">{fmtPct(totals.totalUnrealisedPct)} on invested capital</div>
             </div>
-
-            <div className="insight-overview-card highlight-return">
-              <div className="overview-label">Realized Return</div>
-              <div className={`overview-value ${totals.totalRealized >= 0 ? 'positive' : 'negative'}`}>
-                {formatCurrency(totals.totalRealized)}
+            <div className="summary-card profit">
+              <div className="stat-title">Total return (capital + dividends)</div>
+              <div className="stat-value" style={{ color: totals.totalReturn >= 0 ? '#059669' : '#dc2626' }}>
+                {fmt(totals.totalReturn)}
               </div>
-              <div className="overview-sub">
-                {totals.totalRealized >= 0 ? 'Gain' : 'Loss'} from closed positions
-              </div>
+              <div className="stat-sub">{fmtPct(totals.totalReturnPct)} all-in return</div>
             </div>
-
-            <div className="insight-overview-card highlight-return">
-              <div className="overview-label">Unrealized Return</div>
-              <div className={`overview-value ${totals.totalUnrealized >= 0 ? 'positive' : 'negative'}`}>
-                {formatCurrency(totals.totalUnrealized)}
-              </div>
-              <div className="overview-sub">
-                {totals.totalUnrealized >= 0 ? '+' : ''}{totals.unrealizedPct.toFixed(2)}% from current holdings
+            <div className="summary-card">
+              <div className="stat-title">Dividend income YTD {currentYear}</div>
+              <div className="stat-value">{fmt(totals.ytdDividends)}</div>
+              <div className="stat-sub">
+                {fmt(totals.monthlyAvgDiv)}/mo avg
+                {totals.divGrowth !== null && (
+                  <span style={{ marginLeft: 8, padding: '2px 7px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: totals.divGrowth >= 0 ? '#EAF3DE' : '#FCEBEB', color: totals.divGrowth >= 0 ? '#3B6D11' : '#A32D2D' }}>
+                    {totals.divGrowth >= 0 ? '↑' : '↓'} {Math.abs(totals.divGrowth).toFixed(1)}% vs {lastYear}
+                  </span>
+                )}
               </div>
             </div>
           </div>
         </section>
 
-        {/* Category Breakdown */}
-        <section className="insights-category-section">
-          <div className="section-title">
-            <h2>Breakdown by Category</h2>
-            {loadingPrices && (
-              <span className="muted" style={{ fontSize: '14px' }}>
-                <span className="loading-spinner" style={{ width: '12px', height: '12px', marginRight: '6px' }}></span>
-                Loading current prices...
-              </span>
-            )}
-          </div>
-
-          <div className="insights-category-grid">
-            {Array.from(categoryBreakdowns.entries()).map(([category, data]) => (
-              <div key={category} className="insight-category-card">
-                <div className="category-card-header">
-                  <span
-                    className="category-color-indicator"
-                    style={{ backgroundColor: getCategoryColor(category) }}
-                  />
-                  <span className="category-card-title">{category}</span>
-                </div>
-
-                <div className="category-metrics">
-                  <div className="metric-row">
-                    <span className="metric-label">Total Invested</span>
-                    <span className="metric-value">{formatCurrency(data.totalInvested)}</span>
-                  </div>
-                  <div className="metric-row highlight-row">
-                    <span className="metric-label">Total Dividends</span>
-                    <span className="metric-value positive">
-                      {formatCurrency(data.totalDividends)}
-                    </span>
-                  </div>
-                  <div className="metric-row highlight-row">
-                    <span className="metric-label">
-                      Last Year {new Date().getFullYear() - 1}
-                    </span>
-                    <span className="metric-value positive">
-                      {formatCurrency(data.lastYearDividends)}
-                    </span>
-                  </div>
-                  <div className="metric-row highlight-row">
-                    <span className="metric-label">YTD Dividends {new Date().getFullYear()}</span>
-                    <span className="metric-value positive">
-                      {formatCurrency(data.ytdDividends)}
-                    </span>
-                  </div>
-                  <div className="metric-row highlight-row">
-                    <span className="metric-label">
-                      This Month {new Date().toLocaleString('en-SG', { month: 'short' })}
-                    </span>
-                    <span className="metric-value positive">
-                      {formatCurrency(data.thisMonthDividends)}
-                    </span>
-                  </div>
-                  <div className="metric-row total-row">
-                    <span className="metric-label">Realized Return</span>
-                    <span className={`metric-value ${data.realizedReturn >= 0 ? 'positive' : 'negative'}`}>
-                      {formatCurrency(data.realizedReturn)}
-                    </span>
-                  </div>
-                  <div className="metric-row total-row">
-                    <span className="metric-label">Unrealized Return</span>
-                    <span className={`metric-value ${data.unrealizedReturn >= 0 ? 'positive' : 'negative'}`}>
-                      {formatCurrency(data.unrealizedReturn)}
-                      {data.unrealizedReturnPct !== 0 && (
-                        <span className="metric-pct" style={{ marginLeft: '6px', fontSize: '12px', opacity: 0.8 }}>
-                          ({data.unrealizedReturn >= 0 ? '+' : ''}{data.unrealizedReturnPct.toFixed(2)}%)
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
+        {/* ── Section 2: What the numbers mean ── */}
+        <section style={{ marginBottom: 20 }}>
+          <div className="section-title"><div><p className="eyebrow">Signals</p><h2>What the numbers are telling you</h2></div></div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+            {alerts.map((a, i) => <AlertBox key={i} {...a} />)}
           </div>
         </section>
 
-        {brokerBreakdowns.length > 0 && (
-          <section className="insights-category-section">
-            <div className="section-title">
-              <h2>By Broker</h2>
-              {loadingPrices && (
-                <span className="muted" style={{ fontSize: '14px' }}>
-                  <span className="loading-spinner" style={{ width: '12px', height: '12px', marginRight: '6px' }}></span>
-                  Loading current prices...
-                </span>
-              )}
+        {/* ── Section 3: Passive income goal ── */}
+        <section style={{ marginBottom: 20 }}>
+          <div className="section-title"><div><p className="eyebrow">Goals</p><h2>Passive income progress</h2></div></div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 12 }}>
+            {/* Monthly dividend goal */}
+            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20 }}>
+              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>Monthly dividend goal</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
+                {fmt(totals.monthlyAvgDiv)}
+                <span style={{ fontSize: 14, fontWeight: 500, color: '#64748b' }}> / mo</span>
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b', marginBottom: 8 }}>Target: {fmt(DIV_GOAL)}/mo</div>
+              <div style={{ background: '#f1f5f9', borderRadius: 4, height: 8, overflow: 'hidden' }}>
+                <div style={{ width: `${Math.min((totals.monthlyAvgDiv / DIV_GOAL) * 100, 100)}%`, height: '100%', background: '#378ADD', borderRadius: 4 }} />
+              </div>
+              <div style={{ fontSize: 11, color: '#64748b', marginTop: 6 }}>
+                {((totals.monthlyAvgDiv / DIV_GOAL) * 100).toFixed(0)}% of goal
+                {totals.monthlyAvgDiv < DIV_GOAL && ` · need ${fmt(DIV_GOAL - totals.monthlyAvgDiv)}/mo more`}
+              </div>
             </div>
-            <BrokerBreakdownChart data={brokerBreakdowns} />
+            {/* All-time dividends */}
+            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20 }}>
+              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>All-time dividends collected</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#059669', marginBottom: 4 }}>{fmt(totals.allTimeDividends)}</div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>
+                YTD {currentYear}: {fmt(totals.ytdDividends)}<br />
+                {lastYear}: {fmt(totals.lastYearDividends)}
+              </div>
+            </div>
+            {/* Effective yield */}
+            <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20 }}>
+              <div style={{ fontSize: 12, color: '#64748b', fontWeight: 600, marginBottom: 8 }}>Effective yield on cost (YTD)</div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>
+                {totals.totalCapital > 0 ? ((totals.ytdDividends / totals.totalCapital) * 100).toFixed(2) : '0.00'}%
+              </div>
+              <div style={{ fontSize: 12, color: '#64748b' }}>
+                Based on {fmt(totals.ytdDividends)} YTD dividends<br />
+                on {fmt(totals.totalCapital)} total invested
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── Section 4: Performance by category ── */}
+        <section style={{ marginBottom: 20 }}>
+          <div className="section-title"><div><p className="eyebrow">Performance</p><h2>By asset class</h2></div></div>
+          <CategoryReturnTable rows={categoryRows} />
+        </section>
+
+        {/* ── Section 5: Allocation ── */}
+        <section style={{ marginBottom: 20 }}>
+          <div className="section-title"><div><p className="eyebrow">Diversification</p><h2>Portfolio allocation</h2></div></div>
+          <AllocationBar breakdown={allocationBreakdown} />
+        </section>
+
+        {/* ── Section 6: Best / Worst ── */}
+        {enrichedHoldings.some(h => h.hasLivePrice) && (
+          <section style={{ marginBottom: 20 }}>
+            <div className="section-title"><div><p className="eyebrow">Rankings</p><h2>Best & worst performers</h2></div></div>
+            <PerformersRow holdings={enrichedHoldings} />
           </section>
         )}
 
-        {categoryBreakdowns.size === 0 && (
+        {/* ── Section 7: Dividend YoY chart ── */}
+        <section style={{ marginBottom: 20 }}>
+          <div className="section-title"><div><p className="eyebrow">Income</p><h2>Dividend trend</h2></div></div>
+          <DividendYoYChart transactions={transactions} />
+        </section>
+
+        {/* ── Section 8: By broker ── */}
+        {brokerBreakdown.length > 0 && (
+          <section style={{ marginBottom: 20 }}>
+            <div className="section-title"><div><p className="eyebrow">Brokers</p><h2>By broker</h2></div></div>
+            <BrokerTable data={brokerBreakdown} />
+          </section>
+        )}
+
+        {currentHoldings.length === 0 && (
           <div className="empty-state">
-            <p>No transaction data available</p>
+            <p>No transaction data yet. Add some transactions in the Dashboard to see your insights.</p>
           </div>
         )}
       </main>
