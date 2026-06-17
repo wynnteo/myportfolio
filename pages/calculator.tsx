@@ -170,7 +170,7 @@ function SGIncomeTaxCalculator() {
       effectiveRate,
       earnedIncome,
     };
-  }, [salary, bonus, others, donationAmt, earnedRelief, child2Relief, cpfTopUp, srsTopUp]);
+  }, [salary, bonus, others, donationAmt, child2Relief, cpfTopUp, srsTopUp]);
 
   function handleReset() {
     setSalary(''); setBonus(''); setOthers('');

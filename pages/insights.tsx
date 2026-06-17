@@ -152,7 +152,7 @@ function DividendYoYChart({ transactions }: { transactions: Transaction[] }) {
     }
 
     return () => { if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; } };
-  }, [data]);
+  }, [data, currentYear, lastYear]);
 
   const thisYearTotal = data.thisYear.reduce((a, b) => a + b, 0);
   const lastYearTotal = data.prevYear.reduce((a, b) => a + b, 0);
@@ -264,7 +264,7 @@ function CategoryReturnTable({ rows }: {
   return (
     <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
       <div style={{ padding: '14px 20px', borderBottom: '1px solid #e2e8f0', fontSize: 13, fontWeight: 700, color: '#0f172a' }}>
-        Performance by category — what's working, what isn't
+        Performance by category — what&apos;s working, what isn&apos;t
       </div>
       <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -359,6 +359,7 @@ function AlertBox({ type, icon, title, body }: {
 function PerformersRow({ holdings }: {
   holdings: { symbol: string; productName: string; plPct: number | null; pl: number | null; currency: string; ytdDividends: number; capital: number }[]
 }) {
+
   const withPrices = holdings.filter(h => h.plPct !== null);
   if (withPrices.length === 0) return null;
 
@@ -526,7 +527,7 @@ export default function InsightsPage() {
       setQuotes(next);
       setLoadingPrices(false);
     })();
-  }, [currentHoldings.length]);
+  }, [currentHoldings]);
 
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -546,7 +547,7 @@ export default function InsightsPage() {
           && tx.trade_date && new Date(tx.trade_date).getFullYear() === currentYear)
         .reduce((s, tx) => s + (tx.dividend_amount ?? 0), 0);
 
-      return { ...h, currentPrice, currentValue, pl, plPct, ytdDividends, hasLivePrice: currentPrice !== null };
+      return { ...h, capital: h.totalCost, currentPrice, currentValue, pl, plPct, ytdDividends, hasLivePrice: currentPrice !== null };
     });
   }, [currentHoldings, quotes, transactions, currentYear]);
 
@@ -565,7 +566,8 @@ export default function InsightsPage() {
     const totalReturnPct = totalCapital > 0 ? (totalReturn / totalCapital) * 100 : 0;
 
     const divGrowth = lastYearDividends > 0 ? ((ytdDividends - lastYearDividends) / lastYearDividends) * 100 : null;
-    const monthlyAvgDiv = ytdDividends / (now.getMonth() + 1);
+    const currentMonth = new Date().getMonth() + 1;
+    const monthlyAvgDiv = ytdDividends / currentMonth;
 
     return {
       totalCapital, totalCurrentValue, totalUnrealised, totalUnrealisedPct,
