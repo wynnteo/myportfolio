@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../lib/AuthContext';
+import { fetchWithAuth } from '../lib/api';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -22,25 +23,29 @@ type BillCategory =
 
 interface Bill {
   id: string;
+  user_id: string;
   name: string;
   category: BillCategory;
   country: BillCountry;
   currency: string;
   amount: number;
   frequency: BillFrequency;
-  due_day: number | null;       // day of month (1-31)
-  due_month: number | null;     // for annual bills: month (1-12)
-  auto_debit: boolean;
+  due_day: number | null;
+  due_month: number | null;
+  auto_debit: number; // 0 or 1 from SQLite
   notes: string;
-  is_active: boolean;
+  is_active: number; // 0 or 1 from SQLite
+  created_at: string;
 }
 
 interface BillPayment {
   id: string;
   bill_id: string;
+  user_id: string;
   paid_date: string;
   amount: number;
   notes: string;
+  created_at: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -84,8 +89,6 @@ const CATEGORY_COLORS: Record<BillCategory, string> = {
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-const CURRENCY_BY_COUNTRY: Record<BillCountry, string> = { SG: 'SGD', MY: 'MYR' };
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmt(amount: number, currency = 'SGD') {
@@ -116,6 +119,7 @@ function annualEquivalent(amount: number, frequency: BillFrequency): number {
 function getNextDueDate(bill: Bill): { label: string; daysUntil: number } | null {
   if (!bill.is_active) return null;
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
   const todayMs = today.getTime();
   let next: Date | null = null;
 
@@ -124,7 +128,7 @@ function getNextDueDate(bill: Bill): { label: string; daysUntil: number } | null
     if (d.getTime() < todayMs) d.setMonth(d.getMonth() + 1);
     next = d;
   } else if (bill.frequency === 'Quarterly' && bill.due_day) {
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < 5; i++) {
       const d = new Date(today.getFullYear(), today.getMonth() + i * 3, bill.due_day);
       if (d.getTime() >= todayMs) { next = d; break; }
     }
@@ -141,64 +145,81 @@ function getNextDueDate(bill: Bill): { label: string; daysUntil: number } | null
 
   if (!next) return null;
   const daysUntil = Math.ceil((next.getTime() - todayMs) / 86400000);
-  const label = next.toLocaleDateString('en-SG', { day: 'numeric', month: 'short', year: next.getFullYear() !== today.getFullYear() ? 'numeric' : undefined });
+  const label = next.toLocaleDateString('en-SG', {
+    day: 'numeric', month: 'short',
+    year: next.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
+  });
   return { label, daysUntil };
 }
 
+// ─── Small components ─────────────────────────────────────────────────────────
+
 function DueBadge({ daysUntil }: { daysUntil: number }) {
   const overdue = daysUntil < 0;
-  const urgent = daysUntil >= 0 && daysUntil <= 7;
-  const soon = daysUntil > 7 && daysUntil <= 30;
+  const urgent = !overdue && daysUntil <= 7;
+  const soon = !overdue && daysUntil <= 30;
   const bg = overdue ? '#FCEBEB' : urgent ? '#FAEEDA' : soon ? '#E6F1FB' : '#f1f5f9';
   const color = overdue ? '#A32D2D' : urgent ? '#854F0B' : soon ? '#185FA5' : '#64748b';
-  const label = overdue ? `${Math.abs(daysUntil)}d overdue` : daysUntil === 0 ? 'Due today!' : `${daysUntil}d`;
-  return <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: bg, color }}>{label}</span>;
+  const label = overdue
+    ? `${Math.abs(daysUntil)}d overdue`
+    : daysUntil === 0 ? 'Due today!'
+    : `${daysUntil}d left`;
+  return (
+    <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: bg, color }}>
+      {label}
+    </span>
+  );
 }
 
-// ─── localStorage helpers (no backend needed) ─────────────────────────────────
-
-const BILLS_KEY = 'pf_bills_v1';
-const PAYMENTS_KEY = 'pf_bill_payments_v1';
-
-function loadBills(): Bill[] {
-  try { return JSON.parse(localStorage.getItem(BILLS_KEY) ?? '[]'); } catch { return []; }
+function AlertBox({ type, icon, title, body }: {
+  type: 'warn' | 'good' | 'info'; icon: string; title: string; body: string;
+}) {
+  const s = {
+    warn: { bg: '#FAEEDA', border: '#EF9F27', color: '#633806' },
+    good: { bg: '#EAF3DE', border: '#639922', color: '#27500A' },
+    info: { bg: '#E6F1FB', border: '#85B7EB', color: '#0C447C' },
+  }[type];
+  return (
+    <div style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 10 }}>
+      <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{icon}</span>
+      <div>
+        <div style={{ fontWeight: 700, fontSize: 13, color: s.color, marginBottom: 2 }}>{title}</div>
+        <div style={{ fontSize: 12, color: s.color, lineHeight: 1.5, opacity: 0.9 }}>{body}</div>
+      </div>
+    </div>
+  );
 }
-function saveBills(bills: Bill[]) {
-  localStorage.setItem(BILLS_KEY, JSON.stringify(bills));
-}
-function loadPayments(): BillPayment[] {
-  try { return JSON.parse(localStorage.getItem(PAYMENTS_KEY) ?? '[]'); } catch { return []; }
-}
-function savePayments(payments: BillPayment[]) {
-  localStorage.setItem(PAYMENTS_KEY, JSON.stringify(payments));
-}
-function newId() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
 
-// ─── Prefill with common SG/MY bills ─────────────────────────────────────────
+// ─── API helpers ──────────────────────────────────────────────────────────────
 
-const PREFILL_TEMPLATES: Omit<Bill, 'id'>[] = [
-  { name: 'TNB (Electricity)', category: 'Utilities', country: 'MY', currency: 'MYR', amount: 150, frequency: 'Monthly', due_day: 15, due_month: null, auto_debit: false, notes: '', is_active: true },
-  { name: 'Air Selangor (Water)', category: 'Utilities', country: 'MY', currency: 'MYR', amount: 30, frequency: 'Monthly', due_day: 15, due_month: null, auto_debit: false, notes: '', is_active: true },
-  { name: 'Unifi (Internet)', category: 'Telecommunications', country: 'MY', currency: 'MYR', amount: 99, frequency: 'Monthly', due_day: 1, due_month: null, auto_debit: true, notes: '', is_active: true },
-  { name: 'Cukai Tanah (Quit Rent)', category: 'Property Tax', country: 'MY', currency: 'MYR', amount: 200, frequency: 'Annual', due_day: 31, due_month: 5, auto_debit: false, notes: 'Pay before 31 May', is_active: true },
-  { name: 'Cukai Pintu (Assessment)', category: 'Property Tax', country: 'MY', currency: 'MYR', amount: 300, frequency: 'Half-yearly', due_day: 28, due_month: null, auto_debit: false, notes: 'Feb & Aug', is_active: true },
-  { name: 'Car Insurance (MY)', category: 'Insurance', country: 'MY', currency: 'MYR', amount: 1200, frequency: 'Annual', due_day: null, due_month: null, auto_debit: false, notes: '', is_active: true },
-  { name: 'House Fire Insurance (MY)', category: 'Insurance', country: 'MY', currency: 'MYR', amount: 250, frequency: 'Annual', due_day: null, due_month: null, auto_debit: false, notes: '', is_active: true },
-  { name: 'SP Group (Electricity SG)', category: 'Utilities', country: 'SG', currency: 'SGD', amount: 120, frequency: 'Monthly', due_day: 10, due_month: null, auto_debit: true, notes: '', is_active: true },
-  { name: 'Credit Card (SG)', category: 'Credit Card', country: 'SG', currency: 'SGD', amount: 0, frequency: 'Monthly', due_day: 1, due_month: null, auto_debit: false, notes: 'Variable amount', is_active: true },
-  { name: 'Child 1 Insurance', category: 'Children', country: 'SG', currency: 'SGD', amount: 200, frequency: 'Monthly', due_day: 1, due_month: null, auto_debit: true, notes: '', is_active: true },
-  { name: 'Child 2 Insurance', category: 'Children', country: 'SG', currency: 'SGD', amount: 200, frequency: 'Monthly', due_day: 1, due_month: null, auto_debit: true, notes: '', is_active: true },
-];
+async function apiBills(method: string, body?: object, id?: string) {
+  const url = id ? `/api/bills?id=${id}` : '/api/bills';
+  return fetchWithAuth(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+}
+
+async function apiPayments(method: string, body?: object, id?: string) {
+  const url = id ? `/api/bills?resource=payments&id=${id}` : '/api/bills?resource=payments';
+  return fetchWithAuth(url, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+}
 
 // ─── Bill Form ────────────────────────────────────────────────────────────────
 
 interface BillFormProps {
   initial?: Partial<Bill>;
-  onSave: (bill: Omit<Bill, 'id'>) => void;
+  onSave: (data: Omit<Bill, 'id' | 'user_id' | 'created_at'>) => void;
   onCancel: () => void;
+  loading?: boolean;
 }
 
-function BillForm({ initial = {}, onSave, onCancel }: BillFormProps) {
+function BillForm({ initial = {}, onSave, onCancel, loading }: BillFormProps) {
   const [form, setForm] = useState({
     name: initial.name ?? '',
     category: (initial.category ?? 'Utilities') as BillCategory,
@@ -208,17 +229,17 @@ function BillForm({ initial = {}, onSave, onCancel }: BillFormProps) {
     frequency: (initial.frequency ?? 'Monthly') as BillFrequency,
     due_day: initial.due_day?.toString() ?? '',
     due_month: initial.due_month?.toString() ?? '',
-    auto_debit: initial.auto_debit ?? false,
+    auto_debit: !!(initial.auto_debit),
     notes: initial.notes ?? '',
-    is_active: initial.is_active !== undefined ? initial.is_active : true,
+    is_active: initial.is_active !== 0,
   });
 
   function handleCountryChange(country: BillCountry) {
-    setForm(f => ({ ...f, country, currency: CURRENCY_BY_COUNTRY[country] }));
+    setForm(f => ({ ...f, country, currency: country === 'MY' ? 'MYR' : 'SGD' }));
   }
 
   function handleSubmit() {
-    if (!form.name.trim() || !form.amount) return;
+    if (!form.name.trim()) return;
     onSave({
       name: form.name.trim(),
       category: form.category,
@@ -228,9 +249,9 @@ function BillForm({ initial = {}, onSave, onCancel }: BillFormProps) {
       frequency: form.frequency,
       due_day: form.due_day ? parseInt(form.due_day) : null,
       due_month: form.due_month ? parseInt(form.due_month) : null,
-      auto_debit: form.auto_debit,
+      auto_debit: form.auto_debit ? 1 : 0,
       notes: form.notes.trim(),
-      is_active: form.is_active,
+      is_active: form.is_active ? 1 : 0,
     });
   }
 
@@ -239,11 +260,14 @@ function BillForm({ initial = {}, onSave, onCancel }: BillFormProps) {
   return (
     <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20, marginBottom: 20 }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 14 }}>
+
         <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13, fontWeight: 600 }}>
           Bill Name *
           <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
-            placeholder="e.g. TNB Electricity" style={{ padding: '8px 10px', borderRadius: 7, border: '1px solid #cbd5e1', fontSize: 13 }} />
+            placeholder="e.g. TNB Electricity"
+            style={{ padding: '8px 10px', borderRadius: 7, border: '1px solid #cbd5e1', fontSize: 13 }} />
         </label>
+
         <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13, fontWeight: 600 }}>
           Category
           <select value={form.category} onChange={e => setForm(f => ({ ...f, category: e.target.value as BillCategory }))}
@@ -251,12 +275,14 @@ function BillForm({ initial = {}, onSave, onCancel }: BillFormProps) {
             {BILL_CATEGORIES.map(c => <option key={c} value={c}>{CATEGORY_ICONS[c]} {c}</option>)}
           </select>
         </label>
+
         <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13, fontWeight: 600 }}>
           Country
           <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 4, borderRadius: 8 }}>
             {(['SG', 'MY'] as BillCountry[]).map(c => (
               <button key={c} type="button" onClick={() => handleCountryChange(c)} style={{
-                flex: 1, padding: '6px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                flex: 1, padding: '6px', borderRadius: 6, border: 'none', cursor: 'pointer',
+                fontSize: 13, fontWeight: 600,
                 background: form.country === c ? '#fff' : 'transparent',
                 color: form.country === c ? '#00257c' : '#64748b',
                 boxShadow: form.country === c ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
@@ -264,6 +290,7 @@ function BillForm({ initial = {}, onSave, onCancel }: BillFormProps) {
             ))}
           </div>
         </label>
+
         <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13, fontWeight: 600 }}>
           Currency
           <select value={form.currency} onChange={e => setForm(f => ({ ...f, currency: e.target.value }))}
@@ -271,12 +298,15 @@ function BillForm({ initial = {}, onSave, onCancel }: BillFormProps) {
             {['SGD', 'MYR', 'USD'].map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </label>
+
         <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13, fontWeight: 600 }}>
           Amount ({form.currency}) *
           <input type="number" step="0.01" min="0" value={form.amount}
             onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
-            placeholder="e.g. 150.00" style={{ padding: '8px 10px', borderRadius: 7, border: '1px solid #cbd5e1', fontSize: 13 }} />
+            placeholder="e.g. 150.00"
+            style={{ padding: '8px 10px', borderRadius: 7, border: '1px solid #cbd5e1', fontSize: 13 }} />
         </label>
+
         <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13, fontWeight: 600 }}>
           Frequency
           <select value={form.frequency} onChange={e => setForm(f => ({ ...f, frequency: e.target.value as BillFrequency }))}
@@ -284,6 +314,7 @@ function BillForm({ initial = {}, onSave, onCancel }: BillFormProps) {
             {FREQUENCIES.map(f => <option key={f} value={f}>{f}</option>)}
           </select>
         </label>
+
         {isAnnual && (
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13, fontWeight: 600 }}>
             Due Month
@@ -294,33 +325,46 @@ function BillForm({ initial = {}, onSave, onCancel }: BillFormProps) {
             </select>
           </label>
         )}
+
         <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13, fontWeight: 600 }}>
           Due Day (of month)
           <input type="number" min="1" max="31" value={form.due_day}
             onChange={e => setForm(f => ({ ...f, due_day: e.target.value }))}
-            placeholder="e.g. 15" style={{ padding: '8px 10px', borderRadius: 7, border: '1px solid #cbd5e1', fontSize: 13 }} />
+            placeholder="e.g. 15"
+            style={{ padding: '8px 10px', borderRadius: 7, border: '1px solid #cbd5e1', fontSize: 13 }} />
         </label>
+
         <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13, fontWeight: 600 }}>
           Notes
           <input value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
-            placeholder="Optional" style={{ padding: '8px 10px', borderRadius: 7, border: '1px solid #cbd5e1', fontSize: 13 }} />
+            placeholder="Optional reminder"
+            style={{ padding: '8px 10px', borderRadius: 7, border: '1px solid #cbd5e1', fontSize: 13 }} />
         </label>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, justifyContent: 'flex-end' }}>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, justifyContent: 'center' }}>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-            <input type="checkbox" checked={form.auto_debit} onChange={e => setForm(f => ({ ...f, auto_debit: e.target.checked }))} style={{ width: 16, height: 16 }} />
+            <input type="checkbox" checked={form.auto_debit}
+              onChange={e => setForm(f => ({ ...f, auto_debit: e.target.checked }))}
+              style={{ width: 16, height: 16 }} />
             Auto-debit / GIRO
           </label>
           <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-            <input type="checkbox" checked={form.is_active} onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))} style={{ width: 16, height: 16 }} />
+            <input type="checkbox" checked={form.is_active}
+              onChange={e => setForm(f => ({ ...f, is_active: e.target.checked }))}
+              style={{ width: 16, height: 16 }} />
             Active
           </label>
         </div>
       </div>
+
       <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
-        <button onClick={onCancel} style={{ padding: '8px 18px', borderRadius: 7, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>Cancel</button>
-        <button onClick={handleSubmit} disabled={!form.name.trim() || !form.amount}
-          style={{ padding: '8px 18px', borderRadius: 7, border: 'none', background: '#00257c', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 13, opacity: (!form.name.trim() || !form.amount) ? 0.5 : 1 }}>
-          Save Bill
+        <button onClick={onCancel}
+          style={{ padding: '8px 18px', borderRadius: 7, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
+          Cancel
+        </button>
+        <button onClick={handleSubmit} disabled={loading || !form.name.trim()}
+          style={{ padding: '8px 18px', borderRadius: 7, border: 'none', background: '#00257c', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 13, opacity: (loading || !form.name.trim()) ? 0.5 : 1 }}>
+          {loading ? 'Saving...' : 'Save Bill'}
         </button>
       </div>
     </div>
@@ -329,7 +373,12 @@ function BillForm({ initial = {}, onSave, onCancel }: BillFormProps) {
 
 // ─── Mark Paid Modal ──────────────────────────────────────────────────────────
 
-function MarkPaidModal({ bill, onSave, onClose }: { bill: Bill; onSave: (p: Omit<BillPayment, 'id'>) => void; onClose: () => void }) {
+function MarkPaidModal({ bill, onSave, onClose, saving }: {
+  bill: Bill;
+  onSave: (paid_date: string, amount: number, notes: string) => void;
+  onClose: () => void;
+  saving: boolean;
+}) {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [amount, setAmount] = useState(bill.amount.toString());
   const [notes, setNotes] = useState('');
@@ -338,27 +387,37 @@ function MarkPaidModal({ bill, onSave, onClose }: { bill: Bill; onSave: (p: Omit
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <div className="modal" style={{ width: 'min(480px, 90vw)' }}>
         <div className="modal-header">
-          <div><div className="modal-title">Mark as Paid — {bill.name}</div></div>
+          <div>
+            <div className="modal-title">Mark as Paid</div>
+            <div className="modal-meta"><span>{bill.name}</span><span>{bill.currency}</span></div>
+          </div>
           <button className="ghost" onClick={onClose}>Close</button>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13, fontWeight: 600 }}>
             Payment Date
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{ padding: '8px 10px', borderRadius: 7, border: '1px solid #cbd5e1', fontSize: 13 }} />
+            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+              style={{ padding: '8px 10px', borderRadius: 7, border: '1px solid #cbd5e1', fontSize: 13 }} />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13, fontWeight: 600 }}>
             Amount Paid ({bill.currency})
-            <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} style={{ padding: '8px 10px', borderRadius: 7, border: '1px solid #cbd5e1', fontSize: 13 }} />
+            <input type="number" step="0.01" value={amount} onChange={e => setAmount(e.target.value)}
+              style={{ padding: '8px 10px', borderRadius: 7, border: '1px solid #cbd5e1', fontSize: 13 }} />
           </label>
           <label style={{ display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13, fontWeight: 600 }}>
             Notes (optional)
-            <input type="text" value={notes} onChange={e => setNotes(e.target.value)} placeholder="e.g. paid via PayNow" style={{ padding: '8px 10px', borderRadius: 7, border: '1px solid #cbd5e1', fontSize: 13 }} />
+            <input type="text" value={notes} onChange={e => setNotes(e.target.value)}
+              placeholder="e.g. paid via PayNow"
+              style={{ padding: '8px 10px', borderRadius: 7, border: '1px solid #cbd5e1', fontSize: 13 }} />
           </label>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 8 }}>
-            <button onClick={onClose} style={{ padding: '8px 18px', borderRadius: 7, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>Cancel</button>
-            <button onClick={() => onSave({ bill_id: bill.id, paid_date: date, amount: parseFloat(amount) || bill.amount, notes })}
-              style={{ padding: '8px 18px', borderRadius: 7, border: 'none', background: '#059669', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
-              ✓ Mark Paid
+            <button onClick={onClose}
+              style={{ padding: '8px 18px', borderRadius: 7, border: '1px solid #cbd5e1', background: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 13 }}>
+              Cancel
+            </button>
+            <button onClick={() => onSave(date, parseFloat(amount) || bill.amount, notes)} disabled={saving}
+              style={{ padding: '8px 18px', borderRadius: 7, border: 'none', background: '#059669', color: '#fff', cursor: 'pointer', fontWeight: 600, fontSize: 13, opacity: saving ? 0.6 : 1 }}>
+              {saving ? 'Saving...' : '✓ Mark Paid'}
             </button>
           </div>
         </div>
@@ -375,68 +434,96 @@ export default function BillsPage() {
 
   const [bills, setBills] = useState<Bill[]>([]);
   const [payments, setPayments] = useState<BillPayment[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+  const [savingBill, setSavingBill] = useState(false);
+  const [savingPayment, setSavingPayment] = useState(false);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingBill, setEditingBill] = useState<Bill | null>(null);
   const [markingPaid, setMarkingPaid] = useState<Bill | null>(null);
+  const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
   const [filterCountry, setFilterCountry] = useState<'All' | 'SG' | 'MY'>('All');
   const [filterCategory, setFilterCategory] = useState<string>('All');
   const [filterFrequency, setFilterFrequency] = useState<string>('All');
-  const [showHistory, setShowHistory] = useState<string | null>(null);
-  const [prefillDone, setPrefillDone] = useState(false);
+  const [actionMsg, setActionMsg] = useState('');
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/login');
   }, [authLoading, user, router]);
 
   useEffect(() => {
-    setBills(loadBills());
-    setPayments(loadPayments());
-  }, []);
+    if (user) void load();
+  }, [user]);
 
-  function addBill(data: Omit<Bill, 'id'>) {
-    const updated = [...bills, { ...data, id: newId() }];
-    setBills(updated); saveBills(updated);
-    setShowAddForm(false);
+  async function load() {
+    setLoadingData(true);
+    try {
+      const [bRes, pRes] = await Promise.all([
+        fetchWithAuth('/api/bills'),
+        fetchWithAuth('/api/bills?resource=payments'),
+      ]);
+      if (bRes.ok) setBills(await bRes.json());
+      if (pRes.ok) setPayments(await pRes.json());
+    } finally {
+      setLoadingData(false);
+    }
   }
 
-  function updateBill(id: string, data: Omit<Bill, 'id'>) {
-    const updated = bills.map(b => b.id === id ? { ...data, id } : b);
-    setBills(updated); saveBills(updated);
-    setEditingBill(null);
+  function showMsg(msg: string) {
+    setActionMsg(msg);
+    setTimeout(() => setActionMsg(''), 3000);
   }
 
-  function deleteBill(id: string) {
-    if (!confirm('Delete this bill?')) return;
-    const updatedBills = bills.filter(b => b.id !== id);
-    const updatedPayments = payments.filter(p => p.bill_id !== id);
-    setBills(updatedBills); saveBills(updatedBills);
-    setPayments(updatedPayments); savePayments(updatedPayments);
+  async function handleAddBill(data: Omit<Bill, 'id' | 'user_id' | 'created_at'>) {
+    setSavingBill(true);
+    const res = await apiBills('POST', data);
+    setSavingBill(false);
+    if (res.ok) { setShowAddForm(false); showMsg('Bill added!'); void load(); }
+    else { const e = await res.json().catch(() => ({})); showMsg((e as any).error ?? 'Failed to add bill'); }
   }
 
-  function toggleActive(id: string) {
-    const updated = bills.map(b => b.id === id ? { ...b, is_active: !b.is_active } : b);
-    setBills(updated); saveBills(updated);
+  async function handleUpdateBill(id: string, data: Omit<Bill, 'id' | 'user_id' | 'created_at'>) {
+    setSavingBill(true);
+    const res = await apiBills('PUT', { ...data, id });
+    setSavingBill(false);
+    if (res.ok) { setEditingBill(null); showMsg('Bill updated!'); void load(); }
+    else { const e = await res.json().catch(() => ({})); showMsg((e as any).error ?? 'Failed to update'); }
   }
 
-  function addPayment(data: Omit<BillPayment, 'id'>) {
-    const updated = [...payments, { ...data, id: newId() }];
-    setPayments(updated); savePayments(updated);
-    setMarkingPaid(null);
+  async function handleDeleteBill(id: string) {
+    if (!confirm('Delete this bill and all its payment history?')) return;
+    const res = await apiBills('DELETE', undefined, id);
+    if (res.ok) { showMsg('Bill deleted.'); void load(); }
+    else showMsg('Failed to delete');
   }
 
-  function deletePayment(id: string) {
-    const updated = payments.filter(p => p.id !== id);
-    setPayments(updated); savePayments(updated);
+  async function handleToggleActive(bill: Bill) {
+    await apiBills('PUT', {
+      name: bill.name, category: bill.category, country: bill.country,
+      currency: bill.currency, amount: bill.amount, frequency: bill.frequency,
+      due_day: bill.due_day, due_month: bill.due_month,
+      auto_debit: bill.auto_debit, notes: bill.notes,
+      is_active: bill.is_active ? 0 : 1,
+      id: bill.id,
+    });
+    void load();
   }
 
-  function prefillTemplates() {
-    const newBills = PREFILL_TEMPLATES.map(t => ({ ...t, id: newId() }));
-    const updated = [...bills, ...newBills];
-    setBills(updated); saveBills(updated);
-    setPrefillDone(true);
+  async function handleMarkPaid(bill: Bill, paid_date: string, amount: number, notes: string) {
+    setSavingPayment(true);
+    const res = await apiPayments('POST', { bill_id: bill.id, paid_date, amount, notes });
+    setSavingPayment(false);
+    if (res.ok) { setMarkingPaid(null); showMsg(`Recorded payment for ${bill.name}`); void load(); }
+    else showMsg('Failed to record payment');
   }
 
-  // ── Derived data ────────────────────────────────────────────────────────────
+  async function handleDeletePayment(id: string) {
+    if (!confirm('Remove this payment record?')) return;
+    const res = await apiPayments('DELETE', undefined, id);
+    if (res.ok) { showMsg('Payment removed.'); void load(); }
+    else showMsg('Failed to remove payment');
+  }
+
+  // ── Filtered bills ──────────────────────────────────────────────────────────
 
   const filteredBills = useMemo(() => {
     return bills.filter(b => {
@@ -447,17 +534,21 @@ export default function BillsPage() {
     });
   }, [bills, filterCountry, filterCategory, filterFrequency]);
 
-  // Monthly equivalent totals
+  // ── Summary totals ──────────────────────────────────────────────────────────
+
   const summaryTotals = useMemo(() => {
-    const activeBills = bills.filter(b => b.is_active);
-    const sgMonthly = activeBills.filter(b => b.country === 'SG').reduce((s, b) => s + monthlyEquivalent(b.amount, b.frequency), 0);
-    const myMonthly = activeBills.filter(b => b.country === 'MY').reduce((s, b) => s + monthlyEquivalent(b.amount, b.frequency), 0);
-    const sgAnnual = activeBills.filter(b => b.country === 'SG').reduce((s, b) => s + annualEquivalent(b.amount, b.frequency), 0);
-    const myAnnual = activeBills.filter(b => b.country === 'MY').reduce((s, b) => s + annualEquivalent(b.amount, b.frequency), 0);
-    return { sgMonthly, myMonthly, sgAnnual, myAnnual };
+    const active = bills.filter(b => b.is_active);
+    const sgMonthly = active.filter(b => b.country === 'SG').reduce((s, b) => s + monthlyEquivalent(b.amount, b.frequency), 0);
+    const myMonthly = active.filter(b => b.country === 'MY').reduce((s, b) => s + monthlyEquivalent(b.amount, b.frequency), 0);
+    const sgAnnual = active.filter(b => b.country === 'SG').reduce((s, b) => s + annualEquivalent(b.amount, b.frequency), 0);
+    const myAnnual = active.filter(b => b.country === 'MY').reduce((s, b) => s + annualEquivalent(b.amount, b.frequency), 0);
+    const autoDebitCount = active.filter(b => b.auto_debit).length;
+    const manualCount = active.filter(b => !b.auto_debit).length;
+    return { sgMonthly, myMonthly, sgAnnual, myAnnual, autoDebitCount, manualCount };
   }, [bills]);
 
-  // Upcoming bills (next 30 days)
+  // ── Upcoming in next 30 days ────────────────────────────────────────────────
+
   const upcomingBills = useMemo(() => {
     return bills
       .filter(b => b.is_active)
@@ -466,9 +557,10 @@ export default function BillsPage() {
       .sort((a, b) => (a.due?.daysUntil ?? 999) - (b.due?.daysUntil ?? 999));
   }, [bills]);
 
-  // Category breakdown
+  // ── Category breakdown ──────────────────────────────────────────────────────
+
   const categoryTotals = useMemo(() => {
-    const map = new Map<BillCategory, { sgMonthly: number; myMonthly: number; count: number }>();
+    const map = new Map<string, { sgMonthly: number; myMonthly: number; count: number }>();
     bills.filter(b => b.is_active).forEach(b => {
       const ex = map.get(b.category) ?? { sgMonthly: 0, myMonthly: 0, count: 0 };
       if (b.country === 'SG') ex.sgMonthly += monthlyEquivalent(b.amount, b.frequency);
@@ -476,15 +568,44 @@ export default function BillsPage() {
       ex.count++;
       map.set(b.category, ex);
     });
-    return map;
+    return Array.from(map.entries()).sort((a, b) => (b[1].sgMonthly + b[1].myMonthly) - (a[1].sgMonthly + a[1].myMonthly));
   }, [bills]);
 
-  // Payment history for a bill
+  // ── Alerts ──────────────────────────────────────────────────────────────────
+
+  const alerts = useMemo(() => {
+    const list: { type: 'warn' | 'good' | 'info'; icon: string; title: string; body: string }[] = [];
+    const overdueCount = upcomingBills.filter(x => (x.due?.daysUntil ?? 0) < 0).length;
+    const urgentCount = upcomingBills.filter(x => (x.due?.daysUntil ?? 99) >= 0 && (x.due?.daysUntil ?? 99) <= 3).length;
+
+    if (overdueCount > 0) {
+      list.push({ type: 'warn', icon: '⚠️', title: `${overdueCount} bill${overdueCount > 1 ? 's' : ''} overdue`, body: 'You have bills past their due date. Check the upcoming section and settle them.' });
+    }
+    if (urgentCount > 0) {
+      const names = upcomingBills.filter(x => (x.due?.daysUntil ?? 99) >= 0 && (x.due?.daysUntil ?? 99) <= 3).map(x => x.bill.name).join(', ');
+      list.push({ type: 'warn', icon: '⏰', title: `Due within 3 days`, body: `${names}` });
+    }
+    if (summaryTotals.manualCount > 0) {
+      list.push({ type: 'info', icon: 'ℹ️', title: `${summaryTotals.manualCount} manual bill${summaryTotals.manualCount > 1 ? 's' : ''} need attention`, body: `${summaryTotals.autoDebitCount} of your bills are on auto-debit. The other ${summaryTotals.manualCount} need manual payment each cycle.` });
+    }
+    return list;
+  }, [upcomingBills, summaryTotals]);
+
   function billPayments(billId: string) {
-    return payments.filter(p => p.bill_id === billId).sort((a, b) => new Date(b.paid_date).getTime() - new Date(a.paid_date).getTime());
+    return payments.filter(p => p.bill_id === billId)
+      .sort((a, b) => new Date(b.paid_date).getTime() - new Date(a.paid_date).getTime());
   }
 
-  if (authLoading) return null;
+  if (authLoading || loadingData) {
+    return (
+      <>
+        <header className="site-header">
+          <nav className="site-nav"><Link href="/" className="site-logo">📊 Portfolio Tracker</Link></nav>
+        </header>
+        <main><div className="loading-state">Loading bills...</div></main>
+      </>
+    );
+  }
 
   return (
     <>
@@ -507,67 +628,86 @@ export default function BillsPage() {
       </header>
 
       <main>
-        {/* ── Header ── */}
+        {/* ── Page header ── */}
         <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
           <div>
             <h1>Bills Manager</h1>
-            <p>Track all your recurring bills — Singapore 🇸🇬 and Malaysia 🇲🇾</p>
+            <p>All your recurring bills — Singapore 🇸🇬 and Malaysia 🇲🇾</p>
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            {bills.length === 0 && !prefillDone && (
-              <button onClick={prefillTemplates} style={{ padding: '10px 18px', background: '#f8fafc', border: '1px solid #cbd5e1', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>
-                📋 Load common bills
-              </button>
-            )}
-            <button onClick={() => { setShowAddForm(true); setEditingBill(null); }}
-              style={{ padding: '10px 20px', background: '#00257c', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', fontSize: 14 }}>
-              + Add Bill
-            </button>
-          </div>
+          <button
+            onClick={() => { setShowAddForm(true); setEditingBill(null); }}
+            style={{ padding: '10px 20px', background: '#00257c', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, cursor: 'pointer', fontSize: 14, marginTop: 8 }}>
+            + Add Bill
+          </button>
         </div>
 
-        {/* ── Summary Cards ── */}
+        {actionMsg && (
+          <div style={{ padding: '10px 16px', background: '#dcfce7', color: '#166534', borderRadius: 8, marginBottom: 16, fontWeight: 600, fontSize: 13 }}>
+            {actionMsg}
+          </div>
+        )}
+
+        {/* ── Summary cards ── */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 20 }}>
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: 6 }}>🇸🇬 SG Monthly</div>
+            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: 6 }}>🇸🇬 SG monthly</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>{fmt(summaryTotals.sgMonthly, 'SGD')}</div>
             <div style={{ fontSize: 12, color: '#64748b' }}>Annual: {fmt(summaryTotals.sgAnnual, 'SGD')}</div>
           </div>
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: 6 }}>🇲🇾 MY Monthly</div>
+            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: 6 }}>🇲🇾 MY monthly</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>{fmt(summaryTotals.myMonthly, 'MYR')}</div>
             <div style={{ fontSize: 12, color: '#64748b' }}>Annual: {fmt(summaryTotals.myAnnual, 'MYR')}</div>
           </div>
           <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: 6 }}>Total Active Bills</div>
+            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: 6 }}>Active bills</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>{bills.filter(b => b.is_active).length}</div>
-            <div style={{ fontSize: 12, color: '#64748b' }}>{bills.filter(b => b.auto_debit && b.is_active).length} on auto-debit</div>
+            <div style={{ fontSize: 12, color: '#64748b' }}>{summaryTotals.autoDebitCount} auto-debit · {summaryTotals.manualCount} manual</div>
           </div>
-          <div style={{ background: upcomingBills.some(x => (x.due?.daysUntil ?? 99) <= 7) ? '#FAEEDA' : '#fff', border: `1px solid ${upcomingBills.some(x => (x.due?.daysUntil ?? 99) <= 7) ? '#EF9F27' : '#e2e8f0'}`, borderRadius: 12, padding: '16px 20px' }}>
-            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: 6 }}>⏰ Due This Month</div>
+          <div style={{
+            background: upcomingBills.some(x => (x.due?.daysUntil ?? 99) <= 7) ? '#FAEEDA' : '#fff',
+            border: `1px solid ${upcomingBills.some(x => (x.due?.daysUntil ?? 99) <= 7) ? '#EF9F27' : '#e2e8f0'}`,
+            borderRadius: 12, padding: '16px 20px',
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: 6 }}>⏰ Due this month</div>
             <div style={{ fontSize: 22, fontWeight: 800, color: '#0f172a', marginBottom: 4 }}>{upcomingBills.length}</div>
             <div style={{ fontSize: 12, color: '#64748b' }}>{upcomingBills.filter(x => (x.due?.daysUntil ?? 99) <= 7).length} due within 7 days</div>
           </div>
         </div>
 
-        {/* ── Upcoming dues ── */}
+        {/* ── Alerts ── */}
+        {alerts.length > 0 && (
+          <section style={{ marginBottom: 20 }}>
+            <div className="section-title"><div><p className="eyebrow">Attention</p><h2>Needs your action</h2></div></div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12 }}>
+              {alerts.map((a, i) => <AlertBox key={i} {...a} />)}
+            </div>
+          </section>
+        )}
+
+        {/* ── Upcoming due ── */}
         {upcomingBills.length > 0 && (
           <section style={{ marginBottom: 20 }}>
-            <div className="section-title"><div><p className="eyebrow">Action needed</p><h2>Upcoming in next 30 days</h2></div></div>
+            <div className="section-title"><div><p className="eyebrow">Coming up</p><h2>Due in the next 30 days</h2></div></div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
               {upcomingBills.map(({ bill, due }) => (
                 <div key={bill.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                   <span style={{ fontSize: 22, flexShrink: 0 }}>{CATEGORY_ICONS[bill.category]}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', marginBottom: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{bill.name}</div>
-                    <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>{due!.label} · {fmt(bill.amount, bill.currency)}</div>
+                    <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>
+                      {due!.label} · {fmt(bill.amount, bill.currency)}
+                    </div>
                     <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                       <DueBadge daysUntil={due!.daysUntil} />
-                      {bill.auto_debit && <span style={{ fontSize: 10, fontWeight: 700, color: '#059669', background: '#dcfce7', padding: '2px 6px', borderRadius: 3 }}>Auto</span>}
+                      {!!bill.auto_debit && (
+                        <span style={{ fontSize: 10, fontWeight: 700, color: '#059669', background: '#dcfce7', padding: '2px 6px', borderRadius: 3 }}>GIRO</span>
+                      )}
                     </div>
                   </div>
                   {!bill.auto_debit && (
-                    <button onClick={() => setMarkingPaid(bill)} style={{ padding: '5px 10px', background: '#059669', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, cursor: 'pointer', fontSize: 11, flexShrink: 0, marginTop: 2 }}>
+                    <button onClick={() => setMarkingPaid(bill)}
+                      style={{ padding: '5px 10px', background: '#059669', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 700, cursor: 'pointer', fontSize: 11, flexShrink: 0 }}>
                       ✓ Paid
                     </button>
                   )}
@@ -578,15 +718,15 @@ export default function BillsPage() {
         )}
 
         {/* ── Category breakdown ── */}
-        {categoryTotals.size > 0 && (
+        {categoryTotals.length > 0 && (
           <section style={{ marginBottom: 20 }}>
             <div className="section-title"><div><p className="eyebrow">Breakdown</p><h2>By category (monthly equivalent)</h2></div></div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
-              {Array.from(categoryTotals.entries()).map(([cat, data]) => (
+              {categoryTotals.map(([cat, data]) => (
                 <div key={cat} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: 2, background: CATEGORY_COLORS[cat], flexShrink: 0 }} />
-                    <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{CATEGORY_ICONS[cat]} {cat}</span>
+                    <span style={{ width: 8, height: 8, borderRadius: 2, background: CATEGORY_COLORS[cat as BillCategory] ?? '#94a3b8', flexShrink: 0 }} />
+                    <span style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{CATEGORY_ICONS[cat as BillCategory]} {cat}</span>
                     <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 600, color: '#64748b', background: '#f1f5f9', padding: '1px 6px', borderRadius: 3 }}>{data.count}</span>
                   </div>
                   {data.sgMonthly > 0 && <div style={{ fontSize: 12, color: '#64748b', marginBottom: 2 }}>🇸🇬 {fmt(data.sgMonthly, 'SGD')}/mo</div>}
@@ -597,11 +737,12 @@ export default function BillsPage() {
           </section>
         )}
 
-        {/* ── Add / Edit form ── */}
+        {/* ── All bills table ── */}
         <section>
           <div className="section-title" style={{ flexWrap: 'wrap', gap: 12 }}>
             <div><p className="eyebrow">Manage</p><h2>All Bills</h2></div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+              {/* Country toggle */}
               <div style={{ display: 'flex', gap: 4, background: '#f1f5f9', padding: 4, borderRadius: 8 }}>
                 {(['All', 'SG', 'MY'] as const).map(c => (
                   <button key={c} onClick={() => setFilterCountry(c)} style={{
@@ -625,15 +766,27 @@ export default function BillsPage() {
             </div>
           </div>
 
-          {showAddForm && !editingBill && <BillForm onSave={addBill} onCancel={() => setShowAddForm(false)} />}
-          {editingBill && <BillForm initial={editingBill} onSave={d => updateBill(editingBill.id, d)} onCancel={() => setEditingBill(null)} />}
+          {showAddForm && !editingBill && (
+            <BillForm onSave={handleAddBill} onCancel={() => setShowAddForm(false)} loading={savingBill} />
+          )}
+          {editingBill && (
+            <BillForm
+              initial={editingBill}
+              onSave={d => handleUpdateBill(editingBill.id, d)}
+              onCancel={() => setEditingBill(null)}
+              loading={savingBill}
+            />
+          )}
 
           {filteredBills.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '60px 20px', color: '#94a3b8' }}>
               <div style={{ fontSize: 48, marginBottom: 12 }}>📋</div>
-              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>No bills found</div>
-              <div style={{ fontSize: 13, marginBottom: 20 }}>Add your first bill or load the common bills template</div>
-              {bills.length === 0 && <button onClick={prefillTemplates} style={{ padding: '10px 20px', background: '#00257c', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: 'pointer', fontSize: 13 }}>📋 Load common bills</button>}
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>
+                {bills.length === 0 ? 'No bills yet' : 'No bills match your filters'}
+              </div>
+              <div style={{ fontSize: 13 }}>
+                {bills.length === 0 ? 'Add your first bill using the button above' : 'Try changing the filters'}
+              </div>
             </div>
           ) : (
             <div className="holdings-table-wrapper">
@@ -647,7 +800,7 @@ export default function BillsPage() {
                     <th style={{ textAlign: 'right' }}>Amount</th>
                     <th style={{ textAlign: 'right' }}>Monthly equiv.</th>
                     <th>Next due</th>
-                    <th style={{ textAlign: 'center' }}>Auto</th>
+                    <th style={{ textAlign: 'center' }}>Payment</th>
                     <th style={{ textAlign: 'center' }}>Status</th>
                     <th style={{ textAlign: 'center' }}>Actions</th>
                   </tr>
@@ -656,26 +809,48 @@ export default function BillsPage() {
                   {filteredBills.map(bill => {
                     const due = getNextDueDate(bill);
                     const history = billPayments(bill.id);
+                    const isExpanded = expandedHistory === bill.id;
+
                     return (
                       <>
-                        <tr key={bill.id} style={{ opacity: bill.is_active ? 1 : 0.5 }}>
+                        <tr key={bill.id} style={{ opacity: bill.is_active ? 1 : 0.45 }}>
                           <td>
-                            <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{CATEGORY_ICONS[bill.category]} {bill.name}</div>
-                            {bill.notes && <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{bill.notes}</div>}
+                            <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>
+                              {CATEGORY_ICONS[bill.category]} {bill.name}
+                            </div>
+                            {bill.notes && (
+                              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>{bill.notes}</div>
+                            )}
                           </td>
                           <td>
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 10px', borderRadius: 5, fontSize: 11, fontWeight: 700, background: `${CATEGORY_COLORS[bill.category]}22`, color: CATEGORY_COLORS[bill.category], border: `1px solid ${CATEGORY_COLORS[bill.category]}44` }}>
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 5,
+                              padding: '3px 10px', borderRadius: 5, fontSize: 11, fontWeight: 700,
+                              background: `${CATEGORY_COLORS[bill.category]}22`,
+                              color: CATEGORY_COLORS[bill.category],
+                              border: `1px solid ${CATEGORY_COLORS[bill.category]}44`,
+                            }}>
                               {bill.category}
                             </span>
                           </td>
-                          <td><span style={{ fontSize: 13, fontWeight: 600 }}>{bill.country === 'SG' ? '🇸🇬' : '🇲🇾'} {bill.country}</span></td>
-                          <td><span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>{bill.frequency}</span></td>
-                          <td style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>{fmt(bill.amount, bill.currency)}</td>
-                          <td style={{ textAlign: 'right', fontSize: 12, color: '#64748b' }}>{fmt(monthlyEquivalent(bill.amount, bill.frequency), bill.currency)}</td>
+                          <td>
+                            <span style={{ fontSize: 13, fontWeight: 600 }}>
+                              {bill.country === 'SG' ? '🇸🇬' : '🇲🇾'} {bill.country}
+                            </span>
+                          </td>
+                          <td>
+                            <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>{bill.frequency}</span>
+                          </td>
+                          <td style={{ textAlign: 'right', fontWeight: 700, color: '#0f172a' }}>
+                            {fmt(bill.amount, bill.currency)}
+                          </td>
+                          <td style={{ textAlign: 'right', fontSize: 12, color: '#64748b' }}>
+                            {fmt(monthlyEquivalent(bill.amount, bill.frequency), bill.currency)}
+                          </td>
                           <td>
                             {due ? (
                               <div>
-                                <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a', marginBottom: 2 }}>{due.label}</div>
+                                <div style={{ fontSize: 12, fontWeight: 600, color: '#0f172a', marginBottom: 3 }}>{due.label}</div>
                                 <DueBadge daysUntil={due.daysUntil} />
                               </div>
                             ) : <span style={{ color: '#94a3b8', fontSize: 12 }}>—</span>}
@@ -686,8 +861,9 @@ export default function BillsPage() {
                               : <span style={{ fontSize: 11, color: '#94a3b8' }}>Manual</span>}
                           </td>
                           <td style={{ textAlign: 'center' }}>
-                            <button onClick={() => toggleActive(bill.id)} style={{
-                              padding: '3px 10px', borderRadius: 4, fontSize: 11, fontWeight: 700, cursor: 'pointer', border: 'none',
+                            <button onClick={() => void handleToggleActive(bill)} style={{
+                              padding: '3px 10px', borderRadius: 4, fontSize: 11, fontWeight: 700,
+                              cursor: 'pointer', border: 'none',
                               background: bill.is_active ? '#dcfce7' : '#f1f5f9',
                               color: bill.is_active ? '#166534' : '#94a3b8',
                             }}>
@@ -695,33 +871,44 @@ export default function BillsPage() {
                             </button>
                           </td>
                           <td style={{ textAlign: 'center' }}>
-                            <div className="modal-action-buttons" style={{ justifyContent: 'center', flexWrap: 'wrap' }}>
-                              {!bill.auto_debit && bill.is_active && (
-                                <button className="save-btn" onClick={() => setMarkingPaid(bill)} style={{ background: '#059669', fontSize: 11 }}>✓ Paid</button>
+                            <div className="modal-action-buttons" style={{ justifyContent: 'center', flexWrap: 'wrap', gap: 4 }}>
+                              {!bill.auto_debit && !!bill.is_active && (
+                                <button className="save-btn" onClick={() => setMarkingPaid(bill)}
+                                  style={{ background: '#059669', fontSize: 11, padding: '5px 10px' }}>
+                                  ✓ Paid
+                                </button>
                               )}
-                              <button className="view-btn" style={{ fontSize: 11 }} onClick={() => setShowHistory(showHistory === bill.id ? null : bill.id)}>
-                                {showHistory === bill.id ? 'Hide' : `History (${history.length})`}
+                              <button className="view-btn" style={{ fontSize: 11, padding: '5px 10px' }}
+                                onClick={() => setExpandedHistory(isExpanded ? null : bill.id)}>
+                                {isExpanded ? 'Hide' : `History (${history.length})`}
                               </button>
                               <button className="edit-btn" onClick={() => { setEditingBill(bill); setShowAddForm(false); }}>Edit</button>
-                              <button className="delete-btn" onClick={() => deleteBill(bill.id)}>Del</button>
+                              <button className="delete-btn" onClick={() => void handleDeleteBill(bill.id)}>Del</button>
                             </div>
                           </td>
                         </tr>
-                        {showHistory === bill.id && (
+
+                        {/* Payment history inline */}
+                        {isExpanded && (
                           <tr key={`${bill.id}-history`}>
-                            <td colSpan={10} style={{ background: '#f8fafc', padding: 0 }}>
-                              <div style={{ padding: '12px 16px' }}>
-                                <div style={{ fontWeight: 700, fontSize: 12, color: '#475569', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Payment history — {bill.name}</div>
+                            <td colSpan={10} style={{ padding: 0 }}>
+                              <div style={{ background: '#f8fafc', borderTop: '1px solid #e2e8f0', padding: '12px 20px' }}>
+                                <div style={{ fontWeight: 700, fontSize: 12, color: '#475569', marginBottom: 10, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                  Payment history — {bill.name}
+                                </div>
                                 {history.length === 0 ? (
-                                  <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>No payments recorded yet</div>
+                                  <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic' }}>No payments recorded yet.</div>
                                 ) : (
-                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                                     {history.map(p => (
-                                      <div key={p.id} style={{ display: 'flex', gap: 16, alignItems: 'center', fontSize: 12 }}>
-                                        <span style={{ color: '#64748b', minWidth: 90 }}>{p.paid_date}</span>
+                                      <div key={p.id} style={{ display: 'flex', gap: 20, alignItems: 'center', fontSize: 13, padding: '6px 0', borderBottom: '1px solid #f1f5f9' }}>
+                                        <span style={{ color: '#64748b', minWidth: 90, fontSize: 12 }}>{p.paid_date}</span>
                                         <span style={{ fontWeight: 700, color: '#059669', minWidth: 80 }}>{fmt(p.amount, bill.currency)}</span>
-                                        <span style={{ color: '#94a3b8', flex: 1 }}>{p.notes || '—'}</span>
-                                        <button onClick={() => deletePayment(p.id)} style={{ padding: '2px 8px', fontSize: 11, background: '#fff', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>Remove</button>
+                                        <span style={{ color: '#94a3b8', flex: 1, fontSize: 12 }}>{p.notes || '—'}</span>
+                                        <button onClick={() => void handleDeletePayment(p.id)}
+                                          style={{ padding: '3px 10px', fontSize: 11, background: '#fff', border: '1px solid #fca5a5', color: '#dc2626', borderRadius: 4, cursor: 'pointer', fontWeight: 600 }}>
+                                          Remove
+                                        </button>
                                       </div>
                                     ))}
                                   </div>
@@ -741,7 +928,14 @@ export default function BillsPage() {
       </main>
 
       {/* Mark paid modal */}
-      {markingPaid && <MarkPaidModal bill={markingPaid} onSave={addPayment} onClose={() => setMarkingPaid(null)} />}
+      {markingPaid && (
+        <MarkPaidModal
+          bill={markingPaid}
+          onSave={(d, a, n) => void handleMarkPaid(markingPaid, d, a, n)}
+          onClose={() => setMarkingPaid(null)}
+          saving={savingPayment}
+        />
+      )}
     </>
   );
 }
