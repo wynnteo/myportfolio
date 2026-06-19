@@ -747,7 +747,10 @@ export default function DashboardPage() {
       const best = hs.filter(h => h.plPct !== null).sort((a, b) => (b.plPct ?? 0) - (a.plPct ?? 0))[0] ?? null;
       const worst = hs.filter(h => h.plPct !== null).sort((a, b) => (a.plPct ?? 0) - (b.plPct ?? 0))[0] ?? null;
       return { category: cat, capital, currentValue, pl, plPct, ytdDiv, divYield, count: hs.length, best, worst };
-    }).filter(Boolean) as NonNullable<ReturnType<typeof CATEGORIES['map']>>[];
+    }).filter(
+      (item): item is Exclude<typeof item, null> =>
+        item !== null
+    );
   }, [displayHoldings, transactions, dividendYear]);
 
   // ── Alerts ──────────────────────────────────────────────────────────────────
