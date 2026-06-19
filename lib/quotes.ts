@@ -1,4 +1,4 @@
-import type { BatchQuoteResult } from '../pages/api/quote';
+import type { BatchQuoteResult } from '../pages/api/quotes';
 
 export type QuoteMap = BatchQuoteResult;
 
