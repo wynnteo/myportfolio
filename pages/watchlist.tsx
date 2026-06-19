@@ -345,6 +345,8 @@ export default function WatchlistPage() {
             <Link href="/">Home</Link>
             <Link href="/dashboard">Dashboard</Link>
             <Link href="/transactions">Transactions</Link>
+            <Link href="/accounts">Accounts</Link>
+            <Link href="/bills">Bills</Link>
             <Link href="/watchlist">Watchlist</Link>
             <Link href="/insights">Insights</Link>
             <Link href="/calculator">Calculator</Link>
