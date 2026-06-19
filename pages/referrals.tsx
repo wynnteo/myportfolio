@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { useAuth } from '../lib/AuthContext';
-
+import NavBar from '../components/NavBar';
+import { AlertBox } from '../components/AlertBox';
 interface BrokerPromo {
   name: string;
   icon: string;
@@ -143,32 +144,7 @@ export default function ReferralHub() {
 
   return (
     <>
-      <header className="site-header">
-        <nav className="site-nav">
-          <Link href="/" className="site-logo">
-            📊 Portfolio Tracker
-          </Link>
-          <div className="nav-menu">
-            <Link href="/">Home</Link>
-            {user ? (
-              <>
-                <Link href="/dashboard">Dashboard</Link>
-                <Link href="/transactions">Transactions</Link>
-                <Link href="/calculator">Calculator</Link>
-                <Link href="/referrals">Referrals</Link>
-                <button onClick={() => void logout()}>Logout</button>
-              </>
-            ) : (
-              <>
-                <Link href="/calculator">Calculator</Link>
-                <Link href="/referrals">Referrals</Link>
-                <Link href="/login">Login</Link>
-                <Link href="/register" className="nav-primary">Get Started</Link>
-              </>
-            )}
-          </div>
-        </nav>
-      </header>
+      <NavBar />
 
       <main>
         <div className="page-header">

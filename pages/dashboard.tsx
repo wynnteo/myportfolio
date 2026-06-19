@@ -7,6 +7,9 @@ import {
 } from 'recharts';
 import { fetchWithAuth } from '../lib/api';
 import { useAuth } from '../lib/AuthContext';
+import NavBar from '../components/NavBar';
+import { AlertBox } from '../components/AlertBox';
+import { fetchAllHoldingQuotes } from '../lib/quotes';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -125,25 +128,6 @@ function MetricCard({ label, value, sub, color, highlight }: {
       <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#64748b', marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 800, color: color ?? '#0f172a', marginBottom: 4 }}>{value}</div>
       {sub && <div style={{ fontSize: 12, color: '#64748b' }}>{sub}</div>}
-    </div>
-  );
-}
-
-function AlertBox({ type, icon, title, body }: {
-  type: 'warn' | 'good' | 'info'; icon: string; title: string; body: string;
-}) {
-  const s = {
-    warn: { bg: '#FAEEDA', border: '#EF9F27', color: '#633806' },
-    good: { bg: '#EAF3DE', border: '#639922', color: '#27500A' },
-    info: { bg: '#E6F1FB', border: '#85B7EB', color: '#0C447C' },
-  }[type];
-  return (
-    <div style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 10 }}>
-      <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{icon}</span>
-      <div>
-        <div style={{ fontWeight: 700, fontSize: 13, color: s.color, marginBottom: 2 }}>{title}</div>
-        <div style={{ fontSize: 12, color: s.color, lineHeight: 1.5, opacity: 0.9 }}>{body}</div>
-      </div>
     </div>
   );
 }
@@ -622,37 +606,48 @@ export default function DashboardPage() {
   }, [allHoldings.length]);
 
   async function fetchAllQuotes() {
-    const utSymbols = Array.from(new Set(allHoldings.filter(h => h.category === 'Unit Trusts').map(h => h.symbol)));
-    const otherSymbols = Array.from(new Set(allHoldings.filter(h => h.category !== 'Unit Trusts').map(h => h.symbol)));
-    const allSymbols = [...utSymbols, ...otherSymbols];
+    // const utSymbols = Array.from(new Set(allHoldings.filter(h => h.category === 'Unit Trusts').map(h => h.symbol)));
+    // const otherSymbols = Array.from(new Set(allHoldings.filter(h => h.category !== 'Unit Trusts').map(h => h.symbol)));
+    // const allSymbols = [...utSymbols, ...otherSymbols];
+
+    // setLoadingPrices(true);
+    // setPriceLoadingSymbols(new Set(allSymbols));
+    // const next: Record<string, any> = {};
+
+    // await Promise.all(utSymbols.map(async sym => {
+    //   const h = allHoldings.find(x => x.symbol === sym);
+    //   try {
+    //     const r = await fetch(`/api/fund-quote?s=${encodeURIComponent(sym.includes(':') ? sym : sym + ':SGD')}&name=${encodeURIComponent(h?.productName ?? '')}`);
+    //     if (!r.ok) return;
+    //     const j = await r.json();
+    //     if (typeof j.price === 'number') next[sym] = { price: j.price, asOf: j.lastUpdated ?? null };
+    //   } catch {}
+    //   finally { setPriceLoadingSymbols(p => { const s = new Set(p); s.delete(sym); return s; }); }
+    // }));
+
+    // await Promise.all(otherSymbols.map(async sym => {
+    //   try {
+    //     const r = await fetch(`/api/quote?symbol=${encodeURIComponent(sym)}`);
+    //     if (!r.ok) return;
+    //     next[sym] = await r.json();
+    //   } catch {}
+    //   finally { setPriceLoadingSymbols(p => { const s = new Set(p); s.delete(sym); return s; }); }
+    // }));
+
+    // setQuotes(prev => ({ ...prev, ...next }));
+    // setLastPriceUpdate(new Date());
+    // setLoadingPrices(false);
 
     setLoadingPrices(true);
-    setPriceLoadingSymbols(new Set(allSymbols));
-    const next: Record<string, any> = {};
+    setPriceLoadingSymbols(new Set(allHoldings.map(h => h.symbol)));
 
-    await Promise.all(utSymbols.map(async sym => {
-      const h = allHoldings.find(x => x.symbol === sym);
-      try {
-        const r = await fetch(`/api/fund-quote?s=${encodeURIComponent(sym.includes(':') ? sym : sym + ':SGD')}&name=${encodeURIComponent(h?.productName ?? '')}`);
-        if (!r.ok) return;
-        const j = await r.json();
-        if (typeof j.price === 'number') next[sym] = { price: j.price, asOf: j.lastUpdated ?? null };
-      } catch {}
-      finally { setPriceLoadingSymbols(p => { const s = new Set(p); s.delete(sym); return s; }); }
-    }));
+    const result = await fetchAllHoldingQuotes(allHoldings);
 
-    await Promise.all(otherSymbols.map(async sym => {
-      try {
-        const r = await fetch(`/api/quote?symbol=${encodeURIComponent(sym)}`);
-        if (!r.ok) return;
-        next[sym] = await r.json();
-      } catch {}
-      finally { setPriceLoadingSymbols(p => { const s = new Set(p); s.delete(sym); return s; }); }
-    }));
-
-    setQuotes(prev => ({ ...prev, ...next }));
+    setQuotes(prev => ({ ...prev, ...result }));
+    setPriceLoadingSymbols(new Set());
     setLastPriceUpdate(new Date());
     setLoadingPrices(false);
+
   }
 
   // ── Enrich holdings with live prices ───────────────────────────────────────
@@ -782,23 +777,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <header className="site-header">
-        <nav className="site-nav">
-          <Link href="/" className="site-logo">📊 Portfolio Tracker</Link>
-          <div className="nav-menu">
-            <Link href="/">Home</Link>
-            <Link href="/dashboard">Dashboard</Link>
-            <Link href="/transactions">Transactions</Link>
-            <Link href="/accounts">Accounts</Link>
-            <Link href="/bills">Bills</Link>
-            <Link href="/watchlist">Watchlist</Link>
-            <Link href="/insights">Insights</Link>
-            <Link href="/calculator">Calculator</Link>
-            <Link href="/referrals">Referrals</Link>
-            <button onClick={() => void logout()}>Logout</button>
-          </div>
-        </nav>
-      </header>
+      <NavBar />
 
       <main>
         {/* ── Top bar ── */}

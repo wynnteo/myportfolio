@@ -1,8 +1,10 @@
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import { fetchWithAuth } from '../lib/api';
 import { useAuth } from '../lib/AuthContext';
+import NavBar from '../components/NavBar';
+import { fetchBatchQuotes } from '../lib/quotes';
 
 interface Transaction {
   id: string;
@@ -45,46 +47,35 @@ interface StockPosition {
 
 function formatCurrency(value: number | null, currency: string = 'SGD', decimals: number = 2) {
   if (value === null || Number.isNaN(value)) return '-';
-  return new Intl.NumberFormat('en-SG', { 
-    style: 'currency', 
+  return new Intl.NumberFormat('en-SG', {
+    style: 'currency',
     currency,
     minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals
+    maximumFractionDigits: decimals,
   }).format(value);
 }
 
 function formatQuantity(value: number) {
-  if (value === Math.floor(value)) {
-    return value.toString();
-  }
+  if (value === Math.floor(value)) return value.toString();
   return value.toFixed(4).replace(/\.?0+$/, '');
 }
 
 function formatLastUpdate(date: Date | null) {
   if (!date) return 'Never';
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
+  const diffMs = Date.now() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
-  
   if (diffMins < 1) return 'Just now';
   if (diffMins === 1) return '1 min ago';
   if (diffMins < 60) return `${diffMins} mins ago`;
-  
   const diffHours = Math.floor(diffMins / 60);
   if (diffHours === 1) return '1 hour ago';
   if (diffHours < 24) return `${diffHours} hours ago`;
-  
-  return date.toLocaleString('en-SG', { 
-    month: 'short', 
-    day: 'numeric', 
-    hour: '2-digit', 
-    minute: '2-digit' 
-  });
+  return date.toLocaleString('en-SG', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 export default function WatchlistPage() {
   const router = useRouter();
-  const { user, loading: authLoading, logout } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [quotes, setQuotes] = useState<Record<string, QuoteResponse>>({});
@@ -94,25 +85,18 @@ export default function WatchlistPage() {
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login');
-    }
+    if (!authLoading && !user) router.push('/login');
   }, [authLoading, user, router]);
 
   useEffect(() => {
-    if (user) {
-      void loadTransactions();
-    }
+    if (user) void loadTransactions();
   }, [user]);
 
   async function loadTransactions() {
     try {
       setLoading(true);
       const response = await fetchWithAuth('/api/transactions');
-      if (response.ok) {
-        const data: Transaction[] = await response.json();
-        setTransactions(data);
-      }
+      if (response.ok) setTransactions(await response.json());
     } catch (error) {
       console.error('Failed to load transactions:', error);
     } finally {
@@ -120,7 +104,6 @@ export default function WatchlistPage() {
     }
   }
 
-  // Calculate stock positions
   const stockPositions = useMemo(() => {
     const positions = new Map<string, {
       symbol: string;
@@ -129,91 +112,61 @@ export default function WatchlistPage() {
       buyLots: Array<{ qty: number; costPerShare: number; totalCost: number }>;
     }>();
 
-    // First pass: collect all transactions by symbol
     const txBySymbol = new Map<string, Transaction[]>();
     transactions
       .filter(tx => tx.category === 'Stocks' && (tx.type === 'BUY' || tx.type === 'SELL'))
       .forEach(tx => {
-        const key = tx.symbol;
-        if (!txBySymbol.has(key)) {
-          txBySymbol.set(key, []);
-        }
-        txBySymbol.get(key)!.push(tx);
+        if (!txBySymbol.has(tx.symbol)) txBySymbol.set(tx.symbol, []);
+        txBySymbol.get(tx.symbol)!.push(tx);
       });
 
-    // Second pass: process each symbol's transactions in order
     txBySymbol.forEach((txList, symbol) => {
-      // Sort by date
-      const sortedTx = [...txList].sort((a, b) => {
-        const dateA = new Date(a.trade_date || a.created_at).getTime();
-        const dateB = new Date(b.trade_date || b.created_at).getTime();
-        return dateA - dateB;
-      });
+      const sortedTx = [...txList].sort((a, b) =>
+        new Date(a.trade_date || a.created_at).getTime() -
+        new Date(b.trade_date || b.created_at).getTime()
+      );
 
-      const position = {
-        symbol,
-        productName: '',
-        currency: '',
-        buyLots: [] as Array<{ qty: number; costPerShare: number; totalCost: number }>,
-      };
+      const position = { symbol, productName: '', currency: '', buyLots: [] as Array<{ qty: number; costPerShare: number; totalCost: number }> };
 
       sortedTx.forEach(tx => {
         if (tx.type === 'BUY') {
-          // Add a new buy lot
           const qty = tx.quantity ?? 0;
           const price = tx.price ?? 0;
           const commission = tx.commission ?? 0;
           const costPerShare = qty > 0 ? (qty * price + commission) / qty : 0;
-          
-          position.buyLots.push({
-            qty,
-            costPerShare,
-            totalCost: qty * price + commission,
-          });
-          
+          position.buyLots.push({ qty, costPerShare, totalCost: qty * price + commission });
           position.productName = tx.product_name;
           position.currency = tx.currency;
         } else if (tx.type === 'SELL') {
-          // FIFO: Remove shares from oldest buy lots first
           let qtyToSell = Math.abs(tx.quantity ?? 0);
-          
           while (qtyToSell > 0 && position.buyLots.length > 0) {
-            const oldestLot = position.buyLots[0];
-            
-            if (oldestLot.qty <= qtyToSell) {
-              // Sell entire lot
-              qtyToSell -= oldestLot.qty;
-              position.buyLots.shift(); // Remove this lot completely
+            const oldest = position.buyLots[0];
+            if (oldest.qty <= qtyToSell) {
+              qtyToSell -= oldest.qty;
+              position.buyLots.shift();
             } else {
-              // Partial sell from this lot
-              const sellFromLot = qtyToSell;
-              oldestLot.qty -= sellFromLot;
-              oldestLot.totalCost = oldestLot.qty * oldestLot.costPerShare;
+              oldest.qty -= qtyToSell;
+              oldest.totalCost = oldest.qty * oldest.costPerShare;
               qtyToSell = 0;
             }
           }
         }
       });
 
-      if (position.buyLots.length > 0) {
-        positions.set(symbol, position);
-      }
+      if (position.buyLots.length > 0) positions.set(symbol, position);
     });
 
-    // Calculate final positions
     const result: StockPosition[] = [];
     positions.forEach(pos => {
-      const totalQty = pos.buyLots.reduce((sum, lot) => sum + lot.qty, 0);
-      const totalCost = pos.buyLots.reduce((sum, lot) => sum + lot.totalCost, 0);
-      const avgPrice = totalQty > 0 ? totalCost / totalQty : 0;
-
+      const totalQty = pos.buyLots.reduce((s, l) => s + l.qty, 0);
+      const totalCost = pos.buyLots.reduce((s, l) => s + l.totalCost, 0);
       if (totalQty > 0.0001) {
         result.push({
           symbol: pos.symbol,
           productName: pos.productName,
           currency: pos.currency,
           quantity: totalQty,
-          avgPrice,
+          avgPrice: totalQty > 0 ? totalCost / totalQty : 0,
           totalCost,
           currentPrice: null,
           marketValue: null,
@@ -222,140 +175,81 @@ export default function WatchlistPage() {
         });
       }
     });
-
     return result;
   }, [transactions]);
 
-  // Fetch prices for all stocks
-  async function fetchPrices() {
+  // ── FIX: useCallback so the interval always calls the latest version ──────
+  const fetchPrices = useCallback(async () => {
     const symbols = Array.from(new Set(stockPositions.map(p => p.symbol))).filter(Boolean);
     if (symbols.length === 0) {
       setQuotes({});
       setLastPriceUpdate(null);
       return;
     }
-
     setIsRefreshing(true);
-    const nextQuotes: Record<string, QuoteResponse> = {};
-
-    await Promise.all(
-      symbols.map(async (symbol) => {
-        try {
-          const resp = await fetch(`/api/quote?symbol=${encodeURIComponent(symbol)}`);
-          if (!resp.ok) return;
-          const data: QuoteResponse = await resp.json();
-          nextQuotes[symbol] = data;
-        } catch (err) {
-          // ignore individual failures
-        }
-      })
-    );
-
-    setQuotes(nextQuotes);
+    // ── FIX: use batch endpoint instead of N individual calls ──────────────
+    const result = await fetchBatchQuotes(symbols);
+    setQuotes(result as Record<string, QuoteResponse>);
     setLastPriceUpdate(new Date());
     setIsRefreshing(false);
-  }
+  }, [stockPositions]);
 
-  // Auto-refresh prices every 5 minutes
+  // ── FIX: depend on fetchPrices (stable reference via useCallback) ─────────
   useEffect(() => {
-    if (stockPositions.length > 0) {
-      void fetchPrices();
+    if (stockPositions.length === 0) return;
+    void fetchPrices();
+    const id = setInterval(() => void fetchPrices(), 5 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [fetchPrices]);
 
-      const intervalId = setInterval(() => {
-        void fetchPrices();
-      }, 5 * 60 * 1000); // 5 minutes
-
-      return () => clearInterval(intervalId);
-    }
-  }, [stockPositions.length]);
-
-  // Combine positions with current prices
   const displayPositions = useMemo(() => {
     return stockPositions.map(pos => {
       const quote = quotes[pos.symbol];
-      const currentPrice = quote ? quote.price : null;
-      let marketValue: number | null = null;
-      let pl: number | null = null;
-      let plPct: number | null = null;
-
-      if (currentPrice !== null && !Number.isNaN(currentPrice)) {
-        marketValue = currentPrice * pos.quantity;
-        pl = marketValue - pos.totalCost;
-        plPct = pos.totalCost !== 0 ? (pl / pos.totalCost) * 100 : null;
-      }
-
-      return {
-        ...pos,
-        currentPrice,
-        marketValue,
-        pl,
-        plPct,
-      };
+      const currentPrice = quote?.price ?? null;
+      const marketValue = currentPrice !== null ? currentPrice * pos.quantity : null;
+      const pl = marketValue !== null ? marketValue - pos.totalCost : null;
+      const plPct = pl !== null && pos.totalCost !== 0 ? (pl / pos.totalCost) * 100 : null;
+      return { ...pos, currentPrice, marketValue, pl, plPct };
     });
   }, [stockPositions, quotes]);
 
-  // Sort positions
   const sortedPositions = useMemo(() => {
     if (!sortField) return displayPositions;
-
     return [...displayPositions].sort((a, b) => {
-      let aVal: any = a[sortField as keyof typeof a];
-      let bVal: any = b[sortField as keyof typeof b];
-
-      if (aVal === null) return 1;
-      if (bVal === null) return -1;
-
-      if (typeof aVal === 'string') {
-        return sortDirection === 'asc'
-          ? aVal.localeCompare(bVal)
-          : bVal.localeCompare(aVal);
-      }
-
-      return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      const av = (a as any)[sortField];
+      const bv = (b as any)[sortField];
+      if (av === null) return 1;
+      if (bv === null) return -1;
+      if (typeof av === 'string') return sortDirection === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+      return sortDirection === 'asc' ? av - bv : bv - av;
     });
   }, [displayPositions, sortField, sortDirection]);
 
-  const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
+  function handleSort(field: string) {
+    if (sortField === field) setSortDirection(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortField(field); setSortDirection('asc'); }
+  }
 
-  // Calculate totals
   const totals = useMemo(() => {
-    const totalCost = sortedPositions.reduce((sum, p) => sum + p.totalCost, 0);
-    const totalMarketValue = sortedPositions.reduce((sum, p) => sum + (p.marketValue ?? 0), 0);
+    const totalCost = sortedPositions.reduce((s, p) => s + p.totalCost, 0);
+    const totalMarketValue = sortedPositions.reduce((s, p) => s + (p.marketValue ?? 0), 0);
     const totalPL = totalMarketValue - totalCost;
     const totalPLPct = totalCost !== 0 ? (totalPL / totalCost) * 100 : 0;
-
     return { totalCost, totalMarketValue, totalPL, totalPLPct };
   }, [sortedPositions]);
 
+  if (authLoading || loading) {
+    return (
+      <>
+        <NavBar />
+        <main><div className="loading-state">Loading watchlist...</div></main>
+      </>
+    );
+  }
+
   return (
     <>
-      <header className="site-header">
-        <nav className="site-nav">
-          <Link href="/" className="site-logo">
-            📊 Portfolio Tracker
-          </Link>
-          <div className="nav-menu">
-            <Link href="/">Home</Link>
-            <Link href="/dashboard">Dashboard</Link>
-            <Link href="/transactions">Transactions</Link>
-            <Link href="/accounts">Accounts</Link>
-            <Link href="/bills">Bills</Link>
-            <Link href="/watchlist">Watchlist</Link>
-            <Link href="/insights">Insights</Link>
-            <Link href="/calculator">Calculator</Link>
-            <Link href="/referrals">Referrals</Link>
-            <button onClick={() => void logout()}>Logout</button>
-          </div>
-        </nav>
-      </header>
-
+      <NavBar />
       <main>
         <div className="page-header">
           <div>
@@ -365,7 +259,7 @@ export default function WatchlistPage() {
           <div className="price-update-info">
             {isRefreshing ? (
               <span className="update-time loading">
-                <span className="loading-spinner"></span>
+                <span className="loading-spinner" />
                 Refreshing prices...
               </span>
             ) : lastPriceUpdate ? (
@@ -383,35 +277,32 @@ export default function WatchlistPage() {
           </div>
         </div>
 
-        {/* Summary Cards */}
-        <div className="overview-grid" style={{ marginBottom: '32px' }}>
+        <div className="overview-grid" style={{ marginBottom: 32 }}>
           <div className="summary-card">
             <div className="stat-title">Total Invested</div>
-            <div className="stat-value">{formatCurrency(totals.totalCost, 'SGD')}</div>
+            <div className="stat-value">{formatCurrency(totals.totalCost)}</div>
             <div className="stat-sub">{sortedPositions.length} stock positions</div>
           </div>
           <div className="summary-card">
             <div className="stat-title">Market Value</div>
-            <div className="stat-value">{formatCurrency(totals.totalMarketValue, 'SGD')}</div>
+            <div className="stat-value">{formatCurrency(totals.totalMarketValue)}</div>
             <div className="stat-sub">Live prices from Yahoo Finance</div>
           </div>
           <div className={`summary-card ${totals.totalPL > 0 ? 'profit' : totals.totalPL < 0 ? 'loss' : ''}`}>
             <div className="stat-title">Total P/L</div>
-            <div className="stat-value">{formatCurrency(totals.totalPL, 'SGD')}</div>
+            <div className="stat-value">{formatCurrency(totals.totalPL)}</div>
             <div className="stat-sub">
-              {totals.totalPLPct !== null && totals.totalPLPct !== 0
+              {totals.totalPLPct !== 0
                 ? `${totals.totalPLPct > 0 ? '+' : ''}${totals.totalPLPct.toFixed(2)}%`
                 : '—'}
             </div>
           </div>
         </div>
 
-        {loading ? (
-          <div className="loading-state">Loading watchlist...</div>
-        ) : sortedPositions.length === 0 ? (
+        {sortedPositions.length === 0 ? (
           <div className="empty-state">
             <p>No stock positions found. Add some stock transactions to see them here!</p>
-            <Link href="/dashboard" className="btn-primary" style={{ marginTop: '16px' }}>
+            <Link href="/dashboard" className="btn-primary" style={{ marginTop: 16 }}>
               Go to Dashboard
             </Link>
           </div>
@@ -421,78 +312,48 @@ export default function WatchlistPage() {
               <h2>Stock Positions</h2>
               <p className="muted">Auto-refreshes every 5 minutes</p>
             </div>
-
             <div className="table-wrapper">
               <table className="holdings-table">
                 <thead>
                   <tr>
-                    <th onClick={() => handleSort('symbol')} className="sortable">
-                      Symbol {sortField === 'symbol' && (sortDirection === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th onClick={() => handleSort('productName')} className="sortable">
-                      Product Name {sortField === 'productName' && (sortDirection === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th onClick={() => handleSort('quantity')} className="sortable" style={{ textAlign: 'right' }}>
-                      Units {sortField === 'quantity' && (sortDirection === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th onClick={() => handleSort('avgPrice')} className="sortable" style={{ textAlign: 'right' }}>
-                      Avg Price {sortField === 'avgPrice' && (sortDirection === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th onClick={() => handleSort('currentPrice')} className="sortable" style={{ textAlign: 'right' }}>
-                      Current Price {sortField === 'currentPrice' && (sortDirection === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th onClick={() => handleSort('totalCost')} className="sortable" style={{ textAlign: 'right' }}>
-                      Total Buy {sortField === 'totalCost' && (sortDirection === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th onClick={() => handleSort('marketValue')} className="sortable" style={{ textAlign: 'right' }}>
-                      Market Value {sortField === 'marketValue' && (sortDirection === 'asc' ? '↑' : '↓')}
-                    </th>
-                    <th onClick={() => handleSort('plPct')} className="sortable" style={{ textAlign: 'right' }}>
-                      P/L {sortField === 'plPct' && (sortDirection === 'asc' ? '↑' : '↓')}
-                    </th>
+                    {[
+                      { key: 'symbol', label: 'Symbol' },
+                      { key: 'productName', label: 'Product Name' },
+                      { key: 'quantity', label: 'Units', right: true },
+                      { key: 'avgPrice', label: 'Avg Price', right: true },
+                      { key: 'currentPrice', label: 'Current Price', right: true },
+                      { key: 'totalCost', label: 'Total Buy', right: true },
+                      { key: 'marketValue', label: 'Market Value', right: true },
+                      { key: 'plPct', label: 'P/L', right: true },
+                    ].map(({ key, label, right }) => (
+                      <th key={key} onClick={() => handleSort(key)} className="sortable"
+                        style={{ textAlign: right ? 'right' : 'left' }}>
+                        {label}{sortField === key ? (sortDirection === 'asc' ? ' ↑' : ' ↓') : ''}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {sortedPositions.map((pos, idx) => {
                     const plClass = pos.pl && pos.pl !== 0 ? (pos.pl > 0 ? 'positive' : 'negative') : 'neutral';
-
                     return (
                       <tr key={idx}>
-                        <td>
-                          <div className="symbol-cell">
-                            <div className="symbol-main" style={{ fontWeight: 700, fontSize: '14px' }}>
-                              {pos.symbol}
-                            </div>
-                          </div>
-                        </td>
-                        <td>
-                          <div className="product-cell">{pos.productName || '-'}</div>
-                        </td>
+                        <td><div className="symbol-main" style={{ fontWeight: 700, fontSize: 14 }}>{pos.symbol}</div></td>
+                        <td><div className="product-cell">{pos.productName || '-'}</div></td>
                         <td className="value-cell">{formatQuantity(pos.quantity)}</td>
                         <td className="value-cell">{formatCurrency(pos.avgPrice, pos.currency, 4)}</td>
                         <td className="value-cell">
-                          {pos.currentPrice !== null ? (
-                            <span style={{ fontWeight: 700 }}>
-                              {formatCurrency(pos.currentPrice, pos.currency, 4)}
-                            </span>
-                          ) : (
-                            '-'
-                          )}
+                          {pos.currentPrice !== null
+                            ? <span style={{ fontWeight: 700 }}>{formatCurrency(pos.currentPrice, pos.currency, 4)}</span>
+                            : isRefreshing ? <span style={{ fontSize: 11, color: '#94a3b8' }}>Loading...</span> : '-'}
                         </td>
-                        <td className="value-cell">{formatCurrency(pos.totalCost, pos.currency, 2)}</td>
-                        <td className="value-cell">
-                          {pos.marketValue !== null ? formatCurrency(pos.marketValue, pos.currency, 2) : '-'}
-                        </td>
+                        <td className="value-cell">{formatCurrency(pos.totalCost, pos.currency)}</td>
+                        <td className="value-cell">{pos.marketValue !== null ? formatCurrency(pos.marketValue, pos.currency) : '-'}</td>
                         <td className="pl-cell">
                           <div className={`pl-value ${plClass}`}>
-                            <span className="pl-amount">
-                              {pos.pl !== null ? formatCurrency(pos.pl, pos.currency, 2) : '-'}
-                            </span>
+                            <span className="pl-amount">{pos.pl !== null ? formatCurrency(pos.pl, pos.currency) : '-'}</span>
                             {pos.plPct !== null && (
-                              <span className="pl-percentage">
-                                {pos.plPct > 0 ? '+' : ''}
-                                {pos.plPct.toFixed(2)}%
-                              </span>
+                              <span className="pl-percentage">{pos.plPct > 0 ? '+' : ''}{pos.plPct.toFixed(2)}%</span>
                             )}
                           </div>
                         </td>

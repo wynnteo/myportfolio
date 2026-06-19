@@ -1,41 +1,14 @@
 import Link from 'next/link';
 import { useAuth } from '../lib/AuthContext';
+import NavBar from '../components/NavBar';
+import { AlertBox } from '../components/AlertBox';
 
 export default function LandingPage() {
   const { user, logout } = useAuth();
 
   return (
     <div className="landing-page">
-      <header className="site-header">
-        <nav className="site-nav">
-          <Link href="/" className="site-logo">
-            📊 Portfolio Tracker
-          </Link>
-          <div className="nav-menu">
-            {user ? (
-              <>
-                <Link href="/dashboard">Dashboard</Link>
-                <Link href="/transactions">Transactions</Link>
-                <Link href="/accounts">Accounts</Link>
-                <Link href="/bills">Bills</Link>
-                <Link href="/watchlist">Watchlist</Link>
-                <Link href="/insights">Insights</Link>
-                <Link href="/calculator">Calculator</Link>
-                <Link href="/referrals">Referrals</Link>
-
-                <button onClick={() => void logout()}>Logout</button>
-              </>
-            ) : (
-              <>
-                <Link href="/calculator">Calculator</Link>
-                <Link href="/referrals">Referrals</Link>
-                <Link href="/login">Login</Link>
-                <Link href="/register" className="nav-primary">Get Started</Link>
-              </>
-            )}
-          </div>
-        </nav>
-      </header>
+      <NavBar />
 
       <section className="hero-section">
         <div className="hero-content">

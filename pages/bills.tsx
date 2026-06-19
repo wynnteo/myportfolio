@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useAuth } from '../lib/AuthContext';
 import { fetchWithAuth } from '../lib/api';
+import NavBar from '../components/NavBar';
+import { AlertBox } from '../components/AlertBox';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -161,25 +163,6 @@ function DueBadge({ daysUntil }: { daysUntil: number }) {
   const color = overdue ? '#A32D2D' : urgent ? '#854F0B' : soon ? '#185FA5' : '#64748b';
   const label = overdue ? `${Math.abs(daysUntil)}d overdue` : daysUntil === 0 ? 'Due today!' : `${daysUntil}d left`;
   return <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700, background: bg, color }}>{label}</span>;
-}
-
-function AlertBox({ type, icon, title, body }: {
-  type: 'warn' | 'good' | 'info'; icon: string; title: string; body: string;
-}) {
-  const s = {
-    warn: { bg: '#FAEEDA', border: '#EF9F27', color: '#633806' },
-    good: { bg: '#EAF3DE', border: '#639922', color: '#27500A' },
-    info: { bg: '#E6F1FB', border: '#85B7EB', color: '#0C447C' },
-  }[type];
-  return (
-    <div style={{ background: s.bg, border: `1px solid ${s.border}`, borderRadius: 10, padding: '12px 16px', display: 'flex', gap: 10 }}>
-      <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>{icon}</span>
-      <div>
-        <div style={{ fontWeight: 700, fontSize: 13, color: s.color, marginBottom: 2 }}>{title}</div>
-        <div style={{ fontSize: 12, color: s.color, lineHeight: 1.5, opacity: 0.9 }}>{body}</div>
-      </div>
-    </div>
-  );
 }
 
 // ─── API helpers ──────────────────────────────────────────────────────────────
@@ -569,23 +552,7 @@ export default function BillsPage() {
 
   return (
     <>
-      <header className="site-header">
-        <nav className="site-nav">
-          <Link href="/" className="site-logo">📊 Portfolio Tracker</Link>
-          <div className="nav-menu">
-            <Link href="/">Home</Link>
-            <Link href="/dashboard">Dashboard</Link>
-            <Link href="/transactions">Transactions</Link>
-            <Link href="/accounts">Accounts</Link>
-            <Link href="/bills">Bills</Link>
-            <Link href="/watchlist">Watchlist</Link>
-            <Link href="/insights">Insights</Link>
-            <Link href="/calculator">Calculator</Link>
-            <Link href="/referrals">Referrals</Link>
-            <button onClick={() => void logout()}>Logout</button>
-          </div>
-        </nav>
-      </header>
+      <NavBar />
 
       <main>
         {/* ── Page header ── */}
