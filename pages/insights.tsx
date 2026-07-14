@@ -310,7 +310,7 @@ function BrokerTable({ data }: { data: { broker: string; invested: number; curre
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
-const DIV_GOAL = 500; // monthly dividend goal in SGD — move to user settings later
+const DIV_GOAL = 3000;
 
 export default function InsightsPage() {
   const router = useRouter();

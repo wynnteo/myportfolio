@@ -5,25 +5,9 @@ import { fetchWithAuth } from '../lib/api';
 import { useAuth } from '../lib/AuthContext';
 import NavBar from '../components/NavBar';
 import { fetchBatchQuotes } from '../lib/quotes';
-
-interface Transaction {
-  id: string;
-  user_id: string;
-  symbol: string;
-  product_name: string;
-  category: string;
-  broker: string;
-  currency: string;
-  type: 'BUY' | 'SELL' | 'DIVIDEND';
-  quantity: number | null;
-  price: number | null;
-  commission: number | null;
-  dividend_amount: number | null;
-  trade_date: string | null;
-  notes: string | null;
-  current_price: number | null;
-  created_at: string;
-}
+import {
+  HoldingModal, Transaction, HoldingRow, fmt, fmtQty, getHoldingKey,
+} from '../components/HoldingModal';
 
 interface QuoteResponse {
   symbol: string;
@@ -32,33 +16,9 @@ interface QuoteResponse {
   asOf: string | null;
 }
 
-interface StockPosition {
-  symbol: string;
-  productName: string;
-  currency: string;
-  quantity: number;
-  avgPrice: number;
-  totalCost: number;
-  currentPrice: number | null;
-  marketValue: number | null;
-  pl: number | null;
-  plPct: number | null;
-}
-
-function formatCurrency(value: number | null, currency: string = 'SGD', decimals: number = 2) {
-  if (value === null || Number.isNaN(value)) return '-';
-  return new Intl.NumberFormat('en-SG', {
-    style: 'currency',
-    currency,
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals,
-  }).format(value);
-}
-
-function formatQuantity(value: number) {
-  if (value === Math.floor(value)) return value.toString();
-  return value.toFixed(4).replace(/\.?0+$/, '');
-}
+// Local aliases so the rest of this file reads the same as before
+const formatCurrency = fmt;
+const formatQuantity = fmtQty;
 
 function formatLastUpdate(date: Date | null) {
   if (!date) return 'Never';
@@ -83,6 +43,7 @@ export default function WatchlistPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [sortField, setSortField] = useState<string | null>('symbol');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [selectedHoldingKey, setSelectedHoldingKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/login');
@@ -104,79 +65,44 @@ export default function WatchlistPage() {
     }
   }
 
+  const currentYear = new Date().getFullYear();
+
+  // Same aggregation as the dashboard's holdings builder, restricted to Stocks,
+  // so the shared HoldingModal gets data in exactly the shape it expects.
   const stockPositions = useMemo(() => {
-    const positions = new Map<string, {
-      symbol: string;
-      productName: string;
-      currency: string;
-      buyLots: Array<{ qty: number; costPerShare: number; totalCost: number }>;
-    }>();
-
-    const txBySymbol = new Map<string, Transaction[]>();
-    transactions
-      .filter(tx => tx.category === 'Stocks' && (tx.type === 'BUY' || tx.type === 'SELL'))
-      .forEach(tx => {
-        if (!txBySymbol.has(tx.symbol)) txBySymbol.set(tx.symbol, []);
-        txBySymbol.get(tx.symbol)!.push(tx);
-      });
-
-    txBySymbol.forEach((txList, symbol) => {
-      const sortedTx = [...txList].sort((a, b) =>
-        new Date(a.trade_date || a.created_at).getTime() -
-        new Date(b.trade_date || b.created_at).getTime()
-      );
-
-      const position = { symbol, productName: '', currency: '', buyLots: [] as Array<{ qty: number; costPerShare: number; totalCost: number }> };
-
-      sortedTx.forEach(tx => {
-        if (tx.type === 'BUY') {
-          const qty = tx.quantity ?? 0;
-          const price = tx.price ?? 0;
-          const commission = tx.commission ?? 0;
-          const costPerShare = qty > 0 ? (qty * price + commission) / qty : 0;
-          position.buyLots.push({ qty, costPerShare, totalCost: qty * price + commission });
-          position.productName = tx.product_name;
-          position.currency = tx.currency;
-        } else if (tx.type === 'SELL') {
-          let qtyToSell = Math.abs(tx.quantity ?? 0);
-          while (qtyToSell > 0 && position.buyLots.length > 0) {
-            const oldest = position.buyLots[0];
-            if (oldest.qty <= qtyToSell) {
-              qtyToSell -= oldest.qty;
-              position.buyLots.shift();
-            } else {
-              oldest.qty -= qtyToSell;
-              oldest.totalCost = oldest.qty * oldest.costPerShare;
-              qtyToSell = 0;
-            }
-          }
-        }
-      });
-
-      if (position.buyLots.length > 0) positions.set(symbol, position);
-    });
-
-    const result: StockPosition[] = [];
-    positions.forEach(pos => {
-      const totalQty = pos.buyLots.reduce((s, l) => s + l.qty, 0);
-      const totalCost = pos.buyLots.reduce((s, l) => s + l.totalCost, 0);
-      if (totalQty > 0.0001) {
-        result.push({
-          symbol: pos.symbol,
-          productName: pos.productName,
-          currency: pos.currency,
-          quantity: totalQty,
-          avgPrice: totalQty > 0 ? totalCost / totalQty : 0,
-          totalCost,
-          currentPrice: null,
-          marketValue: null,
-          pl: null,
-          plPct: null,
-        });
+    const map = new Map<string, HoldingRow>();
+    for (const tx of transactions) {
+      if (tx.category !== 'Stocks') continue;
+      const key = getHoldingKey(tx.symbol, tx.broker);
+      const row = map.get(key) ?? {
+        key, symbol: tx.symbol, productName: tx.product_name, category: tx.category,
+        broker: tx.broker, currency: tx.currency, quantity: 0, averagePrice: 0,
+        totalCost: 0, totalCommission: 0, dividends: 0, currentPrice: null,
+        currentValue: null, pl: null, plPct: null, lastPriceTimestamp: -Infinity,
+        thisYearDividends: 0, lastYearDividends: 0, dividendYield: null,
+      };
+      if (tx.type === 'BUY' || tx.type === 'SELL') {
+        row.quantity += tx.quantity ?? 0;
+        row.totalCost += (tx.quantity ?? 0) * (tx.price ?? 0) + (tx.commission ?? 0);
+        row.totalCommission += tx.commission ?? 0;
       }
+      if (tx.type === 'DIVIDEND') {
+        row.dividends += tx.dividend_amount ?? 0;
+        if (tx.trade_date && new Date(tx.trade_date).getFullYear() === currentYear) {
+          row.thisYearDividends += tx.dividend_amount ?? 0;
+        }
+        if (tx.trade_date && new Date(tx.trade_date).getFullYear() === currentYear - 1) {
+          row.lastYearDividends += tx.dividend_amount ?? 0;
+        }
+      }
+      if (tx.product_name) row.productName = tx.product_name;
+      map.set(key, row);
+    }
+    map.forEach(row => {
+      if (row.quantity > 0.0001) row.averagePrice = row.totalCost / row.quantity;
     });
-    return result;
-  }, [transactions]);
+    return Array.from(map.values()).filter(r => r.quantity > 0.0001);
+  }, [transactions, currentYear]);
 
   // ── FIX: useCallback so the interval always calls the latest version ──────
   const fetchPrices = useCallback(async () => {
@@ -202,14 +128,15 @@ export default function WatchlistPage() {
     return () => clearInterval(id);
   }, [fetchPrices]);
 
-  const displayPositions = useMemo(() => {
+  const displayPositions: HoldingRow[] = useMemo(() => {
     return stockPositions.map(pos => {
       const quote = quotes[pos.symbol];
       const currentPrice = quote?.price ?? null;
-      const marketValue = currentPrice !== null ? currentPrice * pos.quantity : null;
-      const pl = marketValue !== null ? marketValue - pos.totalCost : null;
+      const currentValue = currentPrice !== null ? currentPrice * pos.quantity : null;
+      const pl = currentValue !== null ? currentValue - pos.totalCost : null;
       const plPct = pl !== null && pos.totalCost !== 0 ? (pl / pos.totalCost) * 100 : null;
-      return { ...pos, currentPrice, marketValue, pl, plPct };
+      const dividendYield = pos.totalCost > 0 && pos.thisYearDividends > 0 ? (pos.thisYearDividends / pos.totalCost) * 100 : null;
+      return { ...pos, currentPrice, currentValue, pl, plPct, dividendYield };
     });
   }, [stockPositions, quotes]);
 
@@ -230,9 +157,14 @@ export default function WatchlistPage() {
     else { setSortField(field); setSortDirection('asc'); }
   }
 
+  const selectedHolding = useMemo(
+    () => displayPositions.find(h => h.key === selectedHoldingKey) ?? null,
+    [displayPositions, selectedHoldingKey]
+  );
+
   const totals = useMemo(() => {
     const totalCost = sortedPositions.reduce((s, p) => s + p.totalCost, 0);
-    const totalMarketValue = sortedPositions.reduce((s, p) => s + (p.marketValue ?? 0), 0);
+    const totalMarketValue = sortedPositions.reduce((s, p) => s + (p.currentValue ?? 0), 0);
     const totalPL = totalMarketValue - totalCost;
     const totalPLPct = totalCost !== 0 ? (totalPL / totalCost) * 100 : 0;
     return { totalCost, totalMarketValue, totalPL, totalPLPct };
@@ -320,10 +252,10 @@ export default function WatchlistPage() {
                       { key: 'symbol', label: 'Symbol' },
                       { key: 'productName', label: 'Product Name' },
                       { key: 'quantity', label: 'Units', right: true },
-                      { key: 'avgPrice', label: 'Avg Price', right: true },
+                      { key: 'averagePrice', label: 'Avg Price', right: true },
                       { key: 'currentPrice', label: 'Current Price', right: true },
                       { key: 'totalCost', label: 'Total Buy', right: true },
-                      { key: 'marketValue', label: 'Market Value', right: true },
+                      { key: 'currentValue', label: 'Market Value', right: true },
                       { key: 'plPct', label: 'P/L', right: true },
                     ].map(({ key, label, right }) => (
                       <th key={key} onClick={() => handleSort(key)} className="sortable"
@@ -331,24 +263,25 @@ export default function WatchlistPage() {
                         {label}{sortField === key ? (sortDirection === 'asc' ? ' ↑' : ' ↓') : ''}
                       </th>
                     ))}
+                    <th style={{ textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {sortedPositions.map((pos, idx) => {
+                  {sortedPositions.map((pos) => {
                     const plClass = pos.pl && pos.pl !== 0 ? (pos.pl > 0 ? 'positive' : 'negative') : 'neutral';
                     return (
-                      <tr key={idx}>
+                      <tr key={pos.key}>
                         <td><div className="symbol-main" style={{ fontWeight: 700, fontSize: 14 }}>{pos.symbol}</div></td>
                         <td><div className="product-cell">{pos.productName || '-'}</div></td>
                         <td className="value-cell">{formatQuantity(pos.quantity)}</td>
-                        <td className="value-cell">{formatCurrency(pos.avgPrice, pos.currency, 4)}</td>
+                        <td className="value-cell">{formatCurrency(pos.averagePrice, pos.currency, 4)}</td>
                         <td className="value-cell">
                           {pos.currentPrice !== null
                             ? <span style={{ fontWeight: 700 }}>{formatCurrency(pos.currentPrice, pos.currency, 4)}</span>
                             : isRefreshing ? <span style={{ fontSize: 11, color: '#94a3b8' }}>Loading...</span> : '-'}
                         </td>
                         <td className="value-cell">{formatCurrency(pos.totalCost, pos.currency)}</td>
-                        <td className="value-cell">{pos.marketValue !== null ? formatCurrency(pos.marketValue, pos.currency) : '-'}</td>
+                        <td className="value-cell">{pos.currentValue !== null ? formatCurrency(pos.currentValue, pos.currency) : '-'}</td>
                         <td className="pl-cell">
                           <div className={`pl-value ${plClass}`}>
                             <span className="pl-amount">{pos.pl !== null ? formatCurrency(pos.pl, pos.currency) : '-'}</span>
@@ -357,6 +290,9 @@ export default function WatchlistPage() {
                             )}
                           </div>
                         </td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button className="view-btn" onClick={() => setSelectedHoldingKey(pos.key)}>View</button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -364,6 +300,15 @@ export default function WatchlistPage() {
               </table>
             </div>
           </section>
+        )}
+
+        {selectedHolding && (
+          <HoldingModal
+            holding={selectedHolding}
+            transactions={transactions}
+            onClose={() => setSelectedHoldingKey(null)}
+            onReload={() => void loadTransactions()}
+          />
         )}
       </main>
     </>
