@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useState, FormEvent, useMemo } from 'react';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine, ComposedChart } from 'recharts';
 import { useAuth } from '../lib/AuthContext';
 import NavBar from '../components/NavBar';
 import { AlertBox } from '../components/AlertBox';
@@ -836,21 +836,27 @@ function DividendYieldCalculator() {
 
 interface FireResult {
   fireNumber: number;
+  annualExpenses: number;
+  monthlyPassiveIncome: number;
   reached: boolean;
   yearsToFire: number | null;
   fireAge: number | null;
+  retirementYear: number | null;
   progressPct: number;
+  savingsRatePct: number | null;
   monthlyRealReturnPct: number;
-  chartData: { year: number; age: number; balance: number }[];
+  chartData: { year: number; age: number; balance: number; contributions: number }[];
 }
 
 function FireCalculator() {
+  const currentYear = new Date().getFullYear();
   const [currentAge, setCurrentAge] = useState('30');
   const [currentSavings, setCurrentSavings] = useState('');
   const [monthlyContribution, setMonthlyContribution] = useState('');
+  const [monthlyIncome, setMonthlyIncome] = useState('');
   const [annualReturn, setAnnualReturn] = useState('7');
   const [inflationRate, setInflationRate] = useState('3');
-  const [annualExpenses, setAnnualExpenses] = useState('');
+  const [monthlyExpenses, setMonthlyExpenses] = useState('');
   const [withdrawalRate, setWithdrawalRate] = useState('4');
   const [result, setResult] = useState<FireResult | null>(null);
 
@@ -859,42 +865,50 @@ function FireCalculator() {
     const age = parseFloat(currentAge) || 0;
     const savings = parseFloat(currentSavings) || 0;
     const contribution = parseFloat(monthlyContribution) || 0;
+    const income = parseFloat(monthlyIncome) || 0;
     const returnRate = parseFloat(annualReturn) || 0;
     const inflation = parseFloat(inflationRate) || 0;
-    const expenses = parseFloat(annualExpenses) || 0;
+    const monthlyExp = parseFloat(monthlyExpenses) || 0;
+    const annualExpenses = monthlyExp * 12; // auto-calculated, no manual maths needed
     const swr = parseFloat(withdrawalRate) || 4;
 
-    if (expenses <= 0 || swr <= 0) { setResult(null); return; }
+    if (annualExpenses <= 0 || swr <= 0) { setResult(null); return; }
 
-    const fireNumber = expenses / (swr / 100);
+    const fireNumber = annualExpenses / (swr / 100);
+    const monthlyPassiveIncome = (fireNumber * (swr / 100)) / 12;
+    const savingsRatePct = income > 0 ? Math.min(100, (contribution / income) * 100) : null;
 
     // Use "real" (inflation-adjusted) return so everything stays in today's dollars
     const realAnnualReturn = (1 + returnRate / 100) / (1 + inflation / 100) - 1;
     const realMonthlyReturn = Math.pow(1 + realAnnualReturn, 1 / 12) - 1;
 
     let balance = savings;
-    const chartData: { year: number; age: number; balance: number }[] = [{ year: 0, age, balance: Math.round(balance) }];
+    let contributed = savings; // principal only, no growth — for the "Contributions" line
+    const chartData: { year: number; age: number; balance: number; contributions: number }[] =
+      [{ year: 0, age, balance: Math.round(balance), contributions: Math.round(contributed) }];
     let months = 0;
     const maxMonths = 70 * 12; // safety cap
     let reached = fireNumber > 0 && balance >= fireNumber;
 
     while (!reached && months < maxMonths) {
       balance = balance * (1 + realMonthlyReturn) + contribution;
+      contributed += contribution;
       months++;
-      if (months % 12 === 0) chartData.push({ year: months / 12, age: age + months / 12, balance: Math.round(balance) });
+      if (months % 12 === 0) chartData.push({ year: months / 12, age: age + months / 12, balance: Math.round(balance), contributions: Math.round(contributed) });
       if (balance >= fireNumber) reached = true;
     }
 
     const yearsToFire = reached ? months / 12 : null;
     const fireAge = reached ? age + months / 12 : null;
+    const retirementYear = reached ? currentYear + Math.ceil(months / 12) : null;
     const progressPct = fireNumber > 0 ? Math.min(100, (savings / fireNumber) * 100) : 0;
 
-    setResult({ fireNumber, reached, yearsToFire, fireAge, progressPct, monthlyRealReturnPct: realMonthlyReturn * 100, chartData });
+    setResult({ fireNumber, annualExpenses, monthlyPassiveIncome, reached, yearsToFire, fireAge, retirementYear, progressPct, savingsRatePct, monthlyRealReturnPct: realMonthlyReturn * 100, chartData });
   }
 
   function handleReset() {
-    setCurrentAge('30'); setCurrentSavings(''); setMonthlyContribution('');
-    setAnnualReturn('7'); setInflationRate('3'); setAnnualExpenses(''); setWithdrawalRate('4');
+    setCurrentAge('30'); setCurrentSavings(''); setMonthlyContribution(''); setMonthlyIncome('');
+    setAnnualReturn('7'); setInflationRate('3'); setMonthlyExpenses(''); setWithdrawalRate('4');
     setResult(null);
   }
 
@@ -902,7 +916,7 @@ function FireCalculator() {
     <div className="calculator-card">
       <div className="calc-header">
         <h2>🔥 FIRE Calculator</h2>
-        <p className="calc-description">Work out your Financial Independence number and how many years away you are, based on your savings rate and expected returns.</p>
+        <p className="calc-description">Tell it your current savings and how much you want to spend monthly in retirement — it works out the total you need, how many years away that is, and which year you can retire.</p>
       </div>
       <form onSubmit={handleCalculate} className="calc-form">
         <div className="calc-section">
@@ -911,6 +925,14 @@ function FireCalculator() {
             <label>Current Age<input type="number" step="1" value={currentAge} onChange={e => setCurrentAge(e.target.value)} placeholder="e.g., 30" required /></label>
             <label>Current Savings / Portfolio ($)<input type="number" step="0.01" value={currentSavings} onChange={e => setCurrentSavings(e.target.value)} placeholder="e.g., 50000" required /></label>
             <label>Monthly Contribution ($)<input type="number" step="0.01" value={monthlyContribution} onChange={e => setMonthlyContribution(e.target.value)} placeholder="e.g., 2000" required /></label>
+            <label>Monthly Take-Home Income ($, optional)<input type="number" step="0.01" value={monthlyIncome} onChange={e => setMonthlyIncome(e.target.value)} placeholder="e.g., 6000" /></label>
+          </div>
+        </div>
+        <div className="calc-section">
+          <div className="calc-section-title">What you want in retirement</div>
+          <div className="calc-input-grid">
+            <label>Monthly Expenses Wanted ($, today&apos;s $)<input type="number" step="0.01" value={monthlyExpenses} onChange={e => setMonthlyExpenses(e.target.value)} placeholder="e.g., 3500" required /></label>
+            <label>Withdrawal Rate (%, typically 4)<input type="number" step="0.1" value={withdrawalRate} onChange={e => setWithdrawalRate(e.target.value)} placeholder="e.g., 4" required /></label>
           </div>
         </div>
         <div className="calc-section">
@@ -918,8 +940,6 @@ function FireCalculator() {
           <div className="calc-input-grid">
             <label>Expected Annual Return (%)<input type="number" step="0.1" value={annualReturn} onChange={e => setAnnualReturn(e.target.value)} placeholder="e.g., 7" required /></label>
             <label>Inflation Rate (%)<input type="number" step="0.1" value={inflationRate} onChange={e => setInflationRate(e.target.value)} placeholder="e.g., 3" required /></label>
-            <label>Annual Expenses in Retirement ($, today&apos;s $)<input type="number" step="0.01" value={annualExpenses} onChange={e => setAnnualExpenses(e.target.value)} placeholder="e.g., 40000" required /></label>
-            <label>Safe Withdrawal Rate (%)<input type="number" step="0.1" value={withdrawalRate} onChange={e => setWithdrawalRate(e.target.value)} placeholder="e.g., 4" required /></label>
           </div>
         </div>
         <div className="calc-actions">
@@ -932,21 +952,39 @@ function FireCalculator() {
         <div className={`calc-result ${result.reached ? 'profit' : ''}`}>
           <div className="result-grid">
             <div className="result-item highlight">
-              <div className="result-label">FIRE Number</div>
+              <div className="result-label">Total You Need (FIRE Number)</div>
               <div className="result-value large">${fmt(result.fireNumber)}</div>
             </div>
             <div className="result-item">
-              <div className="result-label">Years to FIRE</div>
+              <div className="result-label">Years to Retire</div>
               <div className="result-value">{result.yearsToFire !== null ? result.yearsToFire.toFixed(1) : '70+'}</div>
             </div>
             <div className="result-item">
-              <div className="result-label">Target Age</div>
+              <div className="result-label">You Can Retire In</div>
+              <div className="result-value">{result.retirementYear !== null ? result.retirementYear : '—'}</div>
+            </div>
+            <div className="result-item">
+              <div className="result-label">Retirement Age</div>
               <div className="result-value">{result.fireAge !== null ? result.fireAge.toFixed(1) : '—'}</div>
             </div>
+            <div className="result-item">
+              <div className="result-label">Monthly Passive Income</div>
+              <div className="result-value">${fmt(result.monthlyPassiveIncome)}</div>
+            </div>
+            {result.savingsRatePct !== null && (
+              <div className="result-item">
+                <div className="result-label">Savings Rate</div>
+                <div className="result-value">{result.savingsRatePct.toFixed(0)}%</div>
+              </div>
+            )}
             <div className="result-item">
               <div className="result-label">Current Progress</div>
               <div className="result-value">{result.progressPct.toFixed(1)}%</div>
             </div>
+          </div>
+
+          <div className="result-note" style={{ borderTop: 'none', paddingTop: 0, marginTop: 12 }}>
+            Based on ${fmt(parseFloat(monthlyExpenses) || 0)}/month (${fmt(result.annualExpenses)}/year) in today&apos;s dollars, at a {withdrawalRate}% withdrawal rate.
           </div>
 
           {/* Progress bar */}
@@ -958,16 +996,16 @@ function FireCalculator() {
 
           {!result.reached && (
             <div className="result-note">
-              At this savings rate and return assumption, your FIRE number isn&apos;t reached within 70 years. Try increasing your monthly contribution, expected return, or lowering your target annual expenses.
+              At this savings rate and return assumption, you won&apos;t reach your number within 70 years. Try increasing your monthly contribution, expected return, or lowering your target monthly expenses.
             </div>
           )}
 
           {/* Projection chart */}
           {result.chartData.length > 1 && (
             <div style={{ marginTop: 20 }}>
-              <div className="calc-section-title" style={{ marginBottom: 10 }}>Projected growth (today&apos;s dollars)</div>
-              <ResponsiveContainer width="100%" height={260}>
-                <AreaChart data={result.chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+              <div className="calc-section-title" style={{ marginBottom: 10 }}>Portfolio growth vs. contributions (today&apos;s dollars)</div>
+              <ResponsiveContainer width="100%" height={280}>
+                <ComposedChart data={result.chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                   <defs>
                     <linearGradient id="fireGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#059669" stopOpacity={0.35} />
@@ -977,13 +1015,18 @@ function FireCalculator() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis dataKey="age" tickFormatter={(v: number) => v.toFixed(0)} fontSize={12} label={{ value: 'Age', position: 'insideBottom', offset: -4, fontSize: 11 }} />
                   <YAxis tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} fontSize={12} width={60} />
-                  <Tooltip formatter={(v: number) => [`$${fmt(v)}`, 'Balance']} labelFormatter={(v: number) => `Age ${v.toFixed(0)}`} />
+                  <Tooltip formatter={(v: number, name: string) => [`$${fmt(v)}`, name]} labelFormatter={(v: number) => `Age ${v.toFixed(0)}`} />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
                   {result.fireNumber > 0 && (
-                    <ReferenceLine y={result.fireNumber} stroke="#dc2626" strokeDasharray="4 4" label={{ value: 'FIRE number', position: 'insideTopRight', fontSize: 11, fill: '#dc2626' }} />
+                    <ReferenceLine y={result.fireNumber} stroke="#dc2626" strokeDasharray="4 4" label={{ value: 'FIRE target', position: 'insideTopRight', fontSize: 11, fill: '#dc2626' }} />
                   )}
-                  <Area type="monotone" dataKey="balance" stroke="#059669" strokeWidth={2} fill="url(#fireGradient)" />
-                </AreaChart>
+                  <Area type="monotone" dataKey="balance" name="Portfolio" stroke="#059669" strokeWidth={2} fill="url(#fireGradient)" />
+                  <Line type="monotone" dataKey="contributions" name="Contributions" stroke="#94a3b8" strokeWidth={2} strokeDasharray="5 3" dot={false} />
+                </ComposedChart>
               </ResponsiveContainer>
+              <div className="result-note" style={{ borderTop: 'none', paddingTop: 0 }}>
+                The gap between the green area (portfolio) and the grey dashed line (money you actually put in) is growth from investment returns.
+              </div>
             </div>
           )}
         </div>
