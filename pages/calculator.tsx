@@ -1,10 +1,11 @@
 import Link from 'next/link';
 import { useState, FormEvent, useMemo } from 'react';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import { useAuth } from '../lib/AuthContext';
 import NavBar from '../components/NavBar';
 import { AlertBox } from '../components/AlertBox';
 
-type CalculatorTab = 'breakeven' | 'average' | 'profit' | 'position' | 'dividend' | 'sgtax';
+type CalculatorTab = 'breakeven' | 'average' | 'profit' | 'position' | 'dividend' | 'sgtax' | 'fire';
 
 export default function CalculatorPage() {
   const { user, logout } = useAuth();
@@ -27,6 +28,7 @@ export default function CalculatorPage() {
           <button className={`calc-tab ${activeTab === 'position' ? 'active' : ''}`} onClick={() => setActiveTab('position')}>Position Size</button>
           <button className={`calc-tab ${activeTab === 'dividend' ? 'active' : ''}`} onClick={() => setActiveTab('dividend')}>Dividend Yield</button>
           <button className={`calc-tab ${activeTab === 'sgtax' ? 'active' : ''}`} onClick={() => setActiveTab('sgtax')}>🇸🇬 Income Tax</button>
+          <button className={`calc-tab ${activeTab === 'fire' ? 'active' : ''}`} onClick={() => setActiveTab('fire')}>🔥 FIRE</button>
         </div>
 
         <div className="calculator-content">
@@ -36,6 +38,7 @@ export default function CalculatorPage() {
           {activeTab === 'position' && <PositionSizeCalculator />}
           {activeTab === 'dividend' && <DividendYieldCalculator />}
           {activeTab === 'sgtax' && <SGIncomeTaxCalculator />}
+          {activeTab === 'fire' && <FireCalculator />}
         </div>
       </main>
     </>
@@ -823,6 +826,166 @@ function DividendYieldCalculator() {
               </>
             )}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── FIRE (Financial Independence, Retire Early) Calculator ────────────────
+
+interface FireResult {
+  fireNumber: number;
+  reached: boolean;
+  yearsToFire: number | null;
+  fireAge: number | null;
+  progressPct: number;
+  monthlyRealReturnPct: number;
+  chartData: { year: number; age: number; balance: number }[];
+}
+
+function FireCalculator() {
+  const [currentAge, setCurrentAge] = useState('30');
+  const [currentSavings, setCurrentSavings] = useState('');
+  const [monthlyContribution, setMonthlyContribution] = useState('');
+  const [annualReturn, setAnnualReturn] = useState('7');
+  const [inflationRate, setInflationRate] = useState('3');
+  const [annualExpenses, setAnnualExpenses] = useState('');
+  const [withdrawalRate, setWithdrawalRate] = useState('4');
+  const [result, setResult] = useState<FireResult | null>(null);
+
+  function handleCalculate(e: FormEvent) {
+    e.preventDefault();
+    const age = parseFloat(currentAge) || 0;
+    const savings = parseFloat(currentSavings) || 0;
+    const contribution = parseFloat(monthlyContribution) || 0;
+    const returnRate = parseFloat(annualReturn) || 0;
+    const inflation = parseFloat(inflationRate) || 0;
+    const expenses = parseFloat(annualExpenses) || 0;
+    const swr = parseFloat(withdrawalRate) || 4;
+
+    if (expenses <= 0 || swr <= 0) { setResult(null); return; }
+
+    const fireNumber = expenses / (swr / 100);
+
+    // Use "real" (inflation-adjusted) return so everything stays in today's dollars
+    const realAnnualReturn = (1 + returnRate / 100) / (1 + inflation / 100) - 1;
+    const realMonthlyReturn = Math.pow(1 + realAnnualReturn, 1 / 12) - 1;
+
+    let balance = savings;
+    const chartData: { year: number; age: number; balance: number }[] = [{ year: 0, age, balance: Math.round(balance) }];
+    let months = 0;
+    const maxMonths = 70 * 12; // safety cap
+    let reached = fireNumber > 0 && balance >= fireNumber;
+
+    while (!reached && months < maxMonths) {
+      balance = balance * (1 + realMonthlyReturn) + contribution;
+      months++;
+      if (months % 12 === 0) chartData.push({ year: months / 12, age: age + months / 12, balance: Math.round(balance) });
+      if (balance >= fireNumber) reached = true;
+    }
+
+    const yearsToFire = reached ? months / 12 : null;
+    const fireAge = reached ? age + months / 12 : null;
+    const progressPct = fireNumber > 0 ? Math.min(100, (savings / fireNumber) * 100) : 0;
+
+    setResult({ fireNumber, reached, yearsToFire, fireAge, progressPct, monthlyRealReturnPct: realMonthlyReturn * 100, chartData });
+  }
+
+  function handleReset() {
+    setCurrentAge('30'); setCurrentSavings(''); setMonthlyContribution('');
+    setAnnualReturn('7'); setInflationRate('3'); setAnnualExpenses(''); setWithdrawalRate('4');
+    setResult(null);
+  }
+
+  return (
+    <div className="calculator-card">
+      <div className="calc-header">
+        <h2>🔥 FIRE Calculator</h2>
+        <p className="calc-description">Work out your Financial Independence number and how many years away you are, based on your savings rate and expected returns.</p>
+      </div>
+      <form onSubmit={handleCalculate} className="calc-form">
+        <div className="calc-section">
+          <div className="calc-section-title">Your current situation</div>
+          <div className="calc-input-grid">
+            <label>Current Age<input type="number" step="1" value={currentAge} onChange={e => setCurrentAge(e.target.value)} placeholder="e.g., 30" required /></label>
+            <label>Current Savings / Portfolio ($)<input type="number" step="0.01" value={currentSavings} onChange={e => setCurrentSavings(e.target.value)} placeholder="e.g., 50000" required /></label>
+            <label>Monthly Contribution ($)<input type="number" step="0.01" value={monthlyContribution} onChange={e => setMonthlyContribution(e.target.value)} placeholder="e.g., 2000" required /></label>
+          </div>
+        </div>
+        <div className="calc-section">
+          <div className="calc-section-title">Assumptions</div>
+          <div className="calc-input-grid">
+            <label>Expected Annual Return (%)<input type="number" step="0.1" value={annualReturn} onChange={e => setAnnualReturn(e.target.value)} placeholder="e.g., 7" required /></label>
+            <label>Inflation Rate (%)<input type="number" step="0.1" value={inflationRate} onChange={e => setInflationRate(e.target.value)} placeholder="e.g., 3" required /></label>
+            <label>Annual Expenses in Retirement ($, today&apos;s $)<input type="number" step="0.01" value={annualExpenses} onChange={e => setAnnualExpenses(e.target.value)} placeholder="e.g., 40000" required /></label>
+            <label>Safe Withdrawal Rate (%)<input type="number" step="0.1" value={withdrawalRate} onChange={e => setWithdrawalRate(e.target.value)} placeholder="e.g., 4" required /></label>
+          </div>
+        </div>
+        <div className="calc-actions">
+          <button type="submit" className="calc-submit">Calculate</button>
+          <button type="button" onClick={handleReset} className="calc-reset">Reset</button>
+        </div>
+      </form>
+
+      {result && (
+        <div className={`calc-result ${result.reached ? 'profit' : ''}`}>
+          <div className="result-grid">
+            <div className="result-item highlight">
+              <div className="result-label">FIRE Number</div>
+              <div className="result-value large">${fmt(result.fireNumber)}</div>
+            </div>
+            <div className="result-item">
+              <div className="result-label">Years to FIRE</div>
+              <div className="result-value">{result.yearsToFire !== null ? result.yearsToFire.toFixed(1) : '70+'}</div>
+            </div>
+            <div className="result-item">
+              <div className="result-label">Target Age</div>
+              <div className="result-value">{result.fireAge !== null ? result.fireAge.toFixed(1) : '—'}</div>
+            </div>
+            <div className="result-item">
+              <div className="result-label">Current Progress</div>
+              <div className="result-value">{result.progressPct.toFixed(1)}%</div>
+            </div>
+          </div>
+
+          {/* Progress bar */}
+          <div style={{ marginTop: 16 }}>
+            <div style={{ height: 10, background: '#e2e8f0', borderRadius: 6, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${result.progressPct}%`, background: 'linear-gradient(90deg, #f59e0b, #059669)', borderRadius: 6, transition: 'width 0.3s ease' }} />
+            </div>
+          </div>
+
+          {!result.reached && (
+            <div className="result-note">
+              At this savings rate and return assumption, your FIRE number isn&apos;t reached within 70 years. Try increasing your monthly contribution, expected return, or lowering your target annual expenses.
+            </div>
+          )}
+
+          {/* Projection chart */}
+          {result.chartData.length > 1 && (
+            <div style={{ marginTop: 20 }}>
+              <div className="calc-section-title" style={{ marginBottom: 10 }}>Projected growth (today&apos;s dollars)</div>
+              <ResponsiveContainer width="100%" height={260}>
+                <AreaChart data={result.chartData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="fireGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#059669" stopOpacity={0.35} />
+                      <stop offset="100%" stopColor="#059669" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                  <XAxis dataKey="age" tickFormatter={(v: number) => v.toFixed(0)} fontSize={12} label={{ value: 'Age', position: 'insideBottom', offset: -4, fontSize: 11 }} />
+                  <YAxis tickFormatter={(v: number) => `$${(v / 1000).toFixed(0)}k`} fontSize={12} width={60} />
+                  <Tooltip formatter={(v: number) => [`$${fmt(v)}`, 'Balance']} labelFormatter={(v: number) => `Age ${v.toFixed(0)}`} />
+                  {result.fireNumber > 0 && (
+                    <ReferenceLine y={result.fireNumber} stroke="#dc2626" strokeDasharray="4 4" label={{ value: 'FIRE number', position: 'insideTopRight', fontSize: 11, fill: '#dc2626' }} />
+                  )}
+                  <Area type="monotone" dataKey="balance" stroke="#059669" strokeWidth={2} fill="url(#fireGradient)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          )}
         </div>
       )}
     </div>

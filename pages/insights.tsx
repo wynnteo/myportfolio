@@ -235,38 +235,79 @@ function CategoryReturnTable({ rows }: {
 
 // ─── Performers Row ───────────────────────────────────────────────────────────
 
-function PerformersRow({ holdings }: {
-  holdings: { symbol: string; productName: string; plPct: number | null; pl: number | null; currency: string; ytdDividends: number; capital: number }[]
+function RankedList({ title, icon, rows, color, bg, arrow }: {
+  title: string; icon: string; color: string; bg: string; arrow: string;
+  rows: { symbol: string; productName: string; plPct: number; pl: number | null; currency: string }[];
 }) {
-  const withPrices = holdings.filter(h => h.plPct !== null);
-  if (withPrices.length === 0) return null;
-  const best = withPrices.reduce((a, b) => b.plPct! > a.plPct! ? b : a);
-  const worst = withPrices.reduce((a, b) => b.plPct! < a.plPct! ? b : a);
-  const bestDiv = holdings.filter(h => h.capital > 0 && h.ytdDividends > 0).sort((a, b) => (b.ytdDividends / b.capital) - (a.ytdDividends / a.capital))[0];
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: '14px 16px', flex: 1, minWidth: 240 }}>
+      <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 10 }}>{icon} {title}</div>
+      {rows.length === 0 ? (
+        <div style={{ fontSize: 12, color: '#94a3b8', padding: '8px 0' }}>No data</div>
+      ) : (
+        <div>
+          {rows.map((h, i) => (
+            <div key={h.symbol + i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', borderTop: i > 0 ? '1px solid #f1f5f9' : 'none' }}>
+              <div style={{ width: 18, fontSize: 12, fontWeight: 700, color: '#94a3b8', flexShrink: 0 }}>{i + 1}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: '#0f172a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.symbol}</div>
+                <div style={{ fontSize: 11, color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{h.productName}</div>
+              </div>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 800, fontSize: 13, color, background: bg, padding: '4px 9px', borderRadius: 6, flexShrink: 0 }}>
+                <span style={{ fontSize: 10 }}>{arrow}</span>{fmtPct(h.plPct)}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PerformersRow({ holdings }: {
+  holdings: { symbol: string; productName: string; category: string; plPct: number | null; pl: number | null; currency: string; ytdDividends: number; capital: number }[]
+}) {
+  const categoriesPresent = useMemo(
+    () => CATEGORIES.filter(cat => holdings.some(h => h.category === cat)),
+    [holdings]
+  );
+  const [filter, setFilter] = useState('All');
+
+  const filtered = useMemo(
+    () => filter === 'All' ? holdings : holdings.filter(h => h.category === filter),
+    [holdings, filter]
+  );
+  const withPrices = filtered.filter(h => h.plPct !== null) as (typeof filtered[number] & { plPct: number })[];
+  const topGainers = [...withPrices].sort((a, b) => b.plPct - a.plPct).slice(0, 3);
+  const topLosers = [...withPrices].sort((a, b) => a.plPct - b.plPct).slice(0, 3);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
-      {[
-        { label: '🔥 Top performer', holding: best, color: '#059669', bg: '#EAF3DE', pctStr: fmtPct(best.plPct!) },
-        { label: '📉 Worst performer', holding: worst, color: '#dc2626', bg: '#FCEBEB', pctStr: fmtPct(worst.plPct!) },
-        ...(bestDiv ? [{ label: '💰 Best dividend yield', holding: bestDiv, color: '#185FA5', bg: '#E6F1FB', pctStr: fmtPct((bestDiv.ytdDividends / bestDiv.capital) * 100, false) + ' yield' }] : []),
-      ].map(({ label, holding, color, bg, pctStr }) => (
-        <div key={label} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, padding: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#64748b', marginBottom: 6 }}>{label}</div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: 14, color: '#0f172a' }}>{holding.symbol}</div>
-              <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2, maxWidth: 130, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{holding.productName}</div>
-            </div>
-            <span style={{ fontWeight: 800, fontSize: 16, color, background: bg, padding: '4px 10px', borderRadius: 6 }}>{pctStr}</span>
-          </div>
-          {holding.pl !== null && (
-            <div style={{ fontSize: 11, color: '#64748b', marginTop: 6, paddingTop: 6, borderTop: '1px solid #f1f5f9' }}>
-              {holding.pl >= 0 ? '+' : ''}{fmt(holding.pl, holding.currency)} unrealised
-            </div>
-          )}
+    <div>
+      <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 10, marginBottom: 12 }}>
+        {['All', ...categoriesPresent].map(cat => (
+          <button
+            key={cat}
+            onClick={() => setFilter(cat)}
+            style={{
+              flexShrink: 0, padding: '6px 14px', borderRadius: 20, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              border: filter === cat ? '1px solid #0f172a' : '1px solid #e2e8f0',
+              background: filter === cat ? '#0f172a' : '#fff',
+              color: filter === cat ? '#fff' : '#475569',
+            }}
+          >
+            {cat}
+          </button>
+        ))}
+      </div>
+
+      {withPrices.length === 0 ? (
+        <div style={{ fontSize: 12, color: '#94a3b8', padding: '12px 0' }}>No priced holdings in this category</div>
+      ) : (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+          <RankedList title="Top gainers" icon="🔥" color="#059669" bg="#EAF3DE" arrow="▲" rows={topGainers} />
+          <RankedList title="Top losers" icon="📉" color="#dc2626" bg="#FCEBEB" arrow="▼" rows={topLosers} />
         </div>
-      ))}
+      )}
     </div>
   );
 }

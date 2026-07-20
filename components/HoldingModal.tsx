@@ -120,6 +120,12 @@ export function HoldingModal({ holding, transactions, onClose, onReload }: {
 
   const plClass = (holding.pl ?? 0) > 0 ? 'positive' : (holding.pl ?? 0) < 0 ? 'negative' : '';
 
+  // Total P/L after accounting for all dividends collected (i.e. market value vs.
+  // capital reduced by dividends received — equivalent to unrealised P/L + dividends)
+  const totalPl = holding.pl !== null ? holding.pl + (holding.dividends ?? 0) : null;
+  const totalPlClass = totalPl !== null ? (totalPl > 0 ? 'positive' : totalPl < 0 ? 'negative' : '') : '';
+  const totalPlPct = totalPl !== null && holding.totalCost ? (totalPl / holding.totalCost) * 100 : null;
+
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
       <div className="modal" style={{ width: 'min(960px, 90vw)', maxHeight: '85vh' }}>
@@ -153,6 +159,16 @@ export function HoldingModal({ holding, transactions, onClose, onReload }: {
               {holding.plPct !== null && (
                 <span style={{ padding: '3px 10px', borderRadius: 6, fontWeight: 700, fontSize: 13, background: plClass === 'positive' ? '#059669' : plClass === 'negative' ? '#dc2626' : '#94a3b8', color: '#fff' }}>
                   {holding.plPct > 0 ? '+' : ''}{holding.plPct.toFixed(2)}%
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#fff', borderRadius: 8, border: `1px solid ${totalPlClass === 'positive' ? '#86efac' : totalPlClass === 'negative' ? '#fca5a5' : '#e2e8f0'}`, marginTop: 8 }}>
+              <span style={{ fontSize: 13, fontWeight: 700, color: totalPlClass === 'positive' ? '#059669' : totalPlClass === 'negative' ? '#dc2626' : '#64748b' }}>
+                Total P/L (incl. dividends): {totalPl !== null ? fmt(totalPl, holding.currency) : '—'}
+              </span>
+              {totalPlPct !== null && (
+                <span style={{ padding: '3px 10px', borderRadius: 6, fontWeight: 700, fontSize: 13, background: totalPlClass === 'positive' ? '#059669' : totalPlClass === 'negative' ? '#dc2626' : '#94a3b8', color: '#fff' }}>
+                  {totalPlPct > 0 ? '+' : ''}{totalPlPct.toFixed(2)}%
                 </span>
               )}
             </div>
