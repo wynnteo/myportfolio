@@ -55,6 +55,124 @@ function fmtPct(value: number, showPlus = true) {
   return `${showPlus && value > 0 ? '+' : ''}${value.toFixed(2)}%`;
 }
 
+// ─── Monthly Activity Summary ─────────────────────────────────────────────────
+// This month's activity, grouped by category: how many buys, sells, and
+// dividend payouts landed this month, plus the $ amounts behind each.
+
+interface CategoryActivity {
+  category: string;
+  buyCount: number; buyAmount: number;
+  sellCount: number; sellAmount: number;
+  divCount: number; divAmount: number;
+}
+
+function MonthlyActivitySummary({ transactions }: { transactions: Transaction[] }) {
+  const now = new Date();
+  const monthLabel = now.toLocaleDateString('en-SG', { month: 'long', year: 'numeric' });
+
+  const { rows, totals, txCount } = useMemo(() => {
+    const monthTx = transactions.filter(tx => {
+      if (!tx.trade_date) return false;
+      const d = new Date(tx.trade_date);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+    });
+
+    const map = new Map<string, CategoryActivity>();
+    const get = (cat: string) => {
+      const ex = map.get(cat) ?? { category: cat, buyCount: 0, buyAmount: 0, sellCount: 0, sellAmount: 0, divCount: 0, divAmount: 0 };
+      map.set(cat, ex);
+      return ex;
+    };
+
+    for (const tx of monthTx) {
+      const cat = tx.category || 'Other';
+      const entry = get(cat);
+      if (tx.type === 'BUY') {
+        entry.buyCount += 1;
+        entry.buyAmount += (tx.quantity ?? 0) * (tx.price ?? 0) + (tx.commission ?? 0);
+      } else if (tx.type === 'SELL') {
+        entry.sellCount += 1;
+        entry.sellAmount += (tx.quantity ?? 0) * (tx.price ?? 0) - (tx.commission ?? 0);
+      } else if (tx.type === 'DIVIDEND') {
+        entry.divCount += 1;
+        entry.divAmount += tx.dividend_amount ?? 0;
+      }
+    }
+
+    const rows = Array.from(map.values())
+      .filter(r => r.buyCount + r.sellCount + r.divCount > 0)
+      .sort((a, b) => (b.buyAmount + b.sellAmount + b.divAmount) - (a.buyAmount + a.sellAmount + a.divAmount));
+
+    const totals = rows.reduce((s, r) => ({
+      buyCount: s.buyCount + r.buyCount, buyAmount: s.buyAmount + r.buyAmount,
+      sellCount: s.sellCount + r.sellCount, sellAmount: s.sellAmount + r.sellAmount,
+      divCount: s.divCount + r.divCount, divAmount: s.divAmount + r.divAmount,
+    }), { buyCount: 0, buyAmount: 0, sellCount: 0, sellAmount: 0, divCount: 0, divAmount: 0 });
+
+    return { rows, totals, txCount: monthTx.length };
+  }, [transactions, now]);
+
+  if (txCount === 0) {
+    return (
+      <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 20 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a', marginBottom: 4 }}>{monthLabel}</div>
+        <div style={{ fontSize: 12, color: '#94a3b8' }}>No transactions logged this month yet.</div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
+      <div style={{ padding: '14px 20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#0f172a' }}>{monthLabel} — what you did this month</div>
+        <div style={{ display: 'flex', gap: 14, fontSize: 12, color: '#64748b' }}>
+          <span><b style={{ color: '#0f172a' }}>{totals.buyCount}</b> buys <span style={{ color: '#94a3b8' }}>({fmt(totals.buyAmount)})</span></span>
+          {totals.sellCount > 0 && <span><b style={{ color: '#0f172a' }}>{totals.sellCount}</b> sells <span style={{ color: '#94a3b8' }}>({fmt(totals.sellAmount)})</span></span>}
+          <span><b style={{ color: '#059669' }}>{totals.divCount}</b> dividends <span style={{ color: '#94a3b8' }}>({fmt(totals.divAmount)})</span></span>
+        </div>
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+          <thead>
+            <tr style={{ background: '#f8fafc' }}>
+              {['Category', 'Buys', 'Sells', 'Dividends'].map(h => (
+                <th key={h} style={{ padding: '10px 14px', textAlign: h === 'Category' ? 'left' : 'right', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#475569', borderBottom: '1px solid #e2e8f0', whiteSpace: 'nowrap' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r.category} style={{ borderBottom: i < rows.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                <td style={{ padding: '12px 14px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: CATEGORY_COLORS[r.category] ?? '#94a3b8', flexShrink: 0 }} />
+                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{r.category}</span>
+                  </div>
+                </td>
+                <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                  {r.buyCount > 0
+                    ? <span><b style={{ color: '#0f172a' }}>{r.buyCount}笔</b> <span style={{ color: '#64748b', fontSize: 12 }}>{fmt(r.buyAmount)}</span></span>
+                    : <span style={{ color: '#94a3b8' }}>—</span>}
+                </td>
+                <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                  {r.sellCount > 0
+                    ? <span><b style={{ color: '#0f172a' }}>{r.sellCount}笔</b> <span style={{ color: '#64748b', fontSize: 12 }}>{fmt(r.sellAmount)}</span></span>
+                    : <span style={{ color: '#94a3b8' }}>—</span>}
+                </td>
+                <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                  {r.divCount > 0
+                    ? <span><b style={{ color: '#059669' }}>{r.divCount}笔</b> <span style={{ color: '#64748b', fontSize: 12 }}>{fmt(r.divAmount)}</span></span>
+                    : <span style={{ color: '#94a3b8' }}>—</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── Mini YoY Dividend Chart ──────────────────────────────────────────────────
 
 function DividendYoYChart({ transactions }: { transactions: Transaction[] }) {
@@ -536,6 +654,11 @@ export default function InsightsPage() {
               </div>
             </div>
           </div>
+        </section>
+
+        <section style={{ marginBottom: 20 }}>
+          <div className="section-title"><div><p className="eyebrow">This month</p><h2>Monthly activity summary</h2></div></div>
+          <MonthlyActivitySummary transactions={transactions} />
         </section>
 
         <section style={{ marginBottom: 20 }}>
