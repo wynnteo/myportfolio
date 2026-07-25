@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { fetchWithAuth } from '../lib/api';
 import { useAuth } from '../lib/AuthContext';
@@ -58,17 +58,37 @@ function fmtPct(value: number, showPlus = true) {
 // ─── Monthly Activity Summary ─────────────────────────────────────────────────
 // This month's activity, grouped by category: how many buys, sells, and
 // dividend payouts landed this month, plus the $ amounts behind each.
+// Click a category row to expand it into a breakdown grouped by
+// symbol + transaction type (e.g. 4 UMS buys collapse into one summed line).
+
+interface SymbolTypeGroup {
+  symbol: string;
+  productName: string;
+  type: 'BUY' | 'SELL' | 'DIVIDEND';
+  count: number;
+  amount: number;
+}
 
 interface CategoryActivity {
   category: string;
   buyCount: number; buyAmount: number;
   sellCount: number; sellAmount: number;
   divCount: number; divAmount: number;
+  items: SymbolTypeGroup[];
 }
 
 function MonthlyActivitySummary({ transactions }: { transactions: Transaction[] }) {
   const now = new Date();
   const monthLabel = now.toLocaleDateString('en-SG', { month: 'long', year: 'numeric' });
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  function toggle(category: string) {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(category)) next.delete(category); else next.add(category);
+      return next;
+    });
+  }
 
   const { rows, totals, txCount } = useMemo(() => {
     const monthTx = transactions.filter(tx => {
@@ -77,30 +97,45 @@ function MonthlyActivitySummary({ transactions }: { transactions: Transaction[] 
       return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
     });
 
-    const map = new Map<string, CategoryActivity>();
-    const get = (cat: string) => {
-      const ex = map.get(cat) ?? { category: cat, buyCount: 0, buyAmount: 0, sellCount: 0, sellAmount: 0, divCount: 0, divAmount: 0 };
-      map.set(cat, ex);
+    const catMap = new Map<string, CategoryActivity>();
+    const itemMap = new Map<string, Map<string, SymbolTypeGroup>>(); // category -> "symbol__type" -> group
+
+    const getCat = (cat: string) => {
+      const ex = catMap.get(cat) ?? { category: cat, buyCount: 0, buyAmount: 0, sellCount: 0, sellAmount: 0, divCount: 0, divAmount: 0, items: [] };
+      catMap.set(cat, ex);
+      if (!itemMap.has(cat)) itemMap.set(cat, new Map());
       return ex;
     };
 
     for (const tx of monthTx) {
       const cat = tx.category || 'Other';
-      const entry = get(cat);
+      const entry = getCat(cat);
+      const itemKey = `${tx.symbol}__${tx.type}`;
+      const items = itemMap.get(cat)!;
+      const item = items.get(itemKey) ?? { symbol: tx.symbol, productName: tx.product_name, type: tx.type, count: 0, amount: 0 };
+
       if (tx.type === 'BUY') {
-        entry.buyCount += 1;
-        entry.buyAmount += (tx.quantity ?? 0) * (tx.price ?? 0) + (tx.commission ?? 0);
+        const amt = (tx.quantity ?? 0) * (tx.price ?? 0) + (tx.commission ?? 0);
+        entry.buyCount += 1; entry.buyAmount += amt;
+        item.count += 1; item.amount += amt;
       } else if (tx.type === 'SELL') {
-        entry.sellCount += 1;
-        entry.sellAmount += (tx.quantity ?? 0) * (tx.price ?? 0) - (tx.commission ?? 0);
+        const amt = (tx.quantity ?? 0) * (tx.price ?? 0) - (tx.commission ?? 0);
+        entry.sellCount += 1; entry.sellAmount += amt;
+        item.count += 1; item.amount += amt;
       } else if (tx.type === 'DIVIDEND') {
-        entry.divCount += 1;
-        entry.divAmount += tx.dividend_amount ?? 0;
+        const amt = tx.dividend_amount ?? 0;
+        entry.divCount += 1; entry.divAmount += amt;
+        item.count += 1; item.amount += amt;
       }
+      items.set(itemKey, item);
     }
 
-    const rows = Array.from(map.values())
+    const rows = Array.from(catMap.values())
       .filter(r => r.buyCount + r.sellCount + r.divCount > 0)
+      .map(r => ({
+        ...r,
+        items: Array.from(itemMap.get(r.category)!.values()).sort((a, b) => b.amount - a.amount),
+      }))
       .sort((a, b) => (b.buyAmount + b.sellAmount + b.divAmount) - (a.buyAmount + a.sellAmount + a.divAmount));
 
     const totals = rows.reduce((s, r) => ({
@@ -120,6 +155,9 @@ function MonthlyActivitySummary({ transactions }: { transactions: Transaction[] 
       </div>
     );
   }
+
+  const TYPE_LABEL: Record<string, string> = { BUY: 'Buy', SELL: 'Sell', DIVIDEND: 'Dividend' };
+  const TYPE_COLOR: Record<string, string> = { BUY: '#0f172a', SELL: '#dc2626', DIVIDEND: '#059669' };
 
   return (
     <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
@@ -141,31 +179,65 @@ function MonthlyActivitySummary({ transactions }: { transactions: Transaction[] 
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => (
-              <tr key={r.category} style={{ borderBottom: i < rows.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
-                <td style={{ padding: '12px 14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <span style={{ width: 10, height: 10, borderRadius: 2, background: CATEGORY_COLORS[r.category] ?? '#94a3b8', flexShrink: 0 }} />
-                    <span style={{ fontWeight: 600, color: '#0f172a' }}>{r.category}</span>
-                  </div>
-                </td>
-                <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                  {r.buyCount > 0
-                    ? <span><b style={{ color: '#0f172a' }}>{r.buyCount}笔</b> <span style={{ color: '#64748b', fontSize: 12 }}>{fmt(r.buyAmount)}</span></span>
-                    : <span style={{ color: '#94a3b8' }}>—</span>}
-                </td>
-                <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                  {r.sellCount > 0
-                    ? <span><b style={{ color: '#0f172a' }}>{r.sellCount}笔</b> <span style={{ color: '#64748b', fontSize: 12 }}>{fmt(r.sellAmount)}</span></span>
-                    : <span style={{ color: '#94a3b8' }}>—</span>}
-                </td>
-                <td style={{ padding: '12px 14px', textAlign: 'right' }}>
-                  {r.divCount > 0
-                    ? <span><b style={{ color: '#059669' }}>{r.divCount}笔</b> <span style={{ color: '#64748b', fontSize: 12 }}>{fmt(r.divAmount)}</span></span>
-                    : <span style={{ color: '#94a3b8' }}>—</span>}
-                </td>
-              </tr>
-            ))}
+            {rows.map((r, i) => {
+              const isOpen = expanded.has(r.category);
+              return (
+                <Fragment key={r.category}>
+                  <tr
+                    onClick={() => toggle(r.category)}
+                    style={{ borderBottom: !isOpen && i < rows.length - 1 ? '1px solid #f1f5f9' : 'none', cursor: 'pointer', background: isOpen ? '#f8fafc' : 'transparent' }}
+                  >
+                    <td style={{ padding: '12px 14px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{
+                          display: 'inline-block', fontSize: 10, color: '#94a3b8', transition: 'transform 0.15s',
+                          transform: isOpen ? 'rotate(90deg)' : 'rotate(0deg)',
+                        }}>▶</span>
+                        <span style={{ width: 10, height: 10, borderRadius: 2, background: CATEGORY_COLORS[r.category] ?? '#94a3b8', flexShrink: 0 }} />
+                        <span style={{ fontWeight: 600, color: '#0f172a' }}>{r.category}</span>
+                      </div>
+                    </td>
+                    <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                      {r.buyCount > 0
+                        ? <span><b style={{ color: '#0f172a' }}>{r.buyCount}笔</b> <span style={{ color: '#64748b', fontSize: 12 }}>{fmt(r.buyAmount)}</span></span>
+                        : <span style={{ color: '#94a3b8' }}>—</span>}
+                    </td>
+                    <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                      {r.sellCount > 0
+                        ? <span><b style={{ color: '#0f172a' }}>{r.sellCount}笔</b> <span style={{ color: '#64748b', fontSize: 12 }}>{fmt(r.sellAmount)}</span></span>
+                        : <span style={{ color: '#94a3b8' }}>—</span>}
+                    </td>
+                    <td style={{ padding: '12px 14px', textAlign: 'right' }}>
+                      {r.divCount > 0
+                        ? <span><b style={{ color: '#059669' }}>{r.divCount}笔</b> <span style={{ color: '#64748b', fontSize: 12 }}>{fmt(r.divAmount)}</span></span>
+                        : <span style={{ color: '#94a3b8' }}>—</span>}
+                    </td>
+                  </tr>
+                  {isOpen && (
+                    <tr style={{ borderBottom: i < rows.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                      <td colSpan={4} style={{ padding: 0, background: '#fafbfc' }}>
+                        <div style={{ padding: '4px 14px 12px 40px' }}>
+                          {r.items.map(it => (
+                            <div key={`${it.symbol}__${it.type}`} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderTop: '1px solid #f1f5f9' }}>
+                              <span style={{
+                                fontSize: 10, fontWeight: 700, color: TYPE_COLOR[it.type], background: '#fff',
+                                border: `1px solid ${TYPE_COLOR[it.type]}33`, borderRadius: 4, padding: '2px 6px', minWidth: 56, textAlign: 'center', flexShrink: 0,
+                              }}>{TYPE_LABEL[it.type]}</span>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <span style={{ fontWeight: 700, fontSize: 12.5, color: '#0f172a' }}>{it.symbol}</span>
+                                <span style={{ fontSize: 11, color: '#94a3b8', marginLeft: 6 }}>{it.productName}</span>
+                              </div>
+                              <span style={{ fontSize: 12, color: '#64748b', flexShrink: 0 }}>{it.count}笔</span>
+                              <span style={{ fontWeight: 700, fontSize: 12.5, color: TYPE_COLOR[it.type], minWidth: 90, textAlign: 'right', flexShrink: 0 }}>{fmt(it.amount)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
