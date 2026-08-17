@@ -1579,6 +1579,138 @@ th.sortable:hover {
   color: #64748b;
 }
 
+/* P&L cell tiered highlight — background intensity scales with magnitude */
+.pl-cell.tier-gain-high {
+  background: #15803d;
+}
+.pl-cell.tier-gain-high .pl-amount,
+.pl-cell.tier-gain-high .pl-percentage {
+  color: #ffffff;
+}
+
+.pl-cell.tier-gain-mid {
+  background: #4ade80;
+}
+.pl-cell.tier-gain-mid .pl-amount,
+.pl-cell.tier-gain-mid .pl-percentage {
+  color: #052e16;
+}
+
+.pl-cell.tier-gain-low {
+  background: #dcfce7;
+}
+.pl-cell.tier-gain-low .pl-amount,
+.pl-cell.tier-gain-low .pl-percentage {
+  color: #166534;
+}
+
+.pl-cell.tier-loss-low {
+  background: #fee2e2;
+}
+.pl-cell.tier-loss-low .pl-amount,
+.pl-cell.tier-loss-low .pl-percentage {
+  color: #991b1b;
+}
+
+.pl-cell.tier-loss-mid {
+  background: #f87171;
+}
+.pl-cell.tier-loss-mid .pl-amount,
+.pl-cell.tier-loss-mid .pl-percentage {
+  color: #450a0a;
+}
+
+.pl-cell.tier-loss-high {
+  background: #b91c1c;
+}
+.pl-cell.tier-loss-high .pl-amount,
+.pl-cell.tier-loss-high .pl-percentage {
+  color: #ffffff;
+}
+
+/* Same tiers, applied to the grid-view holding card's P/L strip */
+.holding-card-pl.tier-gain-high {
+  background: #15803d;
+}
+.holding-card-pl.tier-gain-high .holding-pl-amount {
+  color: #ffffff;
+}
+.holding-card-pl.tier-gain-high .holding-pl-pct {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+.holding-card-pl.tier-gain-mid {
+  background: #4ade80;
+}
+.holding-card-pl.tier-gain-mid .holding-pl-amount {
+  color: #052e16;
+}
+.holding-card-pl.tier-gain-mid .holding-pl-pct {
+  background: #052e16;
+  color: #ffffff;
+}
+
+.holding-card-pl.tier-gain-low {
+  background: #dcfce7;
+}
+.holding-card-pl.tier-gain-low .holding-pl-amount {
+  color: #166534;
+}
+
+.holding-card-pl.tier-loss-low {
+  background: #fee2e2;
+}
+.holding-card-pl.tier-loss-low .holding-pl-amount {
+  color: #991b1b;
+}
+
+.holding-card-pl.tier-loss-mid {
+  background: #f87171;
+}
+.holding-card-pl.tier-loss-mid .holding-pl-amount {
+  color: #450a0a;
+}
+.holding-card-pl.tier-loss-mid .holding-pl-pct {
+  background: #450a0a;
+  color: #ffffff;
+}
+
+.holding-card-pl.tier-loss-high {
+  background: #b91c1c;
+}
+.holding-card-pl.tier-loss-high .holding-pl-amount {
+  color: #ffffff;
+}
+.holding-card-pl.tier-loss-high .holding-pl-pct {
+  background: rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+}
+
+/* Dividend breakeven badge — shown when lifetime dividends collected on a
+   position have covered its total cost basis. */
+.div-breakeven-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #059669;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: default;
+  vertical-align: middle;
+}
+.div-breakeven-badge .badge-icon {
+  font-size: 10px;
+  line-height: 1;
+}
+
 /* Action cell - always right aligned */
 .action-cell {
   text-align: center;

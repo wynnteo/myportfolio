@@ -11,7 +11,7 @@ import NavBar from '../components/NavBar';
 import { AlertBox } from '../components/AlertBox';
 import { fetchAllHoldingQuotes } from '../lib/quotes';
 import {
-  HoldingModal, Transaction, HoldingRow, fmt, fmtQty, fmtNum, getHoldingKey,
+  HoldingModal, Transaction, HoldingRow, fmt, fmtQty, fmtNum, getHoldingKey, getPLTierClass, isDividendBreakeven,
 } from '../components/HoldingModal';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -738,6 +738,8 @@ export default function DashboardPage() {
                 <tbody>
                   {pagedHoldings.map(row => {
                     const plClass = (row.pl ?? 0) > 0 ? 'positive' : (row.pl ?? 0) < 0 ? 'negative' : 'neutral';
+                    const tierClass = getPLTierClass(row.plPct);
+                    const divBreakeven = isDividendBreakeven(row);
                     return (
                       <tr key={row.key}>
                         <td>
@@ -748,7 +750,17 @@ export default function DashboardPage() {
                         </td>
                         <td>
                           <div className="symbol-cell">
-                            <div className="symbol-main">{row.productName || row.symbol}</div>
+                            <div className="symbol-main" style={{ display: 'flex', alignItems: 'center' }}>
+                              {row.productName || row.symbol}
+                              {divBreakeven && (
+                                <span
+                                  className="div-breakeven-badge"
+                                  title={`Dividends collected (${fmt(row.dividends, row.currency)}) have covered your total cost (${fmt(row.totalCost, row.currency)}). This position is now paying you for free.`}
+                                >
+                                  <span className="badge-icon">🎯</span>Div B/E
+                                </span>
+                              )}
+                            </div>
                             <div className="symbol-product">{row.symbol} · {row.broker}</div>
                           </div>
                         </td>
@@ -761,7 +773,7 @@ export default function DashboardPage() {
                             : fmtNum(row.currentPrice)}
                         </td>
                         <td className="value-cell">{row.currentValue !== null ? fmt(row.currentValue, row.currency) : '—'}</td>
-                        <td className="pl-cell">
+                        <td className={`pl-cell ${tierClass}`}>
                           <div className={`pl-value ${plClass}`}>
                             <span className="pl-amount">{row.pl !== null ? fmt(row.pl, row.currency) : '—'}</span>
                             {row.plPct !== null && <span className="pl-percentage">{row.plPct > 0 ? '+' : ''}{row.plPct.toFixed(2)}%</span>}
@@ -785,11 +797,23 @@ export default function DashboardPage() {
             <div className="holdings-grid">
               {pagedHoldings.map(row => {
                 const plClass = (row.pl ?? 0) > 0 ? 'positive' : (row.pl ?? 0) < 0 ? 'negative' : 'neutral';
+                const tierClass = getPLTierClass(row.plPct);
+                const divBreakeven = isDividendBreakeven(row);
                 return (
                   <div key={row.key} className="holding-card">
                     <div className="holding-card-header">
                       <div className="holding-card-title">
-                        <span className="holding-symbol">{row.productName || row.symbol}</span>
+                        <span className="holding-symbol">
+                          {row.productName || row.symbol}
+                          {divBreakeven && (
+                            <span
+                              className="div-breakeven-badge"
+                              title={`Dividends collected (${fmt(row.dividends, row.currency)}) have covered your total cost (${fmt(row.totalCost, row.currency)}). This position is now paying you for free.`}
+                            >
+                              <span className="badge-icon">🎯</span>Div B/E
+                            </span>
+                          )}
+                        </span>
                         <div className="category-badge-small"><span className="category-dot-small" style={{ backgroundColor: getCategoryColor(row.category) }} /><span>{row.category}</span></div>
                       </div>
                       <div className="holding-product-name">{row.symbol} · {row.broker}</div>
@@ -807,7 +831,7 @@ export default function DashboardPage() {
                       <div className="holding-value-divider">→</div>
                       <div className="holding-value-item"><span className="holding-value-label">Current</span><span className="holding-value-amount">{row.currentValue !== null ? fmt(row.currentValue, row.currency) : '—'}</span></div>
                     </div>
-                    <div className={`holding-card-pl ${plClass}`}>
+                    <div className={`holding-card-pl ${plClass} ${tierClass}`}>
                       <span className="holding-pl-amount">{row.pl !== null ? fmt(row.pl, row.currency) : '—'}</span>
                       {row.plPct !== null && <span className="holding-pl-pct">{row.plPct > 0 ? '+' : ''}{row.plPct.toFixed(2)}%</span>}
                     </div>

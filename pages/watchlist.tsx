@@ -6,7 +6,7 @@ import { useAuth } from '../lib/AuthContext';
 import NavBar from '../components/NavBar';
 import { fetchBatchQuotes } from '../lib/quotes';
 import {
-  HoldingModal, Transaction, HoldingRow, fmt, fmtQty, getHoldingKey,
+  HoldingModal, Transaction, HoldingRow, fmt, fmtQty, getHoldingKey, getPLTierClass, isDividendBreakeven,
 } from '../components/HoldingModal';
 
 interface QuoteResponse {
@@ -269,9 +269,23 @@ export default function WatchlistPage() {
                 <tbody>
                   {sortedPositions.map((pos) => {
                     const plClass = pos.pl && pos.pl !== 0 ? (pos.pl > 0 ? 'positive' : 'negative') : 'neutral';
+                    const tierClass = getPLTierClass(pos.plPct);
+                    const divBreakeven = isDividendBreakeven(pos);
                     return (
                       <tr key={pos.key}>
-                        <td><div className="symbol-main" style={{ fontWeight: 700, fontSize: 14 }}>{pos.symbol}</div></td>
+                        <td>
+                          <div className="symbol-main" style={{ fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center' }}>
+                            {pos.symbol}
+                            {divBreakeven && (
+                              <span
+                                className="div-breakeven-badge"
+                                title={`Dividends collected (${formatCurrency(pos.dividends, pos.currency)}) have covered your total cost (${formatCurrency(pos.totalCost, pos.currency)}). This position is now paying you for free.`}
+                              >
+                                <span className="badge-icon">🎯</span>Div B/E
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td><div className="product-cell">{pos.productName || '-'}</div></td>
                         <td className="value-cell">{formatQuantity(pos.quantity)}</td>
                         <td className="value-cell">{formatCurrency(pos.averagePrice, pos.currency, 4)}</td>
@@ -282,7 +296,7 @@ export default function WatchlistPage() {
                         </td>
                         <td className="value-cell">{formatCurrency(pos.totalCost, pos.currency)}</td>
                         <td className="value-cell">{pos.currentValue !== null ? formatCurrency(pos.currentValue, pos.currency) : '-'}</td>
-                        <td className="pl-cell">
+                        <td className={`pl-cell ${tierClass}`}>
                           <div className={`pl-value ${plClass}`}>
                             <span className="pl-amount">{pos.pl !== null ? formatCurrency(pos.pl, pos.currency) : '-'}</span>
                             {pos.plPct !== null && (

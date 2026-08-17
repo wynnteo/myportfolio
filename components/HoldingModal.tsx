@@ -68,6 +68,25 @@ export function getHoldingKey(symbol: string, broker: string) {
   return `${broker || 'Unknown'}__${symbol}`;
 }
 
+// P/L tier for background highlighting: deeper color = bigger swing.
+// >20% dark green · >10% green · >0% light green, mirrored for losses.
+export function getPLTierClass(plPct: number | null): string {
+  if (plPct === null || plPct === 0) return '';
+  if (plPct > 0) {
+    if (plPct > 20) return 'tier-gain-high';
+    if (plPct > 10) return 'tier-gain-mid';
+    return 'tier-gain-low';
+  }
+  if (plPct < -20) return 'tier-loss-high';
+  if (plPct < -10) return 'tier-loss-mid';
+  return 'tier-loss-low';
+}
+
+// True once lifetime dividends collected on a position cover its total cost basis.
+export function isDividendBreakeven(row: Pick<HoldingRow, 'dividends' | 'totalCost'>): boolean {
+  return row.totalCost > 0 && row.dividends >= row.totalCost;
+}
+
 // ─── Holdings Modal ───────────────────────────────────────────────────────────
 
 export function HoldingModal({ holding, transactions, onClose, onReload }: {
