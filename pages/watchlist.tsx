@@ -167,7 +167,10 @@ export default function WatchlistPage() {
     const totalMarketValue = sortedPositions.reduce((s, p) => s + (p.currentValue ?? 0), 0);
     const totalPL = totalMarketValue - totalCost;
     const totalPLPct = totalCost !== 0 ? (totalPL / totalCost) * 100 : 0;
-    return { totalCost, totalMarketValue, totalPL, totalPLPct };
+    // Sum only the winners (green) and only the losers (red) separately.
+    const totalProfit = sortedPositions.reduce((s, p) => s + (p.pl !== null && p.pl > 0 ? p.pl : 0), 0);
+    const totalLoss = sortedPositions.reduce((s, p) => s + (p.pl !== null && p.pl < 0 ? p.pl : 0), 0);
+    return { totalCost, totalMarketValue, totalPL, totalPLPct, totalProfit, totalLoss };
   }, [sortedPositions]);
 
   if (authLoading || loading) {
@@ -219,6 +222,20 @@ export default function WatchlistPage() {
             <div className="stat-title">Market Value</div>
             <div className="stat-value">{formatCurrency(totals.totalMarketValue)}</div>
             <div className="stat-sub">Live prices from Yahoo Finance</div>
+          </div>
+          <div className="summary-card profit">
+            <div className="stat-title">Total Profit</div>
+            <div className="stat-value">{formatCurrency(totals.totalProfit)}</div>
+            <div className="stat-sub">
+              {sortedPositions.filter(p => p.pl !== null && p.pl > 0).length} winning position(s)
+            </div>
+          </div>
+          <div className="summary-card loss">
+            <div className="stat-title">Total Loss</div>
+            <div className="stat-value">{formatCurrency(totals.totalLoss)}</div>
+            <div className="stat-sub">
+              {sortedPositions.filter(p => p.pl !== null && p.pl < 0).length} losing position(s)
+            </div>
           </div>
           <div className={`summary-card ${totals.totalPL > 0 ? 'profit' : totals.totalPL < 0 ? 'loss' : ''}`}>
             <div className="stat-title">Total P/L</div>
